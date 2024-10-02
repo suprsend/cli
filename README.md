@@ -21,7 +21,7 @@ Pre-compiled binaries for various platforms are available on the [Releases page]
 
 To build SuprSend CLI from source, follow these steps:
 
-1. Ensure you have Go installed on your system (version 1.16 or later).
+1. Ensure you have Go installed on your system (version 1.20 or later).
 2. Clone the repository:
     
     ```bash

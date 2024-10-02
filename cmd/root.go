@@ -82,7 +82,7 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
-	rootCmd.PersistentFlags().StringVarP(&outputType, "output", "o", "table", "Output Tyle (table, text, yaml, json)")
+	rootCmd.PersistentFlags().StringVarP(&outputType, "output", "o", "pretty", "Output Tyle (pretty, yaml, json)")
 	rootCmd.PersistentFlags().StringVarP(&verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 }
 

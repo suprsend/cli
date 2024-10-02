@@ -18,8 +18,6 @@ func OutputData(data interface{}, format string) {
 		outputJSON(data)
 	case "yaml":
 		outputYAML(data)
-	case "table":
-		outputTable(data)
 	default:
 		outputTable(data)
 	}

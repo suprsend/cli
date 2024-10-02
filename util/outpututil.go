@@ -46,16 +46,29 @@ func outputYAML(data interface{}) {
 }
 
 // outputText prints data in plain text format
-func outputText(data interface{}) {
-	fmt.Printf("Data: %v\n", data)
-}
+// func outputText(data interface{}) {
+// 	fmt.Printf("Data: %v\n", data)
+// }
 
 // FetchData simulates data retrieval
 func FetchData() interface{} {
 	return map[string]string{"key": "value"}
 }
 
-// OutputTable prints the data in tabular format to the CLI. It handles both single structs and slices of structs.
+/*
+outputTable prints a slice of structs or a single struct as a formatted table to the standard output.
+It uses reflection to dynamically handle the struct fields and their values.
+
+Parameters:
+  - data: An interface{} that can be either a single struct or a slice of structs.
+
+The function sets up a tab writer to format the output in a tabular form. It first checks if the input
+is a slice; if not, it converts a single struct into a slice of one element. It then prints the struct
+field names as the table headers and iterates over the slice to print each struct's field values as rows.
+
+Note: The function assumes that the input is either a struct or a slice of structs. If the input is not
+a struct or a slice of structs, it will print an error message and return.
+*/
 func outputTable(data interface{}) {
 	// Set up the tab writer
 	writer := tabwriter.NewWriter(os.Stdout, 10, 10, 2, ' ', 0)

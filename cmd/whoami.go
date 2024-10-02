@@ -14,13 +14,8 @@ import (
 // whoamiCmd represents the whoami command
 var whoamiCmd = &cobra.Command{
 	Use:   "whoami",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "who am i brief summary",
+	Long:  `A longer description of whoami command`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mkey := viper.GetString("management_key")
 		log.Debug("SuprSend Key: ", mkey)

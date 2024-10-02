@@ -17,6 +17,32 @@ brew install suprsend
 
 Pre-compiled binaries for various platforms are available on the [Releases page](https://github.com/suprsend/cli/releases).
 
+### Building from Source
+
+To build SuprSend CLI from source, follow these steps:
+
+1. Ensure you have Go installed on your system (version 1.16 or later).
+2. Clone the repository:
+    
+    ```bash
+    git clone https://github.com/suprsend/suprsend-cli.git
+    cd suprsend-cli
+    ```
+    
+3. Build the binary:
+    
+    ```bash
+    go build -o suprsend
+    ```
+    
+4. The binary will be created in the current directory. You can move it to a location in your PATH for easy access:
+    
+    ```bash
+    sudo mv suprsend /usr/local/bin/
+    ```
+    
+Now you can use the `suprsend` command from anywhere in your terminal.
+
 ## Usage
 
 After installation, you can use the CLI by running the `suprsend` command. For example:

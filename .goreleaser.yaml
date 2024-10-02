@@ -60,7 +60,7 @@ changelog:
       - "^test:"
 
 brews:
-  - name: gophersay
+  - name: suprsend
     homepage: https://github.com/suprsend/homebrew-tap
     commit_author:
       name: suprsend_bot

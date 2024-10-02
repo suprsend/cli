@@ -58,3 +58,16 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+brews:
+  - name: gophersay
+    homepage: https://github.com/suprsend/homebrew-tap
+    commit_author:
+      name: suprsend_bot
+      email: bot@suprsend.com
+    repository:
+      owner: suprsend
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+      git:
+        url: https://github.com/suprsend/homebrew-tap.git

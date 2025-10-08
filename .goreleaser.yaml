@@ -3,7 +3,10 @@ version: 2
 project_name: suprsend
 report_sizes: true
 universal_binaries:
-  - replace: true
+  - replace: true # remove the single-arch darwin binaries from artifacts
+    # name_template: "{{ .ProjectName }}"  # optional, customize the output name
+    hooks:
+      post: cosign sign-blob --key "{{ .Env.KEY_URI }}" --bundle "{{ .Path }}.cosign.bundle" "{{ .Path }}" --yes
 
 before:
   hooks:
@@ -71,6 +74,10 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+release:
+  ids: [tarballs]
+  draft: true
 
 homebrew_casks:
   - name: suprsend
@@ -151,3 +158,29 @@ notarize:
         #
         # Default: 10m.
         timeout: 20m
+
+binary_signs:
+  - id: cosign-kms-bundle
+    # Put the bundle right next to the artifact:
+    signature: "${artifact}.cosign.bundle"
+    cmd: cosign
+    args:
+      - sign-blob
+      - "--key={{ .Env.KEY_URI }}" # e.g. awskms:///alias/suprsend-release
+      - "--bundle" # cosign v3 requires bundle OR (sig+cert)
+      - "${signature}" # writes the bundle here
+      - "${artifact}" # the binary to sign
+      - "--yes"
+    artifacts: binary
+signs:
+  - id: checksums-cosign-kms
+    signature: "${artifact}.cosign.bundle"
+    cmd: cosign
+    args:
+      - sign-blob
+      - "--key={{ .Env.KEY_URI }}"
+      - "--bundle"
+      - "${signature}" # bundle for the checksum artifact
+      - "${artifact}" # usually the checksums.txt produced by GoReleaser
+      - "--yes"
+    artifacts: checksum

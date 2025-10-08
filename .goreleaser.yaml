@@ -163,7 +163,7 @@ notarize:
 binary_signs:
   - id: cosign-kms-bundle
     # Put the bundle right next to the artifact:
-    signature: "${artifact}.cosign.bundle"
+    signature: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}.cosign.bundle'
     cmd: cosign
     args:
       - sign-blob

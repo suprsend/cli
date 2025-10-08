@@ -78,7 +78,7 @@ changelog:
 release:
   ids: [tarballs]
   extra_files:
-    - glob: "dist/**/*.cosign.bundle"
+    - glob: "dist/*.cosign.bundle"
 
 homebrew_casks:
   - name: suprsend

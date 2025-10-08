@@ -16,10 +16,10 @@ var schemaCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit schema from draft to live",
 	Long:  `Commit schema from draft to live in a workspace. Example: suprsend schema commit <slug>`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Error("Schema slug argument is required. Example: suprsend schema commit <slug>")
-			return
+			return fmt.Errorf("Schema slug argument is required. Example: suprsend schema commit <slug>")
 		}
 		slug := args[0]
 
@@ -40,7 +40,7 @@ var schemaCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeSchema(workspace, slug, urlEncodedCommitMessage)
 		if err != nil {
 			log.Error(err.Error())
-			return
+			return err
 		}
 
 		if p != nil {
@@ -48,6 +48,7 @@ var schemaCommitCmd = &cobra.Command{
 		} else {
 			fmt.Fprintf(os.Stdout, "Successfully committed schema '%s' to live mode\n", slug)
 		}
+		return nil
 	},
 }
 

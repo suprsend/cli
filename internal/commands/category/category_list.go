@@ -23,7 +23,7 @@ var categoryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List categories",
 	Long:  "List preferences categories in a workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 
@@ -41,7 +41,7 @@ var categoryListCmd = &cobra.Command{
 		categories, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
-			return
+			return err
 		}
 		outputType, _ := cmd.Flags().GetString("output")
 
@@ -66,10 +66,11 @@ var categoryListCmd = &cobra.Command{
 
 		if len(tableRows) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)
-			return
+			return nil
 		}
 
 		utils.OutputData(tableRows, outputType)
+		return nil
 	},
 }
 

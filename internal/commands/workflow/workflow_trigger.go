@@ -16,10 +16,10 @@ var workflowTrigger = &cobra.Command{
 	Use:   "trigger",
 	Short: "Trigger a specific workflow",
 	Long:  "Trigger a specific workflow by passing a slug",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Error("Workflow slug argument is required. Example: suprsend workflow trigger <slug>")
-			return
+			return fmt.Errorf("Workflow slug argument is required. Example: suprsend workflow trigger <slug>")
 		}
 		slug := args[0]
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -28,7 +28,7 @@ var workflowTrigger = &cobra.Command{
 		path, _ := cmd.Flags().GetString("path")
 		if err != nil {
 			log.WithError(err).Error("Error getting workspace client")
-			return
+			return err
 		}
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -40,13 +40,13 @@ var workflowTrigger = &cobra.Command{
 		wfRequestBody, err := os.ReadFile(path)
 		if err != nil {
 			log.WithError(err).Error("Error reading workflow file")
-			return
+			return err
 		}
 		wfRequestBodyMap := make(map[string]any)
 		err = json.Unmarshal(wfRequestBody, &wfRequestBodyMap)
 		if err != nil {
 			log.WithError(err).Error("Error unmarshalling workflow file")
-			return
+			return err
 		}
 
 		wf := &suprsend.WorkflowTriggerRequest{
@@ -56,13 +56,14 @@ var workflowTrigger = &cobra.Command{
 		_, err = wsClient.Workflows.Trigger(wf)
 		if err != nil {
 			log.WithError(err).Error("Error triggering workflow")
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully triggered workflow '%s'", slug))
 		} else {
 			fmt.Fprintf(os.Stdout, "Successfully triggered workflow '%s'", slug)
 		}
+		return nil
 	},
 }
 

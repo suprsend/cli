@@ -14,7 +14,7 @@ import (
 var eventPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull events from workspace to local directory",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		dirPath, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
@@ -29,7 +29,7 @@ var eventPullCmd = &cobra.Command{
 			}
 			if dirPath == "" {
 				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting \n")
-				return
+				return nil
 			}
 		}
 		var p *pin.Pin
@@ -46,7 +46,7 @@ var eventPullCmd = &cobra.Command{
 		eventsResp, err := mgmntClient.GetEvents(workspace)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to get events: %v\n", err)
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Pulled %d events", len(eventsResp.Results)))
@@ -55,8 +55,9 @@ var eventPullCmd = &cobra.Command{
 		_, err = WriteEventsToFiles(eventsResp, dirPath)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to save events: %v\n", err)
-			return
+			return err
 		}
+		return nil
 	},
 }
 

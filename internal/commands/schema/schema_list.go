@@ -14,7 +14,7 @@ var schemaListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List schemas",
 	Long:  `List schemas in a workspace`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
@@ -34,7 +34,7 @@ var schemaListCmd = &cobra.Command{
 		schemas, err := mgmntClient.ListSchema(workspace, limit, offset, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Listed %d schemas from %s with offset %d", len(schemas.Results), workspace, offset))
@@ -43,10 +43,11 @@ var schemaListCmd = &cobra.Command{
 		outputType, _ := cmd.Flags().GetString("output")
 		if len(schemas.Results) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)
-			return
+			return nil
 		}
 		filteredSchemas := filterSchemaData(schemas.Results)
 		utils.OutputData(filteredSchemas, outputType)
+		return nil
 	},
 }
 

@@ -12,10 +12,10 @@ var workflowDisableCmd = &cobra.Command{
 	Use:   "disable",
 	Short: "Disable a workflow",
 	Long:  "Disable a workflow to deactivate. Example: suprsend workflow disable <slug>",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Error("workflow_slug is required.")
-			return
+			return fmt.Errorf("workflow_slug is required.")
 		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 
@@ -26,10 +26,11 @@ var workflowDisableCmd = &cobra.Command{
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, false)
 		if err != nil {
 			log.Error(err.Error())
-			return
+			return err
 		}
 
 		fmt.Printf("Disabled workflow: %s\n", slug)
+		return nil
 	},
 }
 

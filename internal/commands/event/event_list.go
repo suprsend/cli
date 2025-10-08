@@ -14,7 +14,7 @@ var eventListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List events",
 	Long:  "List all events",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
 			p = pin.New("Loading...",
@@ -31,7 +31,7 @@ var eventListCmd = &cobra.Command{
 		events, err := mgmntClient.ListEvents(workspace, limit, offset)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch events")
-			return
+			return err
 		}
 
 		if p != nil {
@@ -39,6 +39,7 @@ var eventListCmd = &cobra.Command{
 		}
 		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(events.Results, outputType)
+		return nil
 	},
 }
 

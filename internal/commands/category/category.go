@@ -6,6 +6,10 @@ var CategoryCmd = &cobra.Command{
 	Use:   "category",
 	Short: "Manage preference categories",
 	Long:  "Manage preference categories",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.Help()
+		return nil
+	},
 }
 
 func init() {

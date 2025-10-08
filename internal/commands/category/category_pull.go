@@ -16,7 +16,7 @@ var categoryPullCmd = &cobra.Command{
 	Use:   "pull",
 	Long:  "Pull categories from a workspace",
 	Short: "Pull categories from a workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -32,12 +32,12 @@ var categoryPullCmd = &cobra.Command{
 			}
 			if outputDir == "" {
 				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
-				return
+				return nil
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
 			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
-			return
+			return err
 		}
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -53,7 +53,7 @@ var categoryPullCmd = &cobra.Command{
 		categories, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
-			return
+			return err
 		}
 		filePath := filepath.Join(outputDir, "categories_preferences.json")
 		if p != nil {
@@ -62,8 +62,9 @@ var categoryPullCmd = &cobra.Command{
 		err = WriteToFileWithPath(categories, filePath)
 		if err != nil {
 			log.WithError(err).Error("Couldn't write categories to file")
-			return
+			return err
 		}
+		return nil
 	},
 }
 

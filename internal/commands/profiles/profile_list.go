@@ -13,16 +13,16 @@ var listProfilesCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all profiles",
 	Long:  "List all profiles from the config",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return
+			return err
 		}
 		cfg, _, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err)
-			return
+			return err
 		}
 
 		var names []string
@@ -33,7 +33,7 @@ var listProfilesCmd = &cobra.Command{
 
 		if len(names) == 0 {
 			log.Info("No profiles found. Use 'suprsend profiles add' to add a profile")
-			return
+			return err
 		}
 
 		outputType, _ := cmd.Flags().GetString("output")
@@ -100,6 +100,7 @@ var listProfilesCmd = &cobra.Command{
 
 			utils.OutputData(profileData, outputType)
 		}
+		return nil
 	},
 }
 

@@ -22,13 +22,13 @@ var profilesAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a new profile",
 	Long:  "Add a new profile to the configs",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load or create config")
-			return
+			return err
 		}
 
 		if addName != "" && addServiceToken != "" {
@@ -48,13 +48,14 @@ var profilesAddCmd = &cobra.Command{
 			err := SaveConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
-				return
+				return err
 			}
 
 			log.Infof("Profile %s added successfully", addName)
 		} else {
 			runAddInteractive(cfg, path)
 		}
+		return nil
 	},
 }
 

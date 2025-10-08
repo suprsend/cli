@@ -6,7 +6,8 @@ var SchemaCmd = &cobra.Command{
 	Use:   "schema",
 	Short: "Manage trigger payload schemas",
 	Long:  `Manage trigger payload schemas`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Help()
+		return nil
 	},
 }

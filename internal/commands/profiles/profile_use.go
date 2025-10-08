@@ -17,40 +17,41 @@ var (
 var profileUseCmd = &cobra.Command{
 	Use:   "use",
 	Short: "Set the active profile",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return
+			return err
 		}
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
-			return
+			return err
 		}
 
 		if useName == "" {
 			useName = promptForProfileToUse(cfg)
 			if useName == "" {
 				log.Error("No profile name provided")
-				return
+				return err
 			}
 		}
 
 		if _, exists := cfg.Profiles[useName]; !exists {
 			log.Infof("Profile %q does not exist. Use the command 'suprsend profiles list' to see all profiles.", useName)
-			return
+			return err
 		}
 
 		cfg.ActiveProfile = useName
 
 		if err := SaveConfig(cfg, path); err != nil {
 			log.WithError(err).Error("Failed to save config")
-			return
+			return err
 		}
 
 		log.Infof("Active profile set to %q.", useName)
+		return nil
 	},
 }
 

@@ -65,6 +65,9 @@ var startMcpServerCmd = &cobra.Command{
 	Long: `Start SuprSend MCP server.
 This server will handle all the requests from user about SuprSend capabilities and data.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if cmd.Name() == "list-tools" {
+			return
+		}
 		conf := config.Cfg
 		workspace := conf.Workspace
 		serviceToken := getServiceTokenWithPriority()
@@ -172,4 +175,7 @@ func init() {
 	startMcpServerCmd.PersistentFlags().StringVarP(&tools, "tools", "T", "all", "The types of tools to use. Can be either 'all'/'none' or comma separated list of tool names.")
 	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "The types of events to use. Can be either 'all'/'none' or comma separated list of event slugs.")
 	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "The types of workflows to use. Can be either 'all'/'none' or comma separated list of workflow slugs.")
+	startMcpServerCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
+
+	viper.BindPFlag("service_token", startMcpServerCmd.PersistentFlags().Lookup("service-token"))
 }

@@ -76,14 +76,26 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 			currentLimit = remainingLimit
 		}
 
-		url := fmt.Sprintf("%sv1/%s/schema/?limit=%d&offset=%d&mode=%s", c.mgmnt_base_URL, workspace, currentLimit, currentOffset, mode)
-
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", "/")
+		if err != nil {
+			return nil, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(currentLimit))
+		q.Add("offset", strconv.Itoa(currentOffset))
+		q.Add("mode", mode)
+		u.RawQuery = q.Encode()
+		urlStr = u.String()
 		resp, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetHeader("Content-Type", "application/json").
 			SetResult(&ListSchemaResponse{}).
-			Get(url)
+			Get(urlStr)
 		if err != nil {
 			return nil, fmt.Errorf("request failed: %w", err)
 		}
@@ -124,13 +136,23 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*SchemaResponse, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
-	url := fmt.Sprintf("%sv1/%s/schema/%s/?version=%s", c.mgmnt_base_URL, workspace, slug, version)
-
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "/")
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("version", version)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	res, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&SchemaResponse{}).
-		Get(url)
+		Get(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %s", err.Error())
 	}
@@ -154,13 +176,23 @@ func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[str
 	}
 	client := client.NewHTTPClient()
 	defer client.Close()
-	url := fmt.Sprintf("%sv1/%s/schema/%s/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
-
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "/")
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("mode", mode)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&map[string]any{}).
-		Get(url)
+		Get(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
@@ -189,11 +221,25 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 	totalCount := 0
 
 	for {
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", "/")
+		if err != nil {
+			return nil, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
+		q.Add("mode", mode)
+		u.RawQuery = q.Encode()
+		urlStr = u.String()
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&SchemasResponse{}).
-			Get(c.mgmnt_base_URL + "v1/" + workspace + "/schema/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
+			Get(urlStr)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
 			return nil, err
@@ -235,14 +281,26 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 	client := client.NewHTTPClient()
 	defer client.Close()
 	encodedCommitMessage := url.QueryEscape(commitMessage)
-	url := fmt.Sprintf("%sv1/%s/schema/%s/?commit=%s&commit_message=%s", c.mgmnt_base_URL, workspace, schemaSlug, commit, encodedCommitMessage)
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", schemaSlug, "/")
+	if err != nil {
+		return fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("commit", commit)
+	q.Add("commit_message", encodedCommitMessage)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
 		SetBody(payload).
-		Post(url)
+		Post(urlStr)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
@@ -264,8 +322,18 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 	defer client.Close()
 
 	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
-	urlStr := fmt.Sprintf("%sv1/%s/schema/%s/commit/?commit_message=%s", c.mgmnt_base_URL, workspace, slug, urlEncodedCommitMessage)
-
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "commit", "/")
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("commit_message", urlEncodedCommitMessage)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	res, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).

@@ -3,6 +3,7 @@ package mgmnt
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -39,13 +40,25 @@ func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListE
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	url := c.mgmnt_base_URL + "v1/" + workspace + "/event/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset)
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("limit", strconv.Itoa(limit))
+	q.Add("offset", strconv.Itoa(offset))
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	log.Debugf("Getting Events for workspace: %s", workspace)
 	res, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&ListEventsResponse{}).
-		Get(url)
+		Get(urlStr)
 	if err != nil {
 		log.Errorf("Error getting events: %s", err)
 		return nil, err
@@ -68,11 +81,25 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 	totalCount := 0
 
 	for {
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
+		if err != nil {
+			return nil, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
+		q.Add("has_linked_schema", "true")
+		u.RawQuery = q.Encode()
+		urlStr = u.String()
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&EventsResponse{}).
-			Get(c.mgmnt_base_URL + "v1/" + workspace + "/event/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&has_linked_schema=true")
+			Get(urlStr)
 		if err != nil {
 			log.Errorf("Error getting events: %s", err)
 			return nil, err
@@ -107,14 +134,22 @@ func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
 		return err
 	}
 
-	url := c.mgmnt_base_URL + "v1/" + workspace + "/bulk/event/"
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "bulk", "event", "/")
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	urlStr = u.String()
 	log.Debugf("Pushing events to workspace: %s", workspace)
 	res, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
 		SetBody(events).
-		Post(url)
+		Post(urlStr)
 	if err != nil {
 		log.Errorf("Error pushing event: %s", err)
 		return err

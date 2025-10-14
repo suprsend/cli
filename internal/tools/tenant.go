@@ -233,7 +233,7 @@ func newTenantTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
+				mcp.Description(`SuprSend workspace to get the tenant from.`),
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -251,7 +251,7 @@ func newTenantTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
+				mcp.Description(`SuprSend workspace to get the tenant from.`),
 				mcp.Required(),
 			),
 			mcp.WithObject("tenant_properties",
@@ -263,25 +263,25 @@ func newTenantTools() []*Tool {
 		Handler: upsertTenantHandler,
 	}
 
-	update_suprsend_category_preference_tenant := &Tool{
+	update_tenant_default_preference := &Tool{
 		Name:        "tenants.update_preferences",
 		Description: "Enables updating category preference for a tenant",
-		MCPTool: mcp.NewTool("update_suprsend_category_preference_tenant",
-			mcp.WithDescription("Use this tool to update a category preference for a tenant."),
+		MCPTool: mcp.NewTool("update_suprsend_tenant_default_preference",
+			mcp.WithDescription("Use this tool to update default preference for a tenant."),
 			mcp.WithString("tenant_id",
 				mcp.Description("The tenant_id of the tenant to update."),
 				mcp.Required(),
 			),
 			mcp.WithString("category",
-				mcp.Description("category_slug of an category to get."),
+				mcp.Description("category_slug of an category to update."),
 				mcp.Required(),
 			),
 			mcp.WithObject("payload",
-				mcp.Description("The properties to upsert for the tenant."),
+				mcp.Description("The properties to update for the tenant."),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
+				mcp.Description(`SuprSend workspace to update the tenant from.`),
 				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
@@ -299,7 +299,7 @@ func newTenantTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
+				mcp.Description(`SuprSend workspace to get the tenant from.`),
 				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
@@ -307,7 +307,7 @@ func newTenantTools() []*Tool {
 		Handler: getCategoryPreferenceTenant,
 	}
 
-	return []*Tool{get_suprsend_tenant, upsert_suprsend_tenant, update_suprsend_category_preference_tenant, get_suprsend_categories_preference_tenant}
+	return []*Tool{get_suprsend_tenant, upsert_suprsend_tenant, update_tenant_default_preference, get_suprsend_categories_preference_tenant}
 }
 
 func init() {

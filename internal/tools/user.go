@@ -129,16 +129,13 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 }
 
 func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.GetArguments()
-
-	rawPayload, ok := args["payload"].(map[string]any)
+	rawPayload, ok := request.GetArguments()["payload"].(map[string]any)
 	if !ok {
 		return mcp.NewToolResultError("payload must be an object"), nil
 	}
-
-	distinctIds, ok := rawPayload["distinct_id"].([]string)
+	distinctIds, ok := rawPayload["distinct_ids"].([]string)
 	if !ok {
-		return mcp.NewToolResultError("distinct_id must be an array"), nil
+		return mcp.NewToolResultError("distinct_ids must be an array"), nil
 	}
 
 	channelPreferences, ok := rawPayload["channel_preferences"].([]*suprsend.UserGlobalChannelPreference)
@@ -277,15 +274,11 @@ func newUserTools() []*Tool {
 		Handler: getUserPreferencesHandler,
 	}
 
-	update_suprsend_category_preference_user := &Tool{
+	update_suprsend_users_preferences := &Tool{
 		Name:        "user.update_preferences",
 		Description: "Enables updating preferences for users, controlling notification preferences and channel opt-outs.",
-		MCPTool: mcp.NewTool("update_suprsend_category_preference_user",
+		MCPTool: mcp.NewTool("update_suprsend_users_preferences",
 			mcp.WithDescription("Use this tool to update preferences for users, controlling notification preferences and channel opt-outs."),
-			mcp.WithArray("distinct_id",
-				mcp.Description("The distinct_id of the user to update."),
-				mcp.Required(),
-			),
 			mcp.WithObject("payload",
 				mcp.Description("The preferences to update for the users."),
 				mcp.Required(),
@@ -299,7 +292,7 @@ func newUserTools() []*Tool {
 		Handler: updateUserPreference,
 	}
 
-	return []*Tool{get_suprsend_user, upsert_suprsend_user, get_suprsend_user_preferences, update_suprsend_category_preference_user}
+	return []*Tool{get_suprsend_user, upsert_suprsend_user, get_suprsend_user_preferences, update_suprsend_users_preferences}
 }
 
 func init() {

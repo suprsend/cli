@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -94,7 +95,12 @@ func (c *SS_MgmntClient) GetWorkspaceKeyAndSecret(workspace string) (string, str
 	client := &http.Client{}
 
 	// Create a new GET request
-	req, err := http.NewRequest("GET", c.hub_base_URL+"/v1/"+workspace+"/ws_key/bridge/", nil)
+	urlStr, err := url.JoinPath(c.hub_base_URL, "v1", workspace, "ws_key", "bridge", "/")
+	if err != nil {
+		log.Info("Error creating request: ", err)
+		return "", "", err
+	}
+	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		log.Info("Error creating request: ", err)
 		return "", "", err

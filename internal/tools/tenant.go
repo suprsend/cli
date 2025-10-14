@@ -69,7 +69,7 @@ func upsertTenantHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	tenant_payload := &suprsend.Tenant{
 		TenantName:             utils.GetStringPtr(tenant_properties, "tenant_name"),
-		Logo:                   utils.GetStringPtr(tenant_properties, "tenant_logo_ptr"),
+		Logo:                   utils.GetStringPtr(tenant_properties, "logo"),
 		Timezone:               utils.GetStringPtr(tenant_properties, "timezone"),
 		PrimaryColor:           utils.GetStringPtr(tenant_properties, "primary_color"),
 		SecondaryColor:         utils.GetStringPtr(tenant_properties, "secondary_color"),

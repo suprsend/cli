@@ -128,17 +128,7 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 	return mcp.NewToolResultText(string(yamluser)), nil
 }
 
-func updateUserCategoryPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	distinctId, err := request.RequireString("distinct_id")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
-	category, err := request.RequireString("category")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
+func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.GetArguments()
 
 	rawPayload, ok := args["payload"].(map[string]any)
@@ -146,32 +136,25 @@ func updateUserCategoryPreference(ctx context.Context, request mcp.CallToolReque
 		return mcp.NewToolResultError("payload must be an object"), nil
 	}
 
-	pref, ok := rawPayload["preference"].(string)
+	distinctIds, ok := rawPayload["distinct_id"].([]string)
 	if !ok {
-		return mcp.NewToolResultError("preference must be a string"), nil
+		return mcp.NewToolResultError("distinct_id must be an array"), nil
 	}
 
-	optOutAny, ok := rawPayload["opt_out_channels"]
+	channelPreferences, ok := rawPayload["channel_preferences"].([]*suprsend.UserGlobalChannelPreference)
 	if !ok {
-		optOutAny = []any{}
-	}
-	optOutSlice, ok := optOutAny.([]any)
-	if !ok {
-		return mcp.NewToolResultError("opt_out_channels must be an array"), nil
+		return mcp.NewToolResultError("channel_preferences must be an array"), nil
 	}
 
-	optOutChannels := make([]string, 0, len(optOutSlice))
-	for _, v := range optOutSlice {
-		s, ok := v.(string)
-		if !ok {
-			return mcp.NewToolResultError("opt_out_channels must be an array of strings"), nil
-		}
-		optOutChannels = append(optOutChannels, s)
+	categories, ok := rawPayload["categories"].([]*suprsend.UserCategoryPreferenceIn)
+	if !ok {
+		return mcp.NewToolResultError("categories must be an array"), nil
 	}
 
-	prefPayload := suprsend.UserUpdateCategoryPreferenceBody{
-		Preference:     pref,
-		OptOutChannels: optOutChannels,
+	prefPayload := suprsend.UserBulkPreferenceUpdateBody{
+		DistinctIDs:        distinctIds,
+		ChannelPreferences: channelPreferences,
+		Categories:         categories,
 	}
 
 	workspace, err := request.RequireString("workspace")
@@ -184,7 +167,7 @@ func updateUserCategoryPreference(ctx context.Context, request mcp.CallToolReque
 		return nil, err
 	}
 
-	userPref, err := suprsendClient.Users.UpdateCategoryPreference(ctx, distinctId, category, prefPayload, nil)
+	userPref, err := suprsendClient.Users.BulkUpdatePreferences(ctx, prefPayload, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -283,6 +266,7 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of a category to get."),
+				mcp.Required(),
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
@@ -295,19 +279,15 @@ func newUserTools() []*Tool {
 
 	update_suprsend_category_preference_user := &Tool{
 		Name:        "user.update_preferences",
-		Description: "Enables updating a specific category preference for an user",
+		Description: "Enables updating preferences for users, controlling notification preferences and channel opt-outs.",
 		MCPTool: mcp.NewTool("update_suprsend_category_preference_user",
-			mcp.WithDescription("Use this tool to update a specific category preference for an user"),
-			mcp.WithString("distinct_id",
+			mcp.WithDescription("Use this tool to update preferences for users, controlling notification preferences and channel opt-outs."),
+			mcp.WithArray("distinct_id",
 				mcp.Description("The distinct_id of the user to update."),
 				mcp.Required(),
 			),
-			mcp.WithString("category",
-				mcp.Description("category_slug of an category to get."),
-				mcp.Required(),
-			),
 			mcp.WithObject("payload",
-				mcp.Description("Payload of an category to update a category preference for an user."),
+				mcp.Description("The preferences to update for the users."),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
@@ -316,7 +296,7 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
-		Handler: updateUserCategoryPreference,
+		Handler: updateUserPreference,
 	}
 
 	return []*Tool{get_suprsend_user, upsert_suprsend_user, get_suprsend_user_preferences, update_suprsend_category_preference_user}

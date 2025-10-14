@@ -339,6 +339,7 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of the object to get preferences from"),
+				mcp.Required(),
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),
@@ -350,9 +351,9 @@ func newObjectTools() []*Tool {
 
 	update_suprsend_category_preference_object := &Tool{
 		Name:        "objects.update_preferences",
-		Description: "Enables updating a specific category preference for an object.",
+		Description: "Enables updating a specific category preference for an object, controlling notification preferences and channel opt-outs.",
 		MCPTool: mcp.NewTool("update_suprsend_category_preference_object",
-			mcp.WithDescription("Use this tool to update a specific category preference for an object."),
+			mcp.WithDescription("Use this tool to update a specific category preference for an object, controlling notification preferences and channel opt-outs."),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object to get preferences from."),
 				mcp.Required(),
@@ -406,9 +407,9 @@ func newObjectTools() []*Tool {
 
 	add_suprsend_obj_subscriptions := &Tool{
 		Name:        "object.upsert_subscriptions",
-		Description: "Enables upserting subscription to an object",
+		Description: "Enables upserting subscription to an object. Allows users or other objects to subscribe to an object.",
 		MCPTool: mcp.NewTool("add_suprsend_object_subscriptions",
-			mcp.WithDescription("Use this tool to add subscriptions to an object."),
+			mcp.WithDescription("Use this tool to add subscriptions to an object. Allows users or other objects to subscribe to an object."),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object's subscriptions to get."),
 				mcp.Required(),

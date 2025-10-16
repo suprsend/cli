@@ -10,7 +10,7 @@ You can install SuprSend CLI using Homebrew:
 
 ```bash
 brew tap suprsend/tap
-brew install suprsend
+brew install --cask suprsend
 ```
 
 ### Binary Releases

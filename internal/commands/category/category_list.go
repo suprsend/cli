@@ -47,15 +47,15 @@ var categoryListCmd = &cobra.Command{
 
 		// Create flattened table rows
 		var tableRows []CategoryTableRow
-		for _, category := range categories.Categories {
-			for _, section := range category.Sections {
-				for _, subcategory := range section.Subcategories {
+		for _, rootCategory := range categories.RootCategories {
+			for _, section := range rootCategory.Sections {
+				for _, category := range section.Categories {
 					tableRows = append(tableRows, CategoryTableRow{
-						RootCategory:             category.RootCategory,
+						RootCategory:             rootCategory.RootCategory,
 						Section:                  section.Name,
-						CategoryName:             subcategory.Name,
-						DefaultPreference:        subcategory.DefaultPreference,
-						DefaultMandatoryChannels: strings.Join(subcategory.DefaultMandatoryChannels, ", "),
+						CategoryName:             category.Name,
+						DefaultPreference:        category.DefaultPreference,
+						DefaultMandatoryChannels: strings.Join(category.DefaultMandatoryChannels, ", "),
 					})
 				}
 			}

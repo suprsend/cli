@@ -1,0 +1,12 @@
+{
+  "name": "suprsend",
+  "version": "0.1.1",
+  "mcpServers": {
+    "suprsend": {
+      "command": "${extensionPath}${/}suprsend",
+      "args": [
+        "start-mcp-server"
+      ]
+    }
+  }
+}

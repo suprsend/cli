@@ -11,29 +11,29 @@ import (
 )
 
 type PreferenceCategoryResponse struct {
-	Categories  []Category `json:"categories"`
-	Hash        string     `json:"hash"`
-	VersionNo   int        `json:"version_no"`
-	Status      string     `json:"status"`
-	CommitMsg   string     `json:"commit_message"`
-	CommittedAt time.Time  `json:"committed_at"`
+	RootCategories []RootCategory `json:"root_categories"`
+	Hash           string         `json:"hash"`
+	VersionNo      int            `json:"version_no"`
+	Status         string         `json:"status"`
+	CommitMsg      string         `json:"commit_message"`
+	CommittedAt    time.Time      `json:"committed_at"`
 }
 
-type Category struct {
+type RootCategory struct {
 	RootCategory string    `json:"root_category"`
 	Sections     []Section `json:"sections"`
 }
 
 type Section struct {
-	Name              string        `json:"name"`
-	Description       string        `json:"description"`
-	Tags              []string      `json:"tags"`
-	Subcategories     []Subcategory `json:"subcategories"`
-	MandatoryChannels []string      `json:"mandatory_channels"`
-	DefaultPreference string        `json:"default_preference"`
+	Name              string     `json:"name"`
+	Description       string     `json:"description"`
+	Tags              []string   `json:"tags"`
+	Categories        []Category `json:"categories"`
+	MandatoryChannels []string   `json:"mandatory_channels"`
+	DefaultPreference string     `json:"default_preference"`
 }
 
-type Subcategory struct {
+type Category struct {
 	Category                 string   `json:"category"`
 	Name                     string   `json:"name"`
 	Description              string   `json:"description"`

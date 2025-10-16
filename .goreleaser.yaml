@@ -30,10 +30,27 @@ builds:
       - linux
       - windows
       - darwin
+  - id: gemini-cli-extension
+    env:
+      - CGO_ENABLED=0
+    main: ./cmd/suprsend
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X go.szostok.io/version.version={{.Version}}
+      - -X go.szostok.io/version.buildDate={{.Date}}
 
 archives:
   # existing tar/zip archives
   - id: tarballs
+    ids:
+      - suprsend
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
@@ -45,18 +62,20 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
-
-  # NEW: emit the raw binary as an artifact too
-  - id: raw-binaries
-    formats: binary
-    # keep the same naming scheme so users can recognize platform/arch
+  - id: gemini-cli-extension
+    ids:
+      - gemini-cli-extension
+    formats: tar.gz
+    files:
+      - gemini-extension.json
     name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{ if eq .Os "windows" }}win32
+      {{- else }}{{ .Os }}{{ end }}.
+      {{- if eq .Arch "amd64" }}x64
+      {{- else }}{{ .Arch }}{{ end }}.suprsend
+    format_overrides:
+      - goos: windows
+        formats: zip
 
 checksum:
   name_template: "checksums.txt"

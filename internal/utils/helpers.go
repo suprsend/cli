@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -336,6 +337,9 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 		userInstance.Append(map[string]any{key: value})
 		out = fmt.Sprintf("Key appended successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
 	case "increment":
+		if _, err := strconv.Atoi(value); err != nil {
+			return "", errors.New("value must be an integer")
+		}
 		userInstance.Increment(map[string]any{key: value})
 		out = fmt.Sprintf("Key incremented successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
 	case "add_email":

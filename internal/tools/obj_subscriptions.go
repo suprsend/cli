@@ -20,10 +20,7 @@ func getObjectSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	limit_subscriptions, err := request.RequireInt("limit")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	limit_subscriptions := request.GetInt("limit", 20)
 	cursor_list_api_opts := suprsend.CursorListApiOptions{
 		Limit: limit_subscriptions,
 	}

@@ -210,6 +210,29 @@ func getDefaultPreferenceTenant(ctx context.Context, request mcp.CallToolRequest
 	return mcp.NewToolResultText(string(yamlPref)), nil
 }
 
+func getAllTenantsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	workspace := request.GetString("workspace", "staging")
+	limit := request.GetInt("limit", 100)
+
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	tenants, err := suprsendClient.Tenants.List(ctx, &suprsend.TenantListOptions{
+		Limit: limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	yamlTenants, err := yaml.Marshal(tenants)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(yamlTenants)), nil
+}
+
 func newTenantTools() []*Tool {
 	get_suprsend_tenant := &Tool{
 		Name:        "tenants.get",
@@ -226,6 +249,22 @@ func newTenantTools() []*Tool {
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
 		Handler: getTenantHandler,
+	}
+
+	get_suprsend_tenants := &Tool{
+		Name:        "tenants.get_all",
+		Description: "Enables querying all tenants",
+		MCPTool: mcp.NewTool("get_suprsend_tenants",
+			mcp.WithDescription("Use this tool to get all tenants."),
+			mcp.WithNumber("limit",
+				mcp.Description("Number of tenants to get. Default is 100."),
+			),
+			mcp.WithString("workspace",
+				mcp.Description(`SuprSend workspace to get the tenants from.`),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+		),
+		Handler: getAllTenantsHandler,
 	}
 
 	upsert_suprsend_tenant := &Tool{
@@ -290,8 +329,14 @@ func newTenantTools() []*Tool {
 		),
 		Handler: getDefaultPreferenceTenant,
 	}
-
-	return []*Tool{get_suprsend_tenant, upsert_suprsend_tenant, update_tenant_default_preference, get_tenant_default_preference}
+	tools := []*Tool{
+		get_suprsend_tenant,
+		get_suprsend_tenants,
+		upsert_suprsend_tenant,
+		update_tenant_default_preference,
+		get_tenant_default_preference,
+	}
+	return tools
 }
 
 func init() {

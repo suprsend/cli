@@ -110,11 +110,8 @@ func getObjectPreferences(ctx context.Context, request mcp.CallToolRequest) (*mc
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	category, err := request.RequireString("category")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
+	category := request.GetString("category", "")
+	channel_preferences := request.GetBool("channel_preferences", false)
 	workspace := request.GetString("workspace", "staging")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -134,6 +131,12 @@ func getObjectPreferences(ctx context.Context, request mcp.CallToolRequest) (*mc
 		}
 	} else {
 		objPref, err = suprsendClient.Objects.GetCategoryPreference(ctx, objIdentifier, category, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if channel_preferences {
+		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -323,7 +326,9 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of the object to get preferences from"),
-				mcp.Required(),
+			),
+			mcp.WithBoolean("channel_preferences",
+				mcp.Description("Whether to include channel preferences in the response. Default is false."),
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),
@@ -377,9 +382,11 @@ func newObjectTools() []*Tool {
 			mcp.WithString("workspace",
 				mcp.Description("Suprsend workspace to get the object from."),
 			),
+			mcp.WithBoolean("channel_preferences",
+				mcp.Description("Whether to include channel preferences in the response. Default is false."),
+			),
 			mcp.WithNumber("limit",
 				mcp.Description("Number of subscriptions to get for an object."),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),

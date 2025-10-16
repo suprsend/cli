@@ -98,6 +98,7 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	channelPreferences := request.GetBool("channel_preferences", false)
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return nil, err
@@ -116,6 +117,12 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 		}
 	}
 
+	if channelPreferences {
+		userPref, err = suprsendClient.Users.GetGlobalChannelsPreference(ctx, distinctId, &suprsend.UserGlobalChannelsPreferenceOptions{TenantId: tenantId})
+		if err != nil {
+			return nil, err
+		}
+	}
 	yamluser, err := yaml.Marshal(userPref)
 	if err != nil {
 		return nil, err
@@ -305,6 +312,9 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of a category to get."),
+			),
+			mcp.WithBoolean("channel_preferences",
+				mcp.Description("Whether to include channel preferences in the response. Default is false."),
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),

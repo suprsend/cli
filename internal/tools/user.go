@@ -36,7 +36,7 @@ func getUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 }
 
 func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	distinct_id, err := request.RequireString("distinct_id")
+	distinctId, err := request.RequireString("distinct_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -64,20 +64,20 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	identity_provider := request.GetString("identity_provider", "")
-	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
+	identityProvider := request.GetString("identity_provider", "")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	// todo:make everywhere mcp error is returned
 	if err != nil {
 		return nil, err
 	}
-	userInstance := suprsend_client.Users.GetEditInstance(distinct_id)
+	userInstance := suprsendClient.Users.GetEditInstance(distinctId)
 
-	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, identity_provider, distinct_id, workspace)
+	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, identityProvider, distinctId, workspace)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = suprsend_client.Users.Edit(ctx, suprsend.UserEditRequest{EditInstance: userInstance})
+	_, err = suprsendClient.Users.Edit(ctx, suprsend.UserEditRequest{EditInstance: userInstance})
 	if err != nil {
 		return nil, err
 	}
@@ -85,28 +85,32 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 }
 
 func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	distinct_id, err := request.RequireString("distinct_id")
+	distinctId, err := request.RequireString("distinct_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	workspace := request.GetString("workspace", "staging")
+	tenantId, err := request.RequireString("tenant_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	category, err := request.RequireString("category")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return nil, err
 	}
 
 	var userPref interface{}
 	if category == "" {
-		userPref, err = suprsend_client.Users.GetFullPreference(ctx, distinct_id, nil)
+		userPref, err = suprsendClient.Users.GetFullPreference(ctx, distinctId, &suprsend.UserFullPreferencesOptions{TenantId: tenantId})
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		userPref, err = suprsend_client.Users.GetCategoryPreference(ctx, distinct_id, category, nil)
+		userPref, err = suprsendClient.Users.GetCategoryPreference(ctx, distinctId, category, &suprsend.UserCategoryPreferenceOptions{TenantId: tenantId})
 		if err != nil {
 			return nil, err
 		}
@@ -162,6 +166,56 @@ func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	return mcp.NewToolResultText(string(yamlPref)), nil
+}
+
+func getUserListSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	distinctId, err := request.RequireString("distinct_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit := request.GetInt("limit", 20)
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	userListSubscriptions, err := suprsendClient.Users.GetListsSubscribedTo(ctx, distinctId, &suprsend.CursorListApiOptions{Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+
+	yamlUserListSubscriptions, err := yaml.Marshal(userListSubscriptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(string(yamlUserListSubscriptions)), nil
+}
+
+func getUserObjectsSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	distinctId, err := request.RequireString("distinct_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit := request.GetInt("limit", 20)
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	userObjectsSubscriptions, err := suprsendClient.Users.GetObjectsSubscribedTo(ctx, distinctId, &suprsend.CursorListApiOptions{Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+
+	yamlUserObjectsSubscriptions, err := yaml.Marshal(userObjectsSubscriptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(string(yamlUserObjectsSubscriptions)), nil
 }
 
 func newUserTools() []*Tool {
@@ -246,9 +300,11 @@ func newUserTools() []*Tool {
 				mcp.Description(`The distinct_id of the user to get the preferences for.`),
 				mcp.Required(),
 			),
+			mcp.WithString("tenant_id",
+				mcp.Description("The tenant_id of the tenant to get the preferences for."),
+			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of a category to get."),
-				mcp.Required(),
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
@@ -275,7 +331,55 @@ func newUserTools() []*Tool {
 		Handler: updateUserPreference,
 	}
 
-	return []*Tool{get_suprsend_user, upsert_suprsend_user, get_suprsend_user_preferences, update_suprsend_users_preferences}
+	get_suprsend_user_list_subscriptions := &Tool{
+		Name:        "users.get_list_subscriptions",
+		Description: "Enables querying list subscriptions for a user",
+		MCPTool: mcp.NewTool("get_suprsend_user_list_subscriptions",
+			mcp.WithDescription("Use this tool to query list subscriptions for a user."),
+			mcp.WithString("distinct_id",
+				mcp.Description("The distinct_id of the user to get the list subscriptions for."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to run the query from."),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Number of list subscriptions to get for a user."),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+		),
+		Handler: getUserListSubscriptionsHandler,
+	}
+
+	get_suprsend_user_objects_subscriptions := &Tool{
+		Name:        "users.get_objects_subscriptions",
+		Description: "Enables querying object subscriptions for a user",
+		MCPTool: mcp.NewTool("get_suprsend_user_objects_subscriptions",
+			mcp.WithDescription("Use this tool to query object subscriptions for a user."),
+			mcp.WithString("distinct_id",
+				mcp.Description("The distinct_id of the user to get the object subscriptions for."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to run the query from."),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Number of object subscriptions to get for a user."),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+		),
+		Handler: getUserObjectsSubscriptionsHandler,
+	}
+
+	tools := []*Tool{
+		get_suprsend_user,
+		upsert_suprsend_user,
+		get_suprsend_user_preferences,
+		update_suprsend_users_preferences,
+		get_suprsend_user_list_subscriptions,
+		get_suprsend_user_objects_subscriptions,
+	}
+	return tools
 }
 
 func init() {

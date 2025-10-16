@@ -184,7 +184,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 	return mcp.NewToolResultText(string(yamlPref)), nil
 }
 
-func getCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func getDefaultPreferenceTenant(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tenantId, err := request.RequireString("tenant_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -274,13 +274,13 @@ func newTenantTools() []*Tool {
 		Handler: updateCategoryPreferenceTenant,
 	}
 
-	get_suprsend_categories_preference_tenant := &Tool{
+	get_tenant_default_preference := &Tool{
 		Name:        "tenants.get_preferences",
-		Description: "Enables querying all categories preference for a tenant",
-		MCPTool: mcp.NewTool("get_suprsend_categories_preference_tenant",
-			mcp.WithDescription("Use this tool to query categories for a tenant."),
+		Description: "Enables querying default preference for a tenant",
+		MCPTool: mcp.NewTool("get_tenant_default_preference",
+			mcp.WithDescription("Use this tool to query default preference for a tenant."),
 			mcp.WithString("tenant_id",
-				mcp.Description("The tenant_id of the tenant to update."),
+				mcp.Description("The tenant_id of the tenant to get the default preference from."),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
@@ -288,10 +288,10 @@ func newTenantTools() []*Tool {
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
-		Handler: getCategoryPreferenceTenant,
+		Handler: getDefaultPreferenceTenant,
 	}
 
-	return []*Tool{get_suprsend_tenant, upsert_suprsend_tenant, update_tenant_default_preference, get_suprsend_categories_preference_tenant}
+	return []*Tool{get_suprsend_tenant, upsert_suprsend_tenant, update_tenant_default_preference, get_tenant_default_preference}
 }
 
 func init() {

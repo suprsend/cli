@@ -17,10 +17,7 @@ func getUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -44,10 +41,7 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	action, err := request.RequireString("action")
 	if err != nil {
@@ -95,10 +89,7 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 	category, err := request.RequireString("category")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -154,11 +145,7 @@ func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mc
 		Categories:         categories,
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
+	workspace := request.GetString("workspace", "staging")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return nil, err
@@ -189,7 +176,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
@@ -207,7 +193,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
 			),
 			mcp.WithString("action",
 				mcp.Description(`The action to perform.`),
@@ -267,7 +252,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
@@ -285,7 +269,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to run the query from."),
-				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),

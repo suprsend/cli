@@ -20,11 +20,7 @@ func getObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
+	workspace := request.GetString("workspace", "staging")
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -59,10 +55,7 @@ func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 	action, err := request.RequireString("action")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -122,11 +115,7 @@ func getObjectPreferences(ctx context.Context, request mcp.CallToolRequest) (*mc
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
+	workspace := request.GetString("workspace", "staging")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -214,10 +203,7 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 		OptOutChannels: optOutChannels,
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return nil, err
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -253,7 +239,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("Suprsend workspace to get the object from"),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
@@ -275,7 +260,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("Suprsend workspace to get the object from."),
-				mcp.Required(),
 			),
 			mcp.WithObject("object_payload",
 				mcp.Description("Payload of the request that you want to pass for the object."),
@@ -343,7 +327,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),
-				mcp.Required(),
 			),
 		),
 		Handler: getObjectPreferences,
@@ -372,7 +355,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),
-				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
@@ -394,7 +376,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("Suprsend workspace to get the object from."),
-				mcp.Required(),
 			),
 			mcp.WithNumber("limit",
 				mcp.Description("Number of subscriptions to get for an object."),
@@ -420,7 +401,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description("Suprsend workspace to get the object from."),
-				mcp.Required(),
 			),
 			mcp.WithArray("recipients",
 				mcp.Description("Users & Objects who are subscribing to an object"),
@@ -428,9 +408,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithObject("properties",
 				mcp.Description("Properties of an user/object"),
-			),
-			mcp.WithObject("parent_object_properties",
-				mcp.Description("Parent object properties."),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),

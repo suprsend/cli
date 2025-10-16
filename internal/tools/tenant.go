@@ -16,10 +16,7 @@ func getTenantHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -44,10 +41,7 @@ func upsertTenantHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -170,10 +164,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		BlockedChannels:     blockedChannels,
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -199,10 +190,7 @@ func getCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReques
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -234,7 +222,6 @@ func newTenantTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the tenant from.`),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
@@ -252,7 +239,6 @@ func newTenantTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the tenant from.`),
-				mcp.Required(),
 			),
 			mcp.WithObject("tenant_properties",
 				mcp.Description("The properties to upsert for the tenant."),
@@ -282,7 +268,6 @@ func newTenantTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to update the tenant from.`),
-				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
@@ -300,7 +285,6 @@ func newTenantTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the tenant from.`),
-				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),

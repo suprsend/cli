@@ -226,6 +226,52 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 	return mcp.NewToolResultText(string(yamlPref)), nil
 }
 
+func updateObjectChannelPreferenceHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	objId, err := request.RequireString("object_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	objType, err := request.RequireString("object_type")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	obj := suprsend.ObjectIdentifier{
+		Id:         objId,
+		ObjectType: objType,
+	}
+
+	rawPayload, ok := request.GetArguments()["payload"].(map[string]any)
+	if !ok {
+		return mcp.NewToolResultError("payload must be an object"), nil
+	}
+	channelPreferences, ok := rawPayload["channel_preferences"].([]suprsend.ObjectGlobalChannelPreference)
+	if !ok {
+		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+	}
+
+	prefPayload := suprsend.ObjectGlobalChannelsPreferenceUpdateBody{
+		ChannelPreferences: channelPreferences,
+	}
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	objPref, err := suprsendClient.Objects.UpdateGlobalChannelsPreference(ctx, obj, prefPayload, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	yamlPref, err := yaml.Marshal(objPref)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(string(yamlPref)), nil
+}
+
 func newObjectTools() []*Tool {
 	get_suprsend_object := &Tool{
 		Name:        "objects.get",
@@ -366,6 +412,31 @@ func newObjectTools() []*Tool {
 		Handler: updateObjectCategoryPreference,
 	}
 
+	update_suprsend_object_channel_preference := &Tool{
+		Name:        "objects.update_channel_preference",
+		Description: "Enables updating channel preference for an object",
+		MCPTool: mcp.NewTool("update_suprsend_object_channel_preference",
+			mcp.WithDescription("Use this tool to update channel preference for an object."),
+			mcp.WithString("object_id",
+				mcp.Description("The object_id of the object to update the channel preference for."),
+				mcp.Required(),
+			),
+			mcp.WithString("object_type",
+				mcp.Description("The object_type of the object to update the channel preference for."),
+				mcp.Required(),
+			),
+			mcp.WithObject("payload",
+				mcp.Description("The channel preference to update for the object."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to update the channel preference for."),
+			),
+			mcp.WithDestructiveHintAnnotation(true),
+		),
+		Handler: updateObjectChannelPreferenceHandler,
+	}
+
 	get_suprsend_obj_subscriptions := &Tool{
 		Name:        "object.get_subscriptions",
 		Description: "Enables querying subscriptions of an object",
@@ -427,6 +498,7 @@ func newObjectTools() []*Tool {
 		add_suprsend_obj_subscriptions,
 		get_suprsend_object_preferences,
 		update_suprsend_category_preference_object,
+		update_suprsend_object_channel_preference,
 	}
 
 	return tools

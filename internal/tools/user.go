@@ -175,6 +175,38 @@ func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mc
 	return mcp.NewToolResultText(string(yamlPref)), nil
 }
 
+func updateUserChannelPreferenceHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	rawPayload, ok := request.GetArguments()["payload"].(map[string]any)
+	if !ok {
+		return mcp.NewToolResultError("payload must be an object"), nil
+	}
+	channelPreferences, ok := rawPayload["channel_preferences"].([]suprsend.UserGlobalChannelPreference)
+	if !ok {
+		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+	}
+	prefPayload := suprsend.UserGlobalChannelsPreferenceUpdateBody{
+		ChannelPreferences: channelPreferences,
+	}
+	distinctId, err := request.RequireString("distinct_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+	userPref, err := suprsendClient.Users.UpdateGlobalChannelsPreference(ctx, distinctId, prefPayload, nil)
+	if err != nil {
+		return nil, err
+	}
+	yamlPref, err := yaml.Marshal(userPref)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(yamlPref)), nil
+}
+
 func getUserListSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	distinctId, err := request.RequireString("distinct_id")
 	if err != nil {
@@ -341,6 +373,27 @@ func newUserTools() []*Tool {
 		Handler: updateUserPreference,
 	}
 
+	update_suprsend_user_channel_preference := &Tool{
+		Name:        "users.update_channel_preference",
+		Description: "Enables updating channel preference for a user",
+		MCPTool: mcp.NewTool("update_suprsend_user_channel_preference",
+			mcp.WithDescription("Use this tool to update channel preference for a user."),
+			mcp.WithString("distinct_id",
+				mcp.Description("The distinct_id of the user to update the channel preference for."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to update the channel preference for."),
+			),
+			mcp.WithObject("payload",
+				mcp.Description("The channel preference to update for the user."),
+				mcp.Required(),
+			),
+			mcp.WithDestructiveHintAnnotation(true),
+		),
+		Handler: updateUserChannelPreferenceHandler,
+	}
+
 	get_suprsend_user_list_subscriptions := &Tool{
 		Name:        "users.get_list_subscriptions",
 		Description: "Enables querying list subscriptions for a user",
@@ -386,6 +439,7 @@ func newUserTools() []*Tool {
 		upsert_suprsend_user,
 		get_suprsend_user_preferences,
 		update_suprsend_users_preferences,
+		update_suprsend_user_channel_preference,
 		get_suprsend_user_list_subscriptions,
 		get_suprsend_user_objects_subscriptions,
 	}

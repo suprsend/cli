@@ -67,6 +67,25 @@ func init() {
 }
 
 func runAddInteractive(cfg *Config, path string) {
+	sh_ui := cobra_ui.New()
+	var is_self_hosted, sh_prompt_complete bool
+	sh_ui.SetQuestions([]cobra_ui.Question{
+		{
+			CursorStr: "=>",
+			Text:      "is this a self hosted profile?",
+			Options:   []string{"Yes", "No"},
+			Handler: func(input string) error {
+				is_self_hosted = input == "Yes"
+				sh_prompt_complete = true
+				return nil
+			},
+		},
+	})
+	sh_ui.RunInteractiveUI()
+	if !sh_prompt_complete {
+		return
+	}
+
 	ui := cobra_ui.New()
 	var questions []cobra_ui.Question
 
@@ -103,9 +122,35 @@ func runAddInteractive(cfg *Config, path string) {
 
 	if addBaseUrl == "" {
 		addBaseUrl = "https://hub.suprsend.com/"
+		if is_self_hosted {
+			questions = append(questions, cobra_ui.Question{
+				Text: "Base URL: ",
+				Handler: func(s string) error {
+					s = cleanInput(s)
+					if s == "" {
+						return fmt.Errorf("base url cannot be empty")
+					}
+					addBaseUrl = s
+					return nil
+				},
+			})
+		}
 	}
 	if addMgmntUrl == "" {
 		addMgmntUrl = "https://management-api.suprsend.com/"
+		if is_self_hosted {
+			questions = append(questions, cobra_ui.Question{
+				Text: "Management URL: ",
+				Handler: func(s string) error {
+					s = cleanInput(s)
+					if s == "" {
+						return fmt.Errorf("management url cannot be empty")
+					}
+					addMgmntUrl = s
+					return nil
+				},
+			})
+		}
 	}
 
 	if len(questions) > 0 {

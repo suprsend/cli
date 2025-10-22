@@ -67,22 +67,23 @@ func init() {
 }
 
 func runAddInteractive(cfg *Config, path string) {
-	sh_ui := cobra_ui.New()
-	var is_self_hosted, sh_prompt_complete bool
-	sh_ui.SetQuestions([]cobra_ui.Question{
+	shUI := cobra_ui.New()
+	var isSelfHosted, shPromptComplete bool
+	shUI.SetQuestions([]cobra_ui.Question{
 		{
 			CursorStr: "=>",
 			Text:      "is this a self hosted profile?",
 			Options:   []string{"Yes", "No"},
 			Handler: func(input string) error {
-				is_self_hosted = input == "Yes"
-				sh_prompt_complete = true
+				isSelfHosted = input == "Yes"
+				shPromptComplete = true
 				return nil
 			},
 		},
 	})
-	sh_ui.RunInteractiveUI()
-	if !sh_prompt_complete {
+	shUI.RunInteractiveUI()
+	if !shPromptComplete {
+		log.Infof("Profile creation cancelled. Please run 'suprsend profile add' again to add a profile")
 		return
 	}
 
@@ -122,7 +123,7 @@ func runAddInteractive(cfg *Config, path string) {
 
 	if addBaseUrl == "" {
 		addBaseUrl = "https://hub.suprsend.com/"
-		if is_self_hosted {
+		if isSelfHosted {
 			questions = append(questions, cobra_ui.Question{
 				Text: "Base URL: ",
 				Handler: func(s string) error {
@@ -138,7 +139,7 @@ func runAddInteractive(cfg *Config, path string) {
 	}
 	if addMgmntUrl == "" {
 		addMgmntUrl = "https://management-api.suprsend.com/"
-		if is_self_hosted {
+		if isSelfHosted {
 			questions = append(questions, cobra_ui.Question{
 				Text: "Management URL: ",
 				Handler: func(s string) error {

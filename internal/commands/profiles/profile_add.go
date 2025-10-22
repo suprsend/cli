@@ -81,10 +81,12 @@ func runAddInteractive(cfg *Config, path string) {
 			},
 		},
 	})
-	shUI.RunInteractiveUI()
-	if !shPromptComplete {
-		log.Infof("Profile creation cancelled. Please run 'suprsend profile add' again to add a profile")
-		return
+	if addBaseUrl == "" || addMgmntUrl == "" {
+		shUI.RunInteractiveUI()
+		if !shPromptComplete {
+			log.Infof("Profile creation cancelled. Please run 'suprsend profile add' again to add a profile")
+			return
+		}
 	}
 
 	ui := cobra_ui.New()

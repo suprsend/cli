@@ -122,7 +122,6 @@ func runAddInteractive(cfg *Config, path string) {
 	}
 
 	if addBaseUrl == "" {
-		addBaseUrl = "https://hub.suprsend.com/"
 		if isSelfHosted {
 			questions = append(questions, cobra_ui.Question{
 				Text: "Base URL: ",
@@ -131,14 +130,18 @@ func runAddInteractive(cfg *Config, path string) {
 					if s == "" {
 						return fmt.Errorf("base url cannot be empty")
 					}
+					if err := validateUrl(s); err != nil {
+						return err
+					}
 					addBaseUrl = s
 					return nil
 				},
 			})
+		} else {
+			addBaseUrl = "https://hub.suprsend.com/"
 		}
 	}
 	if addMgmntUrl == "" {
-		addMgmntUrl = "https://management-api.suprsend.com/"
 		if isSelfHosted {
 			questions = append(questions, cobra_ui.Question{
 				Text: "Management URL: ",
@@ -147,10 +150,15 @@ func runAddInteractive(cfg *Config, path string) {
 					if s == "" {
 						return fmt.Errorf("management url cannot be empty")
 					}
+					if err := validateUrl(s); err != nil {
+						return err
+					}
 					addMgmntUrl = s
 					return nil
 				},
 			})
+		} else {
+			addMgmntUrl = "https://management-api.suprsend.com/"
 		}
 	}
 

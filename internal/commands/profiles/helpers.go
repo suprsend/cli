@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,6 +43,22 @@ func cleanInput(input string) string {
 	input = strings.TrimPrefix(input, "[")
 	input = strings.TrimSuffix(input, "]")
 	return input
+}
+
+func validateUrl(urlStr string) error {
+
+	// Parse the URL to validate its format
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %v", err)
+	}
+
+	// Check if the scheme is http or https
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be http or https")
+	}
+
+	return nil
 }
 
 func promptForProfileName() string {

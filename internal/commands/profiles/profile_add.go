@@ -81,7 +81,14 @@ func runAddInteractive(cfg *Config, path string) {
 			},
 		},
 	})
-	if addBaseUrl == "" || addMgmntUrl == "" {
+	if addBaseUrl == "" && addMgmntUrl == "" {
+		// if both base url and mgmnt url are not provided, then we could assume that the profile is not self hosted
+		isSelfHosted = false
+	} else if addBaseUrl != "" && addMgmntUrl != "" {
+		// if both base url and mgmnt url are provided, then we could assume that the profile is self hosted
+		isSelfHosted = true
+	} else {
+		// if either base url or mgmnt url is provided, we are not sure if the profile is self hosted, so we need to prompt the user
 		shUI.RunInteractiveUI()
 		if !shPromptComplete {
 			log.Infof("Profile creation cancelled. Please run 'suprsend profile add' again to add a profile")

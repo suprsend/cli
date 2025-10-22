@@ -173,17 +173,12 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 
 	args := request.GetArguments()
 
-	rawPayload, ok := args["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
-	}
-
-	pref, ok := rawPayload["preference"].(string)
-	if !ok {
+	pref, err := request.RequireString("preference")
+	if err != nil {
 		return mcp.NewToolResultError("preference must be a string"), nil
 	}
 
-	optOutAny, ok := rawPayload["opt_out_channels"]
+	optOutAny, ok := args["opt_out_channels"]
 	if !ok {
 		optOutAny = []any{}
 	}
@@ -400,9 +395,17 @@ func newObjectTools() []*Tool {
 				mcp.Description("category_slug of an category to get."),
 				mcp.Required(),
 			),
-			mcp.WithObject("payload",
-				mcp.Description("Payload of an category to update a category preference for an user."),
+			mcp.WithString("preference",
+				mcp.Enum(
+					"opt_in",
+					"opt_out",
+				),
+				mcp.Description("The preference to update for the object."),
 				mcp.Required(),
+			),
+			mcp.WithArray("opt_out_channels",
+				mcp.Description("The channels to opt out from for the object."),
+				mcp.WithStringItems(),
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),

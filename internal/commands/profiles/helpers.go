@@ -58,6 +58,11 @@ func validateUrl(urlStr string) error {
 		return fmt.Errorf("URL scheme must be http or https")
 	}
 
+	// Check if the URL has a host
+	if parsedURL.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+
 	return nil
 }
 

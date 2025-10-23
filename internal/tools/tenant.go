@@ -98,30 +98,31 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	if tenantId == "" {
+		return mcp.NewToolResultError("tenant_id is required"), nil
+	}
 
 	category, err := request.RequireString("category")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	if category == "" {
+		return mcp.NewToolResultError("category is required"), nil
+	}
 
 	args := request.GetArguments()
 
-	rawPayload, ok := args["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
-	}
-
-	pref, ok := rawPayload["preference"].(string)
+	pref, ok := args["preference"].(string)
 	if !ok {
 		return mcp.NewToolResultError("preference must be a string"), nil
 	}
 
-	visibleToSubscriber, ok := rawPayload["visible_to_subscriber"].(bool)
+	visibleToSubscriber, ok := args["visible_to_subscriber"].(bool)
 	if !ok {
 		return mcp.NewToolResultError("visible_to_subscriber must be bool"), nil
 	}
 
-	mandatoryChannelsAny, ok := rawPayload["mandatory_channels"]
+	mandatoryChannelsAny, ok := args["mandatory_channels"]
 	if !ok {
 		mandatoryChannelsAny = []any{}
 	}
@@ -139,7 +140,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		mandatoryChannels = append(mandatoryChannels, s)
 	}
 
-	blockedChannelsAny, ok := rawPayload["blocked_channels"]
+	blockedChannelsAny, ok := args["blocked_channels"]
 	if !ok {
 		blockedChannelsAny = []any{}
 	}
@@ -301,8 +302,28 @@ func newTenantTools() []*Tool {
 				mcp.Description("category_slug of an category to update."),
 				mcp.Required(),
 			),
-			mcp.WithObject("payload",
-				mcp.Description("The properties to update for the tenant."),
+			mcp.WithString(
+				"preference",
+				mcp.Description("The preference to update for the tenant."),
+				mcp.Required(),
+				mcp.Enum(
+					"opt_in",
+					"opt_out",
+					"cant_unsubscribe",
+				),
+			),
+			mcp.WithBoolean("visible_to_subscriber",
+				mcp.Description("Whether the category is visible to subscribers."),
+				mcp.Required(),
+			),
+			mcp.WithArray("mandatory_channels",
+				mcp.Description("The channels to make mandatory for the category."),
+				mcp.WithStringItems(),
+				mcp.Required(),
+			),
+			mcp.WithArray("blocked_channels",
+				mcp.Description("The channels to block for the category."),
+				mcp.WithStringItems(),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",

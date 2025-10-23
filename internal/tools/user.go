@@ -187,13 +187,14 @@ func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mc
 }
 
 func updateUserChannelPreferenceHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	rawPayload, ok := request.GetArguments()["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
-	}
-	channelPreferences, ok := rawPayload["channel_preferences"].([]suprsend.UserGlobalChannelPreference)
+	channelPreferencesAny, ok := request.GetArguments()["channel_preferences"].([]any)
 	if !ok {
 		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+	}
+	var channelPreferences = []suprsend.UserGlobalChannelPreference{}
+	err := utils.Remarshal(channelPreferencesAny, &channelPreferences)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 	prefPayload := suprsend.UserGlobalChannelsPreferenceUpdateBody{
 		ChannelPreferences: channelPreferences,
@@ -429,8 +430,16 @@ func newUserTools() []*Tool {
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to update the channel preference for."),
 			),
-			mcp.WithObject("payload",
-				mcp.Description("The channel preference to update for the user."),
+			mcp.WithArray("channel_preferences",
+				mcp.Description("The channel preferences to update for the users."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"channel":       utils.StringSchema("The channel identifier"),
+						"is_restricted": utils.BoolSchema("Whether the channel is restricted"),
+					},
+					"required": []string{"channel", "is_restricted"},
+				}),
 				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),

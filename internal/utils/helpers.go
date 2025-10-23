@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -193,6 +194,13 @@ func GetMap(m map[string]any, key string) map[string]any {
 func StringSchema(desc string) map[string]any {
 	return map[string]any{
 		"type":        "string",
+		"description": desc,
+	}
+}
+
+func BoolSchema(desc string) map[string]any {
+	return map[string]any{
+		"type":        "boolean",
 		"description": desc,
 	}
 }
@@ -440,4 +448,24 @@ func prepareSlackPayload(slackDetails map[string]any) (map[string]any, string, e
 	}
 
 	return payload, slackOut, nil
+}
+
+func ToStringSlice(in []any) ([]string, error) {
+	out := make([]string, len(in))
+	for i, v := range in {
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("element %d is not a string (type %T)", i, v)
+		}
+		out[i] = s
+	}
+	return out, nil
+}
+
+func Remarshal(src any, dst any) error {
+	data, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, dst)
 }

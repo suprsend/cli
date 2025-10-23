@@ -131,23 +131,34 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 }
 
 func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	rawPayload, ok := request.GetArguments()["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
-	}
-	distinctIds, ok := rawPayload["distinct_ids"].([]string)
+	distinctIdsAny, ok := request.GetArguments()["distinct_ids"].([]any)
 	if !ok {
 		return mcp.NewToolResultError("distinct_ids must be an array"), nil
 	}
+	var distinctIds = []string{}
+	err := utils.Remarshal(distinctIdsAny, &distinctIds)
+	if err != nil {
+		return mcp.NewToolResultError("distinct_ids must be an array of strings"), nil
+	}
 
-	channelPreferences, ok := rawPayload["channel_preferences"].([]*suprsend.UserGlobalChannelPreference)
+	channelPreferencesAny, ok := request.GetArguments()["channel_preferences"].([]any)
 	if !ok {
 		return mcp.NewToolResultError("channel_preferences must be an array"), nil
 	}
+	var channelPreferences = []*suprsend.UserGlobalChannelPreference{}
+	err = utils.Remarshal(channelPreferencesAny, &channelPreferences)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 
-	categories, ok := rawPayload["categories"].([]*suprsend.UserCategoryPreferenceIn)
+	categoriesAny, ok := request.GetArguments()["categories"].([]any)
 	if !ok {
 		return mcp.NewToolResultError("categories must be an array"), nil
+	}
+	var categories = []*suprsend.UserCategoryPreferenceIn{}
+	err = utils.Remarshal(categoriesAny, &categories)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	prefPayload := suprsend.UserBulkPreferenceUpdateBody{
@@ -361,8 +372,41 @@ func newUserTools() []*Tool {
 		Description: "Enables updating preferences for users, controlling notification preferences and channel opt-outs.",
 		MCPTool: mcp.NewTool("update_suprsend_users_preferences",
 			mcp.WithDescription("Use this tool to update preferences for users, controlling notification preferences and channel opt-outs."),
-			mcp.WithObject("payload",
-				mcp.Description("The preferences to update for the users."),
+			mcp.WithArray("distinct_ids",
+				mcp.Description("The distinct_ids of the users to update the preferences for."),
+				mcp.WithStringItems(),
+				mcp.Required(),
+			),
+			mcp.WithArray("channel_preferences",
+				mcp.Description("The channel preferences to update for the users."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"channel":       utils.StringSchema("The channel identifier"),
+						"is_restricted": utils.BoolSchema("Whether the channel is restricted"),
+					},
+					"required": []string{"channel", "is_restricted"},
+				}),
+				mcp.Required(),
+			),
+			mcp.WithArray("categories",
+				mcp.Description("The categories to update the preferences for."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"category": utils.StringSchema("The category identifier"),
+						"preference": map[string]any{
+							"type":        "string",
+							"description": "The preference to update for the category",
+							"enum": []string{
+								"opt_in",
+								"opt_out",
+							},
+						},
+						"opt_out_channels": utils.ArraySchema("The channels to opt out from for the category"),
+					},
+					"required": []string{"category", "preference", "opt_out_channels"},
+				}),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",

@@ -236,13 +236,14 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, request mcp.CallT
 		ObjectType: objType,
 	}
 
-	rawPayload, ok := request.GetArguments()["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
-	}
-	channelPreferences, ok := rawPayload["channel_preferences"].([]suprsend.ObjectGlobalChannelPreference)
+	channelPreferencesAny, ok := request.GetArguments()["channel_preferences"].([]any)
 	if !ok {
 		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+	}
+	var channelPreferences = []suprsend.ObjectGlobalChannelPreference{}
+	err = utils.Remarshal(channelPreferencesAny, &channelPreferences)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	prefPayload := suprsend.ObjectGlobalChannelsPreferenceUpdateBody{
@@ -428,8 +429,16 @@ func newObjectTools() []*Tool {
 				mcp.Description("The object_type of the object to update the channel preference for."),
 				mcp.Required(),
 			),
-			mcp.WithObject("payload",
-				mcp.Description("The channel preference to update for the object."),
+			mcp.WithArray("channel_preferences",
+				mcp.Description("The channel preferences to update for the users."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"channel":       utils.StringSchema("The channel identifier"),
+						"is_restricted": utils.BoolSchema("Whether the channel is restricted"),
+					},
+					"required": []string{"channel", "is_restricted"},
+				}),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",

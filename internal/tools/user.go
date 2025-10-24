@@ -47,6 +47,9 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	if action == "" {
+		return mcp.NewToolResultError("action is required"), nil
+	}
 
 	key := request.GetString("key", "")
 	value := request.GetString("value", "")
@@ -356,6 +359,7 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of a category to get."),
+				mcp.Required(),
 			),
 			mcp.WithBoolean("channel_preferences",
 				mcp.Description("Whether to include channel preferences in the response. Default is false."),

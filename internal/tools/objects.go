@@ -368,6 +368,7 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of the object to get preferences from"),
+				mcp.Required(),
 			),
 			mcp.WithBoolean("channel_preferences",
 				mcp.Description("Whether to include channel preferences in the response. Default is false."),

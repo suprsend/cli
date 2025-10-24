@@ -89,13 +89,22 @@ func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	identity_provider := request.GetString("identity_provider", "")
-
-	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, identity_provider, obj_identifier, workspace)
+	ms_teams_details, err := getMSTeamsDetails(request, action)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	identity_provider := request.GetString("identity_provider", "")
+
+	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, ms_teams_details, identity_provider, obj_identifier, workspace)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	_, err = suprsend_client.Objects.Edit(ctx, suprsend.ObjectEditRequest{EditInstance: obj_instance})
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	return mcp.NewToolResultText(out), nil
 }
 
@@ -333,6 +342,8 @@ func newObjectTools() []*Tool {
 					"remove_iospush",
 					"add_slack",
 					"remove_slack",
+					"add_ms_teams",
+					"remove_ms_teams",
 				),
 			),
 			mcp.WithString("key",
@@ -347,6 +358,10 @@ func newObjectTools() []*Tool {
 			mcp.WithObject("slack_details",
 				mcp.Description(`This is only applicable for add_slack and remove_slack actions.`),
 				mcp.Properties(slackPropertiesSchema),
+			),
+			mcp.WithObject("ms_teams_details",
+				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
+				mcp.Properties(msTeamsPropertiesSchema),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),

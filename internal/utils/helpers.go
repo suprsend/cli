@@ -222,7 +222,7 @@ func RequiresKey(action string) bool {
 	return actions[action]
 }
 
-func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, identity_provider string, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
+func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, identity_provider string, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -309,6 +309,17 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 			objectInstance.RemoveSlack(payload)
 		}
 		out = fmt.Sprintf(slackOut, objectIdentifier.Id, value)
+	case "add_ms_teams", "remove_ms_teams":
+		payload, msTeamsOut, err := prepareMSTeamsPayload(ms_teams_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_ms_teams" {
+			objectInstance.AddMSTeams(payload)
+		} else {
+			objectInstance.RemoveMSTeams(payload)
+		}
+		out = fmt.Sprintf(msTeamsOut, objectIdentifier.Id, value)
 	}
 
 	return out, err

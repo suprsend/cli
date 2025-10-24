@@ -80,7 +80,7 @@ func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError("key is required for " + action), nil
 	}
 
-	if utils.RequiresKey(action) && value == "" {
+	if utils.RequiresValue(action) && value == "" {
 		return mcp.NewToolResultError("value is required for " + action), nil
 	}
 
@@ -99,9 +99,7 @@ func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	identity_provider := request.GetString("identity_provider", "")
-
-	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, ms_teams_details, webpush_details, identity_provider, obj_identifier, workspace)
+	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, ms_teams_details, webpush_details, obj_identifier, workspace)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -330,6 +328,7 @@ func newObjectTools() []*Tool {
 				use action "remove" to remove a object's properties.
 				use action "set" to set a object's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack, add ms_teams, add webpush use the respective actions.
 				use action "unset" to unset a object's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack, remove ms_teams, remove webpush use the respective actions.
+				use action "set_once" to set a object's property once, this will only set the property if it is not already set.
 				use action "append" to append a value to a object's property.
 				use action "increment" to increment a object's property.
 				use action "add_email" to add an email to a object.
@@ -355,6 +354,7 @@ func newObjectTools() []*Tool {
 					"remove",
 					"set",
 					"unset",
+					"set_once",
 					"append",
 					"increment",
 					"add_email",
@@ -382,9 +382,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("value",
 				mcp.Description(`The value to needs to be added/removed/set/unset/appended/incremented.`),
-			),
-			mcp.WithString("identity_provider",
-				mcp.Description(`This is only applicable for add_androidpush, remove_androidpush, add_iospush, remove_iospush actions.`),
 			),
 			mcp.WithObject("slack_details",
 				mcp.Description(`This is only applicable for add_slack and remove_slack actions.`),

@@ -58,7 +58,7 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError("key is required for " + action), nil
 	}
 
-	if utils.RequiresKey(action) && value == "" {
+	if utils.RequiresValue(action) && value == "" {
 		return mcp.NewToolResultError("value is required for " + action), nil
 	}
 
@@ -72,7 +72,6 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	identityProvider := request.GetString("identity_provider", "")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	// todo:make everywhere mcp error is returned
 	if err != nil {
@@ -85,7 +84,7 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, ms_teams_details, webpush_details, identityProvider, distinctId, workspace)
+	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, ms_teams_details, webpush_details, distinctId, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -319,6 +318,7 @@ func newUserTools() []*Tool {
 					use action "remove" to remove a user's properties.
 					use action "set" to set a user's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack use the respective actions.
 					use action "unset" to unset a user's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack use the respective actions.
+					use action "set_once" to set a user's property once, this will only set the property if it is not already set.
 					use action "append" to append a value to a user's property.
 					use action "increment" to increment a user's property.
 					use action "add_email" to add an email to a user.
@@ -340,6 +340,7 @@ func newUserTools() []*Tool {
 					"upsert",
 					"remove",
 					"set",
+					"set_once",
 					"unset",
 					"append",
 					"increment",
@@ -368,9 +369,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("value",
 				mcp.Description(`The value to needs to be added/removed/set/unset/appended/incremented.`),
-			),
-			mcp.WithString("identity_provider",
-				mcp.Description(`This is only applicable for add_androidpush, remove_androidpush, add_iospush, remove_iospush actions.`),
 			),
 			mcp.WithObject("slack_details",
 				mcp.Description(`This is only applicable for add_slack and remove_slack actions.`),

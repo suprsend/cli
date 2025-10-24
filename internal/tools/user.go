@@ -80,7 +80,12 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	}
 	userInstance := suprsendClient.Users.GetEditInstance(distinctId)
 
-	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, ms_teams_details, identityProvider, distinctId, workspace)
+	webpush_details, err := getWebpushDetails(request, action)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, ms_teams_details, webpush_details, identityProvider, distinctId, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -354,6 +359,8 @@ func newUserTools() []*Tool {
 					"remove_slack",
 					"add_ms_teams",
 					"remove_ms_teams",
+					"add_webpush",
+					"remove_webpush",
 				),
 			),
 			mcp.WithString("key",
@@ -372,6 +379,23 @@ func newUserTools() []*Tool {
 			mcp.WithObject("ms_teams_details",
 				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
 				mcp.Properties(msTeamsPropertiesSchema),
+			),
+			mcp.WithObject("webpush_details",
+				mcp.Description(`This is only applicable for add_webpush and remove_webpush actions.`),
+				mcp.Properties(
+					map[string]interface{}{
+						"keys": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"auth":   utils.StringSchema("The auth key for the webpush"),
+								"p256dh": utils.StringSchema("The p256dh key for the webpush"),
+							},
+							"required":             []string{"auth", "p256dh"},
+							"additionalProperties": false,
+						},
+						"endpoint": utils.StringSchema("The endpoint for the webpush"),
+					},
+				),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
@@ -665,4 +689,22 @@ func getMSTeamsDetails(request mcp.CallToolRequest, action string) (map[string]a
 	}
 
 	return msTeamsDetails, nil
+}
+
+func getWebpushDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {
+	if action != "add_webpush" && action != "remove_webpush" {
+		return nil, nil
+	}
+
+	webpushDetailsRaw, ok := request.GetArguments()["webpush_details"]
+	if !ok {
+		return nil, errors.New("required argument 'webpush_details' not found")
+	}
+
+	webpushDetails, ok := webpushDetailsRaw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid webpush_details")
+	}
+
+	return webpushDetails, nil
 }

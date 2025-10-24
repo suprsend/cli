@@ -94,9 +94,14 @@ func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	webpush_details, err := getWebpushDetails(request, action)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
 	identity_provider := request.GetString("identity_provider", "")
 
-	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, ms_teams_details, identity_provider, obj_identifier, workspace)
+	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, ms_teams_details, webpush_details, identity_provider, obj_identifier, workspace)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -319,7 +324,31 @@ func newObjectTools() []*Tool {
 				mcp.Description("Payload of the request that you want to pass for the object."),
 			),
 			mcp.WithString("action",
-				mcp.Description(`The action to perform.`),
+				mcp.Description(`
+				the action to perform.
+				use action "upsert" to create a new object or update an existing object's properties.
+				use action "remove" to remove a object's properties.
+				use action "set" to set a object's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack, add ms_teams, add webpush use the respective actions.
+				use action "unset" to unset a object's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack, remove ms_teams, remove webpush use the respective actions.
+				use action "append" to append a value to a object's property.
+				use action "increment" to increment a object's property.
+				use action "add_email" to add an email to a object.
+				use action "remove_email" to remove an email from a object.
+				use action "add_sms" to add an SMS to a object.
+				use action "remove_sms" to remove an SMS from a object.
+				use action "add_whatsapp" to add a WhatsApp to a object.
+				use action "remove_whatsapp" to remove a WhatsApp from a object.
+				use action "add_androidpush" to add an Android push to a object.
+				use action "remove_androidpush" to remove an Android push from a object.
+				use action "add_iospush" to add an iOS push to a object.
+				use action "remove_iospush" to remove an iOS push from a object.
+				use action "add_slack" to add a Slack to a object.
+				use action "remove_slack" to remove a Slack from a object.
+				use action "add_ms_teams" to add a Microsoft Teams to a object.
+				use action "remove_ms_teams" to remove a Microsoft Teams from a object.
+				use action "add_webpush" to add a Webpush to a object.
+				use action "remove_webpush" to remove a Webpush from a object.
+				`),
 				mcp.Required(),
 				mcp.Enum(
 					"upsert",
@@ -344,6 +373,8 @@ func newObjectTools() []*Tool {
 					"remove_slack",
 					"add_ms_teams",
 					"remove_ms_teams",
+					"add_webpush",
+					"remove_webpush",
 				),
 			),
 			mcp.WithString("key",
@@ -362,6 +393,23 @@ func newObjectTools() []*Tool {
 			mcp.WithObject("ms_teams_details",
 				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
 				mcp.Properties(msTeamsPropertiesSchema),
+			),
+			mcp.WithObject("webpush_details",
+				mcp.Description(`This is only applicable for add_webpush and remove_webpush actions.`),
+				mcp.Properties(
+					map[string]interface{}{
+						"keys": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"auth":   utils.StringSchema("The auth key for the webpush"),
+								"p256dh": utils.StringSchema("The p256dh key for the webpush"),
+							},
+							"required":             []string{"auth", "p256dh"},
+							"additionalProperties": false,
+						},
+						"endpoint": utils.StringSchema("The endpoint for the webpush"),
+					},
+				),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),

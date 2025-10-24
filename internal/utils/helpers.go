@@ -222,7 +222,7 @@ func RequiresKey(action string) bool {
 	return actions[action]
 }
 
-func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, identity_provider string, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
+func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, identity_provider string, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -320,12 +320,23 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 			objectInstance.RemoveMSTeams(payload)
 		}
 		out = fmt.Sprintf(msTeamsOut, objectIdentifier.Id, value)
+	case "add_webpush", "remove_webpush":
+		payload, webpushOut, err := prepareWebpushPayload(webpush_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_webpush" {
+			objectInstance.AddWebpush(payload, "vapid")
+		} else {
+			objectInstance.RemoveWebpush(payload, "vapid")
+		}
+		out = fmt.Sprintf(webpushOut, objectIdentifier.Id, value)
 	}
 
 	return out, err
 }
 
-func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, identity_provider, distinct_id string, workspace string) (string, error) {
+func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, identity_provider, distinct_id string, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -419,6 +430,17 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 			userInstance.RemoveMSTeams(payload)
 		}
 		out = fmt.Sprintf(msTeamsOut, distinct_id, value)
+	case "add_webpush", "remove_webpush":
+		payload, webpushOut, err := prepareWebpushPayload(webpush_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_webpush" {
+			userInstance.AddWebpush(payload, "vapid")
+		} else {
+			userInstance.RemoveWebpush(payload, "vapid")
+		}
+		out = fmt.Sprintf(webpushOut, distinct_id, value)
 	}
 	return out, err
 }
@@ -550,6 +572,33 @@ func prepareMSTeamsPayload(msTeamsDetails map[string]any) (map[string]any, strin
 		return nil, "", errors.New("invalid type for ms_teams_details")
 	}
 	return payload, msTeamsOut, nil
+}
+
+func prepareWebpushPayload(webpushDetails map[string]any) (map[string]any, string, error) {
+	var payload map[string]any
+	var webpushOut string
+
+	keys, ok := webpushDetails["keys"].(map[string]any)
+	if !ok {
+		return nil, "", errors.New("keys is required for webpush_details")
+	}
+	auth, ok := keys["auth"].(string)
+	if !ok {
+		return nil, "", errors.New("auth is required for webpush_details")
+	}
+	p256dh, ok := keys["p256dh"].(string)
+	if !ok {
+		return nil, "", errors.New("p256dh is required for webpush_details")
+	}
+	endpoint, ok := webpushDetails["endpoint"].(string)
+	if !ok || endpoint == "" {
+		return nil, "", errors.New("endpoint is required for webpush_details")
+	}
+	payload = map[string]any{"keys": map[string]any{"auth": auth, "p256dh": p256dh}, "endpoint": endpoint}
+	webpushOut = "Webpush added successfully for user with distinct_id: %s and value: %s"
+	return payload, webpushOut, nil
+
+	return payload, webpushOut, nil
 }
 
 func ToStringSlice(in []any) ([]string, error) {

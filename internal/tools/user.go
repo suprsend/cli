@@ -67,6 +67,11 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	ms_teams_details, err := getMSTeamsDetails(request, action)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
 	identityProvider := request.GetString("identity_provider", "")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	// todo:make everywhere mcp error is returned
@@ -75,7 +80,7 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	}
 	userInstance := suprsendClient.Users.GetEditInstance(distinctId)
 
-	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, identityProvider, distinctId, workspace)
+	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, ms_teams_details, identityProvider, distinctId, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -347,6 +352,8 @@ func newUserTools() []*Tool {
 					"remove_iospush",
 					"add_slack",
 					"remove_slack",
+					"add_ms_teams",
+					"remove_ms_teams",
 				),
 			),
 			mcp.WithString("key",
@@ -361,6 +368,10 @@ func newUserTools() []*Tool {
 			mcp.WithObject("slack_details",
 				mcp.Description(`This is only applicable for add_slack and remove_slack actions.`),
 				mcp.Properties(slackPropertiesSchema),
+			),
+			mcp.WithObject("ms_teams_details",
+				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
+				mcp.Properties(msTeamsPropertiesSchema),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
@@ -538,6 +549,89 @@ var slackPropertiesSchema = map[string]any{
 	"slack_incoming_webhook_url": utils.StringSchema("Incoming webhook URL for the Slack"),
 }
 
+var msTeamsPropertiesSchema = map[string]interface{}{
+	"type": map[string]interface{}{
+		"required": true,
+		"type":     "string",
+		"enum": []string{
+			"incoming_webhook",
+			"channel",
+			"user",
+			"user_id",
+		},
+	},
+	"incoming_webhook": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+		},
+		"required": []string{"url"},
+		"title":    "IncomingWebhook",
+	},
+	"channel": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"tenant_id": map[string]interface{}{
+				"type": "string",
+			},
+			"service_url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+			"conversation_id": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"required": []string{"conversation_id", "service_url", "tenant_id"},
+		"title":    "Channel",
+	},
+	"user": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"tenant_id": map[string]interface{}{
+				"type": "string",
+			},
+			"service_url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+			"conversation_id": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"required": []string{"conversation_id", "service_url", "tenant_id"},
+		"title":    "Channel",
+	},
+	"user_id": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"tenant_id": map[string]interface{}{
+				"type": "string",
+			},
+			"service_url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+			"user_id": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"required": []string{"tenant_id", "user_id", "service_url"},
+		"title":    "UserID",
+	},
+}
+
 func getSlackDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {
 	if action != "add_slack" && action != "remove_slack" {
 		return nil, nil
@@ -552,6 +646,23 @@ func getSlackDetails(request mcp.CallToolRequest, action string) (map[string]any
 	if !ok {
 		return nil, errors.New("invalid slack_details")
 	}
-
 	return slackDetails, nil
+}
+
+func getMSTeamsDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {
+	if action != "add_ms_teams" && action != "remove_ms_teams" {
+		return nil, nil
+	}
+
+	msTeamsDetailsRaw, ok := request.GetArguments()["ms_teams_details"]
+	if !ok {
+		return nil, errors.New("required argument 'ms_teams_details' not found")
+	}
+
+	msTeamsDetails, ok := msTeamsDetailsRaw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid ms_teams_details")
+	}
+
+	return msTeamsDetails, nil
 }

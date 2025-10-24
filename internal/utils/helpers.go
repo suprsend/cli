@@ -314,7 +314,7 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 	return out, err
 }
 
-func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, identity_provider, distinct_id string, workspace string) (string, error) {
+func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, identity_provider, distinct_id string, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -397,8 +397,18 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 			userInstance.RemoveSlack(payload)
 		}
 		out = fmt.Sprintf(slackOut, distinct_id, value)
+	case "add_ms_teams", "remove_ms_teams":
+		payload, msTeamsOut, err := prepareMSTeamsPayload(ms_teams_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_ms_teams" {
+			userInstance.AddMSTeams(payload)
+		} else {
+			userInstance.RemoveMSTeams(payload)
+		}
+		out = fmt.Sprintf(msTeamsOut, distinct_id, value)
 	}
-
 	return out, err
 }
 
@@ -448,6 +458,87 @@ func prepareSlackPayload(slackDetails map[string]any) (map[string]any, string, e
 	}
 
 	return payload, slackOut, nil
+}
+
+func prepareMSTeamsPayload(msTeamsDetails map[string]any) (map[string]any, string, error) {
+	msteamsType, ok := msTeamsDetails["type"].(string)
+	if !ok || msteamsType == "" {
+		return nil, "", errors.New("type is required for ms_teams_details and must be one of: incoming_webhook, channel, user, user_id")
+	}
+	var payload map[string]any
+	var msTeamsOut string
+	switch msteamsType {
+	case "incoming_webhook":
+		incomingWebhook, ok := msTeamsDetails["incoming_webhook"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("incoming_webhook is required for ms_teams_details when type is incoming_webhook")
+		}
+		url, ok := incomingWebhook["url"].(string)
+		if !ok || url == "" {
+			return nil, "", errors.New("url is required for incoming_webhook")
+		}
+		payload = map[string]any{"incoming_webhook": map[string]any{"url": url}}
+		msTeamsOut = "Incoming webhook added successfully for user with distinct_id: %s and value: %s"
+	case "channel":
+		channel, ok := msTeamsDetails["channel"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("channel is required for ms_teams_details when type is channel")
+		}
+		tenantId, ok := channel["tenant_id"].(string)
+		if !ok || tenantId == "" {
+			return nil, "", errors.New("tenant_id is required for channel")
+		}
+		serviceUrl, ok := channel["service_url"].(string)
+		if !ok || serviceUrl == "" {
+			return nil, "", errors.New("service_url is required for channel")
+		}
+		conversationId, ok := channel["conversation_id"].(string)
+		if !ok || conversationId == "" {
+			return nil, "", errors.New("conversation_id is required for channel")
+		}
+		payload = map[string]any{"tenant_id": tenantId, "service_url": serviceUrl, "conversation_id": conversationId}
+		msTeamsOut = "Channel added successfully for user with distinct_id: %s and value: %s"
+	case "user":
+		user, ok := msTeamsDetails["user"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("user is required for ms_teams_details when type is user")
+		}
+		tenantId, ok := user["tenant_id"].(string)
+		if !ok || tenantId == "" {
+			return nil, "", errors.New("tenant_id is required for user")
+		}
+		serviceUrl, ok := user["service_url"].(string)
+		if !ok || serviceUrl == "" {
+			return nil, "", errors.New("service_url is required for user")
+		}
+		conversationId, ok := user["conversation_id"].(string)
+		if !ok || conversationId == "" {
+			return nil, "", errors.New("conversation_id is required for user")
+		}
+		payload = map[string]any{"tenant_id": tenantId, "service_url": serviceUrl, "conversation_id": conversationId}
+		msTeamsOut = "User added successfully for user with distinct_id: %s and value: %s"
+	case "user_id":
+		userId, ok := msTeamsDetails["user_id"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("user_id is required for ms_teams_details when type is user_id")
+		}
+		userIdValue, ok := userId["user_id"].(string)
+		if !ok || userIdValue == "" {
+			return nil, "", errors.New("user_id is required for user_id")
+		}
+		tenantId, ok := userId["tenant_id"].(string)
+		if !ok || tenantId == "" {
+			return nil, "", errors.New("tenant_id is required for user_id")
+		}
+		serviceUrl, ok := userId["service_url"].(string)
+		if !ok || serviceUrl == "" {
+			return nil, "", errors.New("service_url is required for user_id")
+		}
+		payload = map[string]any{"user_id": userIdValue, "tenant_id": tenantId, "service_url": serviceUrl}
+	default:
+		return nil, "", errors.New("invalid type for ms_teams_details")
+	}
+	return payload, msTeamsOut, nil
 }
 
 func ToStringSlice(in []any) ([]string, error) {

@@ -303,7 +303,28 @@ func newUserTools() []*Tool {
 				mcp.Description(`SuprSend workspace to get the user from.`),
 			),
 			mcp.WithString("action",
-				mcp.Description(`The action to perform.`),
+				mcp.Description(
+					`The action to perform.
+					use action "upsert" to create a new user or update an existing user's properties.
+					use action "remove" to remove a user's properties.
+					use action "set" to set a user's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack use the respective actions.
+					use action "unset" to unset a user's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack use the respective actions.
+					use action "append" to append a value to a user's property.
+					use action "increment" to increment a user's property.
+					use action "add_email" to add an email to a user.
+					use action "remove_email" to remove an email from a user.
+					use action "add_sms" to add an SMS to a user.
+					use action "remove_sms" to remove an SMS from a user.
+					use action "add_whatsapp" to add a WhatsApp to a user.
+					use action "remove_whatsapp" to remove a WhatsApp from a user.
+					use action "add_androidpush" to add an Android push to a user.
+					use action "remove_androidpush" to remove an Android push from a user.
+					use action "add_iospush" to add an iOS push to a user.
+					use action "remove_iospush" to remove an iOS push from a user.
+					use action "add_slack" to add a Slack to a user.
+					use action "remove_slack" to remove a Slack from a user.
+					use action "set_preferred_language" to set a user's preferred language.
+					use action "set_timezone" to set a user's timezone.`),
 				mcp.Required(),
 				mcp.Enum(
 					"upsert",

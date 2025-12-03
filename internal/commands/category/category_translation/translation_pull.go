@@ -74,9 +74,9 @@ var translationPullCmd = &cobra.Command{
 			filename := filepath.Join(outputDir, fmt.Sprintf("%s.json", locale))
 			fileData, err := json.MarshalIndent(translations, "", "  ")
 			if err != nil {
-				log.WithError(err).Errorf("Couldn't marshal translations for locale '%s'", locale)
+				log.WithError(err).Errorf("Failed to serialize translations to JSON for locale '%s'", locale)
 				failedCount++
-				errors = append(errors, fmt.Sprintf("Locale '%s': Failed to marshal translations to JSON - %v", locale, err))
+				errors = append(errors, fmt.Sprintf("Failed to serialize translations to JSON for locale '%s': %v", locale, err))
 				continue
 			}
 

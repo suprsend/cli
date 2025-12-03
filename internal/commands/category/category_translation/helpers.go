@@ -12,14 +12,14 @@ var defaultDir = filepath.Join(".", "suprsend", "category")
 
 func promptForOutputDirectory() string {
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := defaultDir
+	dd := defaultDir
 	fmt.Fprintf(os.Stdout, "Where would you like to save the translations?\n")
-	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
+	fmt.Fprintf(os.Stdout, "Default: %s\n", dd)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultDir
+		return dd
 	}
 	return input
 }

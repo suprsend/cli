@@ -21,16 +21,12 @@ var translationPushCmd = &cobra.Command{
 	Long:  "Push preference translations",
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
-		path, _ := cmd.Flags().GetString("file")
 		locale, _ := cmd.Flags().GetString("locale")
 		dir, _ := cmd.Flags().GetString("dir")
 
 		// Determine the translations directory
-		translationsDir := filepath.Join(".", "suprsend", "category", "translations")
-		if path != "" {
-			// If a specific file is provided, use its directory
-			translationsDir = filepath.Dir(path)
-		} else if dir != "" {
+		translationsDir := defaultDir
+		if dir != "" {
 			// If a directory is provided, use it
 			translationsDir = dir
 		}
@@ -61,6 +57,10 @@ var translationPushCmd = &cobra.Command{
 				fileLocale := strings.TrimSuffix(name, ".json")
 				// If a specific locale is requested, filter for it
 				if locale != "" && fileLocale != locale {
+					continue
+				}
+				// Skip categories_preferences.json file
+				if fileLocale == "categories_preferences" {
 					continue
 				}
 				localeFiles = append(localeFiles, name)
@@ -148,8 +148,7 @@ var translationPushCmd = &cobra.Command{
 }
 
 func init() {
-	translationPushCmd.Flags().StringP("file", "f", "", "Path to translations file (default: ./suprsend/category/translations/preference_translations.json)")
 	translationPushCmd.Flags().StringP("locale", "l", "", "Specific locale to push (if not provided, all locale files will be pushed)")
-	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations to push from (default: ./suprsend/category/translations)")
+	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations to push from (default: ./suprsend/category/)")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

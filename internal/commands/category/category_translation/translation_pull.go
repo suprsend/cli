@@ -22,7 +22,7 @@ var translationPullCmd = &cobra.Command{
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 		if outputDir == "" {
-			outputDir = filepath.Join(".", "suprsend", "category", "translations")
+			outputDir = defaultDir
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)

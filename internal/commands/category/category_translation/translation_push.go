@@ -113,7 +113,7 @@ var translationPushCmd = &cobra.Command{
 			}
 
 			// Parse the JSON
-			var translation mgmnt.PreferenceTranslationResponse
+			var translation mgmnt.PreferenceTranslationContent
 			if err := json.Unmarshal(data, &translation); err != nil {
 				log.WithError(err).Errorf("Couldn't parse translations JSON from %s", filePath)
 				failedCount++

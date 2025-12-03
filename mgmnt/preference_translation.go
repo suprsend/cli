@@ -13,7 +13,7 @@ type PreferenceTranslation struct {
 	Description string `json:"description"`
 }
 
-type PreferenceTranslationResponse struct {
+type PreferenceTranslationContent struct {
 	Sections   map[string]PreferenceTranslation `json:"sections"`
 	Categories map[string]PreferenceTranslation `json:"categories"`
 }
@@ -52,7 +52,7 @@ func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPref
 	return translations, nil
 }
 
-func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale string) (*PreferenceTranslationResponse, error) {
+func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale string) (*PreferenceTranslationContent, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
@@ -60,7 +60,7 @@ func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale st
 	res, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
-		SetResult(&PreferenceTranslationResponse{}).
+		SetResult(&PreferenceTranslationContent{}).
 		Get(url)
 
 	if err != nil {
@@ -75,12 +75,12 @@ func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale st
 		return nil, fmt.Errorf("request failed with status: %s", res.Status())
 	}
 
-	translations := res.Result().(*PreferenceTranslationResponse)
+	translations := res.Result().(*PreferenceTranslationContent)
 
 	return translations, nil
 }
 
-func (c *SS_MgmntClient) PushPreferenceTranslation(workspace, locale string, translation PreferenceTranslationResponse) error {
+func (c *SS_MgmntClient) PushPreferenceTranslation(workspace, locale string, translation PreferenceTranslationContent) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/content/%s", c.mgmnt_base_URL, workspace, locale)

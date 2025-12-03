@@ -52,10 +52,6 @@ func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPref
 	return translations, nil
 }
 
-func (c *SS_MgmntClient) GetPreferenceTranslations(workspace string) (*PreferenceTranslationResponse, error) {
-	return c.GetPreferenceTranslationsForLocale(workspace, "es")
-}
-
 func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale string) (*PreferenceTranslationResponse, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()

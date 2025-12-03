@@ -108,6 +108,6 @@ var translationPullCmd = &cobra.Command{
 
 func init() {
 	translationPullCmd.Flags().StringP("dir", "d", "", "Output directory for translations (default: "+defaultDir+")")
-	translationPullCmd.PersistentFlags().BoolP("force", "f", false, "Force using default directory without prompting")
+	translationPullCmd.Flags().BoolP("force", "f", false, "Force using default directory without prompting")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

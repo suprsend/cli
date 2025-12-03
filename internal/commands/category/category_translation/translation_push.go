@@ -44,6 +44,11 @@ var translationPushCmd = &cobra.Command{
 			return
 		}
 
+		if locale == "en" {
+			log.Warnf("cannot push English translations")
+			return
+		}
+
 		// Filter for locale JSON files (e.g., en.json, es.json)
 		var localeFiles []string
 		for _, file := range files {
@@ -149,6 +154,6 @@ var translationPushCmd = &cobra.Command{
 
 func init() {
 	translationPushCmd.Flags().StringP("locale", "l", "", "Specific locale to push (if not provided, all locale files will be pushed)")
-	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations to push from (default: ./suprsend/category/)")
+	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations to push from (default: "+defaultDir+")")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

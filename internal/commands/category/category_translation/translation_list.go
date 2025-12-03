@@ -12,8 +12,8 @@ import (
 
 var translationListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List translations",
-	Long:  "List translations",
+	Short: "List preference translations",
+	Long:  "List preference translations",
 	Run: func(cmd *cobra.Command, args []string) {
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {

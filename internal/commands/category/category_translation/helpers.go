@@ -16,7 +16,12 @@ func promptForOutputDirectory() string {
 	fmt.Fprintf(os.Stdout, "Where would you like to save the translations?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", dd)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
-	input, _ := reader.ReadString('\n')
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		// If there's an error reading input, fall back to default directory
+		fmt.Fprintf(os.Stderr, "Error reading input: %v. Using default directory: %s\n", err, dd)
+		return dd
+	}
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return dd

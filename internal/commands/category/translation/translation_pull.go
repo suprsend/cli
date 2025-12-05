@@ -21,6 +21,12 @@ var translationPullCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
+
+		if workspace == "" {
+			log.Error("workspace flag is required")
+			return
+		}
+
 		if outputDir == "" {
 			outputDir = defaultDir
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {

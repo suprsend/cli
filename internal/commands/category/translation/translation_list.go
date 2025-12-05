@@ -17,6 +17,11 @@ var translationListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		workspace, _ := cmd.Flags().GetString("workspace")
+		if workspace == "" {
+			log.Error("workspace flag is required")
+			return
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		var p *pin.Pin

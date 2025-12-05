@@ -279,6 +279,75 @@ func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspac
 		return fmt.Errorf("error pushing categories: %w", err)
 	}
 	log.Printf("Pushed categories to %s", toWorkspace)
+
+	// Sync category translations
+	if err := syncCategoryTranslations(mgmntClient, fromWorkspace, toWorkspace, dirPath); err != nil {
+		return fmt.Errorf("error syncing category translations: %w", err)
+	}
+
+	return nil
+}
+
+func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string) error {
+	log.Infof("Pulling category translations from %s ...", fromWorkspace)
+	locales, err := mgmntClient.ListPreferenceTranslations(fromWorkspace)
+	if err != nil {
+		return fmt.Errorf("error getting preference translation locales: %w", err)
+	}
+
+	var errors []string
+	successCount := 0
+
+	for _, localeResult := range locales.Results {
+		locale := localeResult.Locale
+
+		// Skip English translations
+		if locale == "en" {
+			continue
+		}
+
+		translations, err := mgmntClient.GetPreferenceTranslationsForLocale(fromWorkspace, locale)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to fetch translations for locale %s: %v", locale, err))
+			log.WithError(err).Errorf("Failed to fetch translations for locale %s", locale)
+			continue
+		}
+
+		// Write translation file locally
+		filename := filepath.Join(dirPath, fmt.Sprintf("%s.json", locale))
+		fileData, err := json.MarshalIndent(translations, "", "  ")
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to serialize translations for locale %s: %v", locale, err))
+			log.WithError(err).Errorf("Failed to serialize translations for locale %s", locale)
+			continue
+		}
+
+		if err := os.WriteFile(filename, fileData, 0644); err != nil {
+			errors = append(errors, fmt.Sprintf("failed to write translation file for locale %s: %v", locale, err))
+			log.WithError(err).Errorf("Failed to write translation file for locale %s", locale)
+			continue
+		}
+
+		// Push translation to destination workspace
+		err = mgmntClient.PushPreferenceTranslation(toWorkspace, locale, *translations)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to push translations for locale %s: %v", locale, err))
+			log.WithError(err).Errorf("Failed to push translations for locale %s", locale)
+			continue
+		}
+
+		successCount++
+		log.Infof("Pushed category translations for locale: %s", locale)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("one or more category translations failed to sync:\n%s", strings.Join(errors, "\n"))
+	}
+
+	if successCount > 0 {
+		log.Printf("Pushed %d category translation locale(s) to %s", successCount, toWorkspace)
+	}
+
 	return nil
 }
 

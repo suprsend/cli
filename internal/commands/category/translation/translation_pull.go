@@ -1,4 +1,4 @@
-package category_translation
+package translation
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package category_translation
+package translation
 
 import (
 	"github.com/spf13/cobra"

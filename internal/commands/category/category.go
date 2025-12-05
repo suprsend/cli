@@ -2,7 +2,7 @@ package category
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/suprsend/cli/internal/commands/category/category_translation"
+	"github.com/suprsend/cli/internal/commands/category/translation"
 )
 
 var CategoryCmd = &cobra.Command{
@@ -13,5 +13,5 @@ var CategoryCmd = &cobra.Command{
 
 func init() {
 	CategoryCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to push categories to")
-	CategoryCmd.AddCommand(category_translation.TranslationCmd)
+	CategoryCmd.AddCommand(translation.TranslationCmd)
 }

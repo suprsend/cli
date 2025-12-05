@@ -24,6 +24,11 @@ var translationPushCmd = &cobra.Command{
 		locale, _ := cmd.Flags().GetString("locale")
 		dir, _ := cmd.Flags().GetString("dir")
 
+		if workspace == "" {
+			log.Error("workspace flag is required")
+			return
+		}
+
 		// Determine the translations directory
 		translationsDir := defaultDir
 		if dir != "" {
@@ -106,7 +111,7 @@ var translationPushCmd = &cobra.Command{
 			// Read the translation file
 			data, err := os.ReadFile(filePath)
 			if err != nil {
-				log.WithError(err).Errorf("Couldn't read translations from file %s", filePath)
+				log.WithError(err).Debugf("Couldn't read translations from file %s", filePath)
 				failedCount++
 				errors = append(errors, fmt.Sprintf("Failed to read %s: %v", fileName, err))
 				continue

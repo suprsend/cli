@@ -38,6 +38,26 @@ type SchemaResponse struct {
 	JSONSchema  JSONSchema `json:"json_schema"`
 }
 
+type LinkedSchemasResponse struct {
+	Results []LinkedSchemas `json:"results"`
+	Meta    struct {
+		Count  int `json:"count"`
+		Limit  int `json:"limit"`
+		Offset int `json:"offset"`
+	} `json:"meta"`
+}
+
+type LinkedSchemas struct {
+	Slug            string     `json:"slug"`
+	VersionNo       *int       `json:"version_no"`
+	Name            string     `json:"name"`
+	Description     string     `json:"description"`
+	JSONSchema      JSONSchema `json:"json_schema"`
+	LinkedWorkflows []string   `json:"linked_workflows"`
+	LinkedEvents    []string   `json:"linked_events"`
+	CreatedAt       string     `json:"created_at"`
+}
+
 type SchemaPayload struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
@@ -173,6 +193,62 @@ func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[str
 	}
 
 	return resp.Result().(*map[string]any), nil
+}
+
+func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchemasResponse, error) {
+	if mode != "live" && mode != "draft" {
+		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	limit := 50
+	offset := 0
+	allSchemas := []LinkedSchemas{}
+	totalCount := 0
+
+	for {
+		res, err := client.R().
+			SetDebug(c.debug).
+			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+			SetResult(&LinkedSchemasResponse{}).
+			Get(c.mgmnt_base_URL + "v1/" + workspace + "/schema/all/linked/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
+			return nil, err
+		}
+		if res.IsError() {
+			var errorResp ErrorResponse
+			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
+				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+			}
+			return nil, fmt.Errorf("request failed: %s", res.Status())
+		}
+
+		schemas := res.Result().(*LinkedSchemasResponse)
+
+		if len(schemas.Results) == 0 {
+			break
+		}
+
+		allSchemas = append(allSchemas, schemas.Results...)
+		totalCount += len(schemas.Results)
+		offset += limit
+	}
+
+	return &LinkedSchemasResponse{
+		Results: allSchemas,
+		Meta: struct {
+			Count  int `json:"count"`
+			Limit  int `json:"limit"`
+			Offset int `json:"offset"`
+		}{
+			Count:  totalCount,
+			Limit:  limit,
+			Offset: 0,
+		},
+	}, nil
 }
 
 func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, error) {

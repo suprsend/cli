@@ -12,6 +12,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/category"
 	"github.com/suprsend/cli/internal/commands/event"
 	"github.com/suprsend/cli/internal/commands/schema"
+	"github.com/suprsend/cli/internal/commands/translation"
 	"github.com/suprsend/cli/internal/commands/workflow"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
@@ -35,7 +36,7 @@ var syncCmd = &cobra.Command{
 		var assetsToSync []string
 		switch assets {
 		case "all":
-			assetsToSync = []string{"category", "schema", "event", "workflow"}
+			assetsToSync = []string{"category", "schema", "event", "workflow", "translation"}
 		case "workflow":
 			assetsToSync = []string{"workflow"}
 		case "schema":
@@ -44,8 +45,10 @@ var syncCmd = &cobra.Command{
 			assetsToSync = []string{"event"}
 		case "category":
 			assetsToSync = []string{"category"}
+		case "translation":
+			assetsToSync = []string{"translation"}
 		default:
-			log.Errorf("Invalid asset type: '%s'. Valid options are: all, workflow, schema, event, category", assets)
+			log.Errorf("Invalid asset type: '%s'. Valid options are: all, workflow, schema, event, category, translation", assets)
 			return
 		}
 
@@ -81,6 +84,12 @@ var syncCmd = &cobra.Command{
 					log.WithError(err).Errorf("Failed to sync categories")
 					hasErrors = true
 				}
+			case "translation":
+				err := syncTranslation(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath)
+				if err != nil {
+					log.WithError(err).Errorf("Failed to sync translations")
+					hasErrors = true
+				}
 			default:
 				log.Errorf("Invalid asset type: %s", assetType)
 			}
@@ -101,7 +110,7 @@ func init() {
 	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace (required)")
 	syncCmd.Flags().StringP("dir", "d", "", "Directory to sync assets to")
 	syncCmd.Flags().StringP("mode", "m", "live", "Mode to sync assets (draft, live), default: live")
-	syncCmd.Flags().StringP("assets", "a", "all", "Assets to sync (all, workflow, schema, event, category)")
+	syncCmd.Flags().StringP("assets", "a", "all", "Assets to sync (all, workflow, schema, event, category, translation)")
 }
 
 func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
@@ -270,5 +279,60 @@ func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspac
 		return fmt.Errorf("error pushing categories: %w", err)
 	}
 	log.Printf("Pushed categories to %s", toWorkspace)
+	return nil
+}
+
+func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
+	if dirPath == "" {
+		dirPath = filepath.Join(".", "suprsend", "translation")
+	} else {
+		dirPath = filepath.Join(dirPath, "translation")
+	}
+
+	log.Infof("Pulling translations from %s ...", fromWorkspace)
+	translations_resp, err := mgmntClient.GetTranslations(fromWorkspace, mode)
+	if err != nil {
+		return fmt.Errorf("error getting translations: %w", err)
+	}
+	_, err = translation.WriteTranslationToFiles(*translations_resp, dirPath)
+	if err != nil {
+		return fmt.Errorf("error writing translations to files: %w", err)
+	}
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return fmt.Errorf("error reading local translations directory: %w", err)
+	}
+
+	var errors []string
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+
+		path := filepath.Join(dirPath, file.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error reading file %s: %v", file.Name(), err))
+			continue
+		}
+
+		var translation map[string]any
+		if err := json.Unmarshal(data, &translation); err != nil {
+			errors = append(errors, fmt.Sprintf("error unmarshalling JSON for %s: %v", file.Name(), err))
+			continue
+		}
+
+		err = mgmntClient.PushTranslation(toWorkspace, file.Name(), translation)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to push translation %s: %v", file.Name(), err))
+			log.WithError(err).Errorf("Failed to push translation %s", file.Name())
+			continue
+		}
+
+		log.Infof("Pushed translation: %s\n", file.Name())
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("one or more translations failed to sync:\n%s", strings.Join(errors, "\n"))
+	}
 	return nil
 }

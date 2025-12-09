@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var defaultDir = filepath.Join(".", "suprsend", "category")
+var defaultDir = filepath.Join(".", "suprsend", "category", "translation")
 
 func promptForOutputDirectory() string {
 	reader := bufio.NewReader(os.Stdin)

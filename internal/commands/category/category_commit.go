@@ -40,6 +40,9 @@ var categoryCommitCmd = &cobra.Command{
 			defer cancel()
 		}
 
+		// Push translations after committing categories
+		translation.PushTranslations(workspace, "", translationDir)
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		err := mgmntClient.FinalizeCategories(workspace, commitMsg)
 		if err != nil {
@@ -50,8 +53,6 @@ var categoryCommitCmd = &cobra.Command{
 			p.Stop(fmt.Sprintf("Committed categories to %s", workspace))
 		}
 
-		// Push translations after committing categories
-		translation.PushTranslations(workspace, "", translationDir)
 	},
 }
 

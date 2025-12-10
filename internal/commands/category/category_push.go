@@ -57,7 +57,9 @@ var categoryPushCmd = &cobra.Command{
 			defer cancel()
 		}
 
-		translation.PushTranslations(workspace, "", translationDir)
+		if commit == "true" {
+			translation.PushTranslations(workspace, "", translationDir)
+		}
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()
 		urlEncodedCommitMessage := url.QueryEscape(commitMessage)

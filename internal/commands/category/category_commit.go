@@ -40,7 +40,6 @@ var categoryCommitCmd = &cobra.Command{
 			defer cancel()
 		}
 
-		// Push translations after committing categories
 		translation.PushTranslations(workspace, "", translationDir)
 
 		mgmntClient := utils.GetSuprSendMgmntClient()

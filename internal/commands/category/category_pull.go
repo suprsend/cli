@@ -66,7 +66,6 @@ var categoryPullCmd = &cobra.Command{
 			return
 		}
 
-		// Pull translations after pulling categories
 		translationDir := filepath.Join(outputDir, "translation")
 		translation.PullTranslations(workspace, translationDir, force)
 	},

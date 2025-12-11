@@ -1,9 +1,13 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+      - feature/signing-support
   
 permissions:
   contents: write

@@ -57,6 +57,7 @@ var translationPushCmd = &cobra.Command{
 				cancel = p.Start(context.Background())
 			}
 
+			stats.Total++
 			path := filepath.Join(outputDir, file.Name())
 			data, err := os.ReadFile(path)
 			if err != nil {

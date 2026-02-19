@@ -68,7 +68,8 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 		}
 		slug, _ := obj["slug"].(string)
 		filename := filepath.Join(outputDir, obj["filename"].(string))
-		fileData, err := json.MarshalIndent(wf, "", "  ")
+		content, _ := obj["content"]
+		fileData, err := json.MarshalIndent(content, "", "  ")
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to marshal translation '%s': %v\n", slug, err)
 			stats.Failed++

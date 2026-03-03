@@ -14,6 +14,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/event"
 	"github.com/suprsend/cli/internal/commands/profiles"
 	"github.com/suprsend/cli/internal/commands/schema"
+	"github.com/suprsend/cli/internal/commands/template"
 	"github.com/suprsend/cli/internal/commands/translation"
 	workflow "github.com/suprsend/cli/internal/commands/workflow"
 	"github.com/suprsend/cli/internal/config"
@@ -66,6 +67,7 @@ func init() {
 	rootCmd.AddCommand(event.EventCmd)
 	rootCmd.AddCommand(translation.TranslationCmd)
 	rootCmd.AddCommand(schema.SchemaCmd)
+	rootCmd.AddCommand(template.TemplateCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if err := config.SetUpLogs(); err != nil {

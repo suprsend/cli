@@ -80,6 +80,23 @@ func TestCategoryList_InvalidMode(t *testing.T) {
 	}
 }
 
+func TestCategoryList_APIError(t *testing.T) {
+	server := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"code": 401, "message": "Invalid service token"}`))
+	})
+
+	_, _, exitCode := runCLIWithEnv(t, map[string]string{
+		"SUPRSEND_SERVICE_TOKEN": "bad-token",
+		"SUPRSEND_MGMNT_URL":     server.URL,
+	}, "category", "list", "--workspace", "test-ws")
+
+	if exitCode == 0 {
+		t.Error("expected non-zero exit code for API error, got 0")
+	}
+}
+
 func TestCategoryList_EmptyResponse(t *testing.T) {
 	server := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

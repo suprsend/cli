@@ -13,7 +13,7 @@ import (
 type PreferenceCategoryResponse struct {
 	RootCategories []RootCategory `json:"root_categories"`
 	Hash           string         `json:"hash"`
-	VersionNo      int            `json:"version_no"`
+	VersionNo      *int           `json:"version_no"`
 	Status         string         `json:"status"`
 	CommitMsg      string         `json:"commit_message"`
 	CommittedAt    time.Time      `json:"committed_at"`

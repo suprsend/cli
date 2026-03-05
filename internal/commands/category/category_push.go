@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
 )
@@ -22,6 +23,12 @@ var categoryPushCmd = &cobra.Command{
 		path, _ := cmd.Flags().GetString("dir")
 		commit, _ := cmd.Flags().GetString("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
+
+		translationDir := path
+		if translationDir == "" {
+			translationDir = filepath.Join(".", "suprsend", "category")
+		}
+		translationDir = filepath.Join(translationDir, "translation")
 
 		if path == "" {
 			path = filepath.Join(".", "suprsend", "category", "categories_preferences.json")
@@ -48,6 +55,10 @@ var categoryPushCmd = &cobra.Command{
 			)
 			cancel := p.Start(context.Background())
 			defer cancel()
+		}
+
+		if commit == "true" {
+			translation.PushTranslations(workspace, "", translationDir)
 		}
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()

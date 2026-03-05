@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
 )
@@ -64,6 +65,10 @@ var categoryPullCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't write categories to file")
 			return err
 		}
+
+		translationDir := filepath.Join(outputDir, "translation")
+		translation.PullTranslations(workspace, translationDir, force)
+
 		return nil
 	},
 }

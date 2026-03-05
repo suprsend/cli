@@ -1,21 +1,18 @@
-## suprsend category commit
+# suprsend category pull
 
-Commit categories
-
-### Synopsis
-
-Commit categories to a workspace
+Pull categories from a workspace
 
 ```
-suprsend category commit [flags]
+suprsend category pull [flags]
 ```
 
 ### Options
 
 ```
-      --commit-message string   Commit message
-  -d, --dir string              Output directory for categories (default: ./suprsend/category)
-  -h, --help                    help for commit
+  -d, --dir string    Output directory for categories (default: ./suprsend/category)
+  -f, --force         Force using default directory without prompting
+  -h, --help          help for pull
+  -m, --mode string   Mode to pull categories from (default "live")
 ```
 
 ### Options inherited from parent commands
@@ -27,8 +24,4 @@ suprsend category commit [flags]
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace to push categories to (default "staging")
 ```
-
-### SEE ALSO
-
-* [suprsend category](suprsend_category.md)	 - Manage preference categories
 

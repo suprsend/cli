@@ -1,21 +1,21 @@
-## suprsend category commit
+## suprsend category translation push
 
-Commit categories
+Push preference translations
 
 ### Synopsis
 
-Commit categories to a workspace
+Push preference translations
 
 ```
-suprsend category commit [flags]
+suprsend category translation push [flags]
 ```
 
 ### Options
 
 ```
-      --commit-message string   Commit message
-  -d, --dir string              Output directory for categories (default: ./suprsend/category)
-  -h, --help                    help for commit
+  -d, --dir string      Directory for translations to push from (default: suprsend/category/translation)
+  -h, --help            help for push
+  -l, --locale string   Specific locale to push (if not provided, all locale files will be pushed)
 ```
 
 ### Options inherited from parent commands
@@ -30,5 +30,5 @@ suprsend category commit [flags]
 
 ### SEE ALSO
 
-* [suprsend category](suprsend_category.md)	 - Manage preference categories
+* [suprsend category translation](suprsend_category_translation.md)	 - Manage preference category translations
 

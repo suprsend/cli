@@ -29,4 +29,5 @@ Manage preference categories
 * [suprsend category list](suprsend_category_list.md)	 - List categories
 * [suprsend category pull](suprsend_category_pull.md)	 - Pull categories from a workspace
 * [suprsend category push](suprsend_category_push.md)	 - Push categories to a workspace
+* [suprsend category translation](suprsend_category_translation.md)	 - Manage preference category translations
 

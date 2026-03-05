@@ -1,8 +1,6 @@
-## suprsend category commit
+# suprsend category commit
 
 Commit categories
-
-### Synopsis
 
 Commit categories to a workspace
 
@@ -27,8 +25,4 @@ suprsend category commit [flags]
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace to push categories to (default "staging")
 ```
-
-### SEE ALSO
-
-* [suprsend category](suprsend_category.md)	 - Manage preference categories
 

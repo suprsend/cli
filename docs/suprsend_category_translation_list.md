@@ -1,21 +1,19 @@
-## suprsend category commit
+## suprsend category translation list
 
-Commit categories
+List preference translations
 
 ### Synopsis
 
-Commit categories to a workspace
+List preference translations
 
 ```
-suprsend category commit [flags]
+suprsend category translation list [flags]
 ```
 
 ### Options
 
 ```
-      --commit-message string   Commit message
-  -d, --dir string              Output directory for categories (default: ./suprsend/category)
-  -h, --help                    help for commit
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -30,5 +28,5 @@ suprsend category commit [flags]
 
 ### SEE ALSO
 
-* [suprsend category](suprsend_category.md)	 - Manage preference categories
+* [suprsend category translation](suprsend_category_translation.md)	 - Manage preference category translations
 

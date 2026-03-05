@@ -7,7 +7,7 @@ import (
 
 var genSkillsCmd = &cobra.Command{
 	Use:    "genskills [dir]",
-	Hidden: true,
+	Hidden: false,
 	Short:  "Generate SKILLS.md",
 	Args:   cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -37,6 +37,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend generate-types python`](references/suprsend_generate-types_python.md) - Generate Python types from JSON Schema
 - [`suprsend generate-types swift`](references/suprsend_generate-types_swift.md) - Generate Swift types from JSON Schema
 - [`suprsend generate-types typescript`](references/suprsend_generate-types_typescript.md) - Generate TypeScript types from JSON Schema
+- [`suprsend genskills`](references/suprsend_genskills.md) - Generate SKILLS.md
 - [`suprsend profile`](references/suprsend_profile.md) - Manage Profile
 - [`suprsend profile add`](references/suprsend_profile_add.md) - Add a new profile
 - [`suprsend profile list`](references/suprsend_profile_list.md) - List all profiles

@@ -26,6 +26,39 @@ type TemplateAPIResponse struct {
 	} `json:"meta"`
 }
 
+type TemplateVariantResponse struct {
+	Results []map[string]any `json:"results"`
+}
+
+func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]map[string]any, error) {
+	if mode != "live" && mode != "draft" {
+		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	url := fmt.Sprintf("%sv2/%s/template/%s/variant/?mode=%s&include_content=true", c.mgmnt_base_URL, workspace, slug, mode)
+
+	log.Debugf("Getting template variants for slug: %s, workspace: %s, mode: %s", slug, workspace, mode)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetResult(&TemplateVariantResponse{}).
+		Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return nil, fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return resp.Result().(*TemplateVariantResponse).Results, nil
+}
+
 func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)

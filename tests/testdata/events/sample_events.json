@@ -1,0 +1,9 @@
+{
+  "events": [
+    {
+      "name": "test-event",
+      "description": "A test event",
+      "schema": "test-schema"
+    }
+  ]
+}

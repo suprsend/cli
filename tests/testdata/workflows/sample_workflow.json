@@ -1,0 +1,7 @@
+{
+  "slug": "test-workflow",
+  "name": "Test Workflow",
+  "description": "A test workflow",
+  "is_enabled": true,
+  "status": "live"
+}

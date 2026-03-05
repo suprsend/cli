@@ -1,0 +1,9 @@
+active_profile: default
+profiles:
+  default:
+    base_url: "https://hub.suprsend.com/"
+    mgmnt_url: "https://management-api.suprsend.com/"
+    service_token: "test-service-token-12345"
+  staging:
+    base_url: "https://staging.suprsend.com/"
+    service_token: "staging-token-67890"

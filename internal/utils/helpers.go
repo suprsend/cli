@@ -581,6 +581,7 @@ func prepareMSTeamsPayload(msTeamsDetails map[string]any) (map[string]any, strin
 			return nil, "", errors.New("service_url is required for user_id")
 		}
 		payload = map[string]any{"user_id": userIdValue, "tenant_id": tenantId, "service_url": serviceUrl}
+		msTeamsOut = "User ID added successfully for user with distinct_id: %s and value: %s"
 	default:
 		return nil, "", errors.New("invalid type for ms_teams_details")
 	}
@@ -609,8 +610,6 @@ func prepareWebpushPayload(webpushDetails map[string]any) (map[string]any, strin
 	}
 	payload = map[string]any{"keys": map[string]any{"auth": auth, "p256dh": p256dh}, "endpoint": endpoint}
 	webpushOut = "Webpush added successfully for user with distinct_id: %s and value: %s"
-	return payload, webpushOut, nil
-
 	return payload, webpushOut, nil
 }
 

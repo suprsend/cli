@@ -1,0 +1,7 @@
+{
+  "results": [
+    {"slug": "workflow-one", "name": "Workflow One", "is_enabled": true, "status": "live"},
+    {"slug": "workflow-two", "name": "Workflow Two", "is_enabled": false, "status": "live"}
+  ],
+  "meta": {"count": 2, "limit": 50, "offset": 0}
+}

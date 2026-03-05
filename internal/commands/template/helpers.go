@@ -120,10 +120,10 @@ func WriteTemplatesToFiles(results []templateResult, outputDir string) (*Templat
 		// Write each variant
 		for _, variant := range tmpl.Variants {
 			channel, _ := variant["channel"].(string)
-			variantName, _ := variant["variant_name"].(string)
+			variantName, _ := variant["id"].(string)
 
 			if channel == "" || variantName == "" {
-				debugErrorLog("Skipping variant with missing channel or variant_name for template '%s'", tmpl.Slug)
+				debugErrorLog("Skipping variant with missing channel or id for template '%s'", tmpl.Slug)
 				continue
 			}
 

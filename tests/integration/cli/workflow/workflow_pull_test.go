@@ -11,7 +11,7 @@ import (
 )
 
 func TestWorkflowPull_All(t *testing.T) {
-	listData, err := os.ReadFile(filepath.Join("..", "..", "testdata", "workflows", "workflow_list_response.json"))
+	listData, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "workflows", "workflow_list_response.json"))
 	if err != nil {
 		t.Fatalf("failed to read workflow_list_response.json: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestWorkflowPull_All(t *testing.T) {
 }
 
 func TestWorkflowPull_BySlug(t *testing.T) {
-	sampleData, err := os.ReadFile(filepath.Join("..", "..", "testdata", "workflows", "sample_workflow.json"))
+	sampleData, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "workflows", "sample_workflow.json"))
 	if err != nil {
 		t.Fatalf("failed to read sample_workflow.json: %v", err)
 	}

@@ -117,6 +117,7 @@ var workflowPushCmd = &cobra.Command{
 				for _, errorMsg := range stats.Errors {
 					fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 				}
+				return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
 			}
 			return nil
 		}
@@ -207,6 +208,7 @@ var workflowPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 			}
+			return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
 		}
 		return nil
 	},

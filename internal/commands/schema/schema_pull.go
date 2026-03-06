@@ -32,8 +32,7 @@ var schemaPullCmd = &cobra.Command{
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
-				return nil
+				return fmt.Errorf("no output directory specified")
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
@@ -71,7 +70,9 @@ var schemaPullCmd = &cobra.Command{
 			if p != nil {
 				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			}
-			os.WriteFile(filepath.Join(outputDir, slug+".json"), schemaData, 0644)
+			if err := os.WriteFile(filepath.Join(outputDir, slug+".json"), schemaData, 0644); err != nil {
+				return fmt.Errorf("failed to write schema file: %w", err)
+			}
 			return nil
 		}
 		schemas, err := mgmntClient.GetSchemas(workspace, mode)

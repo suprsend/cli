@@ -1,0 +1,15 @@
+{
+  "slug": "test-schema",
+  "name": "Test Schema",
+  "description": "A test schema for integration testing",
+  "is_enabled": true,
+  "json_schema": {
+    "type": "object",
+    "title": "Test Schema",
+    "$defs": {},
+    "properties": {
+      "event_id": {"type": "string"},
+      "user_id": {"type": "integer"}
+    }
+  }
+}

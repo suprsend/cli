@@ -1,0 +1,14 @@
+{
+  "events": [
+    {
+      "name": "ORDER_CREATED",
+      "description": "Order created event",
+      "payload_schema": {"schema": "order-schema", "version_no": 1}
+    },
+    {
+      "name": "PAYMENT_DONE",
+      "description": "Payment done event",
+      "payload_schema": {"schema": "payment-schema", "version_no": 2}
+    }
+  ]
+}

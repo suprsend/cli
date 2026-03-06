@@ -61,7 +61,6 @@ func runCLIWithEnv(t *testing.T, env map[string]string, args ...string) (stdout,
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
 
-	// Inherit PATH but set custom env vars
 	cmd.Env = append(os.Environ(), "NO_COLOR=true")
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)

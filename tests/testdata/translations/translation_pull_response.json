@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "count": 1,
+    "limit": 10,
+    "offset": 0
+  },
+  "results": [
+    {
+      "locale": "en",
+      "filename": "en.json",
+      "version_no": 1,
+      "version_status": "live",
+      "content": {
+        "hello": "Hello",
+        "world": "World",
+        "greeting": "Welcome"
+      }
+    }
+  ]
+}

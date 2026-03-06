@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "count": 2,
+    "limit": 50,
+    "offset": 0
+  },
+  "results": [
+    {
+      "slug": "schema-alpha",
+      "name": "Schema Alpha",
+      "description": "Alpha schema"
+    },
+    {
+      "slug": "schema-beta",
+      "name": "Schema Beta",
+      "description": "Beta schema"
+    }
+  ]
+}

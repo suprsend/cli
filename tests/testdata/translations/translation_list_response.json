@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "count": 2,
+    "limit": 20,
+    "offset": 0
+  },
+  "results": [
+    {
+      "locale": "en",
+      "filename": "en.json",
+      "version_no": 1,
+      "version_status": "live",
+      "action": "update"
+    },
+    {
+      "locale": "fr",
+      "filename": "fr.json",
+      "version_no": 1,
+      "version_status": "live",
+      "action": "update"
+    }
+  ]
+}

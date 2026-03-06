@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "count": 2,
+    "limit": 20,
+    "offset": 0
+  },
+  "results": [
+    {
+      "slug": "schema-one",
+      "title": "Schema One",
+      "name": "Schema One",
+      "description": "First test schema",
+      "is_enabled": true,
+      "json_schema": {
+        "type": "object",
+        "title": "Schema One",
+        "$defs": {},
+        "properties": {"event_id": {"type": "string"}}
+      }
+    },
+    {
+      "slug": "schema-two",
+      "title": "Schema Two",
+      "name": "Schema Two",
+      "description": "Second test schema",
+      "is_enabled": false,
+      "json_schema": {
+        "type": "object",
+        "title": "Schema Two",
+        "$defs": {},
+        "properties": {"order_id": {"type": "string"}}
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+    "$schema": "https://schema.suprsend.com/preference_category/v1/schema.json",
+    "root_categories": [
+        {
+            "root_category": "system",
+            "sections": [
+                {
+                    "name": "system section",
+                    "slug": "system-section",
+                    "description": "system section",
+                    "tags": ["wwr"],
+                    "categories": [
+                        {
+                            "category": "akhil-system",
+                            "name": "akhil-system",
+                            "description": "akhil-system",
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": ["qqq"]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "root_category": "transactional",
+            "sections": [
+                {
+                    "name": null,
+                    "slug": null,
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "return",
+                            "name": "return",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": ["email", "androidpush"],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "root_category": "promotional",
+            "sections": []
+        }
+    ],
+    "hash": "abc123",
+    "version_no": 1,
+    "status": "active",
+    "commit_message": null,
+    "committed_at": "2025-12-09T16:49:32.285408+00:00"
+}

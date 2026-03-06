@@ -1,0 +1,79 @@
+{
+    "$schema": "https://schema.suprsend.com/preference_category/v1/schema.json",
+    "root_categories": [
+        {
+            "root_category": "system",
+            "sections": [
+                {
+                    "name": "system section",
+                    "slug": "system-section",
+                    "description": "system section",
+                    "tags": ["wwr"],
+                    "categories": [
+                        {
+                            "category": "akhil-system",
+                            "name": "akhil-system",
+                            "description": "akhil-system",
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": ["qqq"]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "root_category": "transactional",
+            "sections": [
+                {
+                    "name": null,
+                    "slug": null,
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "return",
+                            "name": "return",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": ["email"],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "root_category": "promotional",
+            "sections": [
+                {
+                    "name": null,
+                    "slug": null,
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "refund-promotion",
+                            "name": "Refund promotion",
+                            "description": "updates",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "hash": "abc123",
+    "version_no": 292,
+    "status": "draft",
+    "commit_message": null,
+    "committed_at": null,
+    "validation_result": {
+        "is_valid": true
+    }
+}

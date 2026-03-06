@@ -2,17 +2,12 @@ package cli_test
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestCategoryList_Live(t *testing.T) {
-	listData, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "categories", "category_list_response.json"))
-	if err != nil {
-		t.Fatalf("failed to read category_list_response.json: %v", err)
-	}
+	listData := readTestdata(t, "categories", "category_list_response.json")
 
 	server := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		// Verify the request path and mode query param

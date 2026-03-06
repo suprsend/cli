@@ -34,6 +34,18 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// readTestdata reads a file from the testdata directory relative to the integration test root.
+// path components are joined under tests/testdata/.
+func readTestdata(t *testing.T, parts ...string) []byte {
+	t.Helper()
+	args := append([]string{"..", "..", "..", "testdata"}, parts...)
+	data, err := os.ReadFile(filepath.Join(args...))
+	if err != nil {
+		t.Fatalf("failed to read testdata file %s: %v", filepath.Join(parts...), err)
+	}
+	return data
+}
+
 // newMockServer creates a test HTTP server and registers cleanup automatically.
 func newMockServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()

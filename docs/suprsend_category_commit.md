@@ -14,6 +14,7 @@ suprsend category commit [flags]
 
 ```
       --commit-message string   Commit message
+  -d, --dir string              Output directory for categories (default: ./suprsend/category)
   -h, --help                    help for commit
 ```
 

@@ -13,7 +13,7 @@ suprsend sync [flags]
 ### Options
 
 ```
-  -a, --assets string   Assets to sync (all, workflow, schema, event, category) (default "all")
+  -a, --assets string   Assets to sync (all, workflow, schema, event, category, translation) (default "all")
   -d, --dir string      Directory to sync assets to
   -f, --from string     Source workspace (required) (default "staging")
   -h, --help            help for sync

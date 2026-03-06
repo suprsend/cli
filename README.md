@@ -52,7 +52,7 @@ suprsend --help
 ```
 
 ## Documentation
-Please refer to documentation [here](docs/suprsend.md)
+Please refer to documentation [here](https://docs.suprsend.com/reference/cli-intro) OR if you want to access the cobra generated docs those are [here](docs/suprsend.md)
 
 ## Contributing
 

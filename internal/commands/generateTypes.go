@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,15 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
+
+type schemaToBeGeneratedType struct {
+	Slug        string           `json:"slug"`
+	VersionNo   *int             `json:"version_no"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	JSONSchema  mgmnt.JSONSchema `json:"json_schema"`
+	TriggerName string           `json:"trigger_name"`
+}
 
 var generateTypesCmd = &cobra.Command{
 	Use:   "generate-types",
@@ -51,12 +61,19 @@ var generateTypesJavaCmd = &cobra.Command{
 		mode, _ := cmd.Flags().GetString("mode")
 		lombok, _ := cmd.Flags().GetBool("lombok")
 		packageName, _ := cmd.Flags().GetString("package")
+		fileName, _ := cmd.Flags().GetString("output-file")
+		if fileName == "" {
+			log.Error("File name argument is required")
+			return
+		}
+
 		// Generate output directory from package name
 		outputDir := filepath.Join(strings.ReplaceAll(packageName, ".", string(os.PathSeparator)))
 		if err := os.MkdirAll(outputDir, 0o755); err != nil {
 			log.WithError(err).Errorf("Failed to create output directory: %s", outputDir)
 			return
 		}
+
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
 			p = pin.New("Generating Java types...",
@@ -66,28 +83,38 @@ var generateTypesJavaCmd = &cobra.Command{
 			cancel := p.Start(context.Background())
 			defer cancel()
 		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		schemasResp, err := mgmntClient.GetSchemas(workspace, mode)
+		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
 			return
 		}
-		var validSchemas []*mgmnt.SchemaResponse
+
+		var schemasToBeGenerated []*schemaToBeGeneratedType
 		for _, schema := range schemasResp.Results {
-			schemaBytes, err := json.Marshal(schema)
-			if err != nil {
-				continue
+			// loop through schema.LinkedWorkflows and schema.LinkedEvents and add to schemasToBeGenerated
+			for _, linkedWorkflow := range schema.LinkedWorkflows {
+				schemasToBeGenerated = append(schemasToBeGenerated, &schemaToBeGeneratedType{
+					Slug:        schema.Slug,
+					VersionNo:   schema.VersionNo,
+					Name:        schema.Name,
+					TriggerName: CleanTriggerName(linkedWorkflow) + "Workflow",
+					JSONSchema:  schema.JSONSchema,
+				})
 			}
-			var schemaResp mgmnt.SchemaResponse
-			if err := json.Unmarshal(schemaBytes, &schemaResp); err != nil {
-				continue
+			for _, linkedEvent := range schema.LinkedEvents {
+				schemasToBeGenerated = append(schemasToBeGenerated, &schemaToBeGeneratedType{
+					Slug:        schema.Slug,
+					VersionNo:   schema.VersionNo,
+					Name:        schema.Name,
+					TriggerName: CleanTriggerName(linkedEvent) + "Event",
+					JSONSchema:  schema.JSONSchema,
+				})
 			}
-			if schemaResp.JSONSchema.Properties == nil {
-				continue
-			}
-			validSchemas = append(validSchemas, &schemaResp)
 		}
-		if len(validSchemas) == 0 {
+
+		if len(schemasToBeGenerated) == 0 {
 			if p != nil {
 				p.Stop("No valid schemas found")
 			}
@@ -96,18 +123,18 @@ var generateTypesJavaCmd = &cobra.Command{
 		}
 
 		generatedCount := 0
-		for _, targetSchema := range validSchemas {
-			var schemaName string
-			if targetSchema.Title == "" {
-				schemaName = targetSchema.Slug + "Data"
-			}
-			fileName := filepath.Join(outputDir, schemaName+".java")
-			if _, err := os.Stat(fileName); err == nil {
-				if err := os.WriteFile(fileName, []byte(""), 0o644); err != nil {
-					log.WithError(err).Errorf("Failed to clear existing file: %s", fileName)
+		for _, targetSchema := range schemasToBeGenerated {
+			schemaName := targetSchema.TriggerName
+			javaFileName := filepath.Join(outputDir, schemaName+".java")
+			log.Debugf("Processing TargetSchema: %v", targetSchema)
+
+			if _, err := os.Stat(javaFileName); err == nil {
+				if err := os.WriteFile(javaFileName, []byte(""), 0o644); err != nil {
+					log.WithError(err).Errorf("Failed to clear existing file: %s", javaFileName)
 					continue
 				}
 			}
+
 			schemaJSON := map[string]interface{}{
 				"type":       targetSchema.JSONSchema.Type,
 				"properties": targetSchema.JSONSchema.Properties,
@@ -122,18 +149,20 @@ var generateTypesJavaCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Failed to marshal schema: %v", err)
 			}
+
 			javaFlags := buildFlags
 			if javaFlags != "" {
-				javaFlags += "just-types=true,package=" + packageName
+				javaFlags += ",just-types=true,package=" + packageName
 			} else {
 				javaFlags = "just-types=true,package=" + packageName
 			}
 			if lombok {
 				javaFlags += `,lombok="true"`
 			}
-			err = runTypeMorph("java", string(schemaBytes), schemaName, fileName, javaFlags)
+
+			err = runTypeMorph("java", string(schemaBytes), schemaName, javaFileName, javaFlags)
 			if err != nil {
-				log.WithError(err).Errorln("Could not generate types for schema: " + targetSchema.Title)
+				log.WithError(err).Errorln("Could not generate types for schema: " + targetSchema.Slug)
 			} else {
 				generatedCount++
 			}
@@ -232,29 +261,36 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		schemasResp, err := mgmntClient.GetSchemas(workspace, mode)
+		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
 			return
 		}
-		var validSchemas []*mgmnt.SchemaResponse
-		for _, schema := range schemasResp.Results {
-			schemaBytes, err := json.Marshal(schema)
-			if err != nil {
-				continue
-			}
-			var schemaResp mgmnt.SchemaResponse
-			if err := json.Unmarshal(schemaBytes, &schemaResp); err != nil {
-				continue
-			}
-			if len(schemaResp.JSONSchema.Properties) == 0 {
-				continue
-			}
 
-			validSchemas = append(validSchemas, &schemaResp)
+		var schemasToBeGenerated []*schemaToBeGeneratedType
+		for _, schema := range schemasResp.Results {
+			// loop through schema.LinkedWorkflows and schema.LinkedEvents and add to schemasToBeGenerated
+			for _, linkedWorkflow := range schema.LinkedWorkflows {
+				schemasToBeGenerated = append(schemasToBeGenerated, &schemaToBeGeneratedType{
+					Slug:        schema.Slug,
+					VersionNo:   schema.VersionNo,
+					Name:        schema.Name,
+					TriggerName: CleanTriggerName(linkedWorkflow) + "Workflow",
+					JSONSchema:  schema.JSONSchema,
+				})
+			}
+			for _, linkedEvent := range schema.LinkedEvents {
+				schemasToBeGenerated = append(schemasToBeGenerated, &schemaToBeGeneratedType{
+					Slug:        schema.Slug,
+					VersionNo:   schema.VersionNo,
+					Name:        schema.Name,
+					TriggerName: CleanTriggerName(linkedEvent) + "Event",
+					JSONSchema:  schema.JSONSchema,
+				})
+			}
 		}
 
-		if len(validSchemas) == 0 {
+		if len(schemasToBeGenerated) == 0 {
 			if p != nil {
 				p.Stop("No valid schemas found")
 			}
@@ -270,11 +306,9 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 		}
 
 		generatedCount := 0
-		for _, targetSchema := range validSchemas {
-			var schemaName string
-			if targetSchema.Title == "" {
-				schemaName = targetSchema.Slug + "Data"
-			}
+		for _, targetSchema := range schemasToBeGenerated {
+			schemaName := targetSchema.TriggerName
+			log.Debugf("Processing TargetSchema: %v", targetSchema)
 
 			schemaJSON := map[string]interface{}{
 				"type":       targetSchema.JSONSchema.Type,
@@ -290,10 +324,9 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 			if err != nil {
 				log.Fatalf("Failed to marshal schema: %v", err)
 			}
-
 			err = runTypeMorph(targetLang, string(schemaBytes), schemaName, fileName, buildFlags)
 			if err != nil {
-				log.WithError(err).Errorln("Could not generate types for schema: " + targetSchema.Title)
+				log.WithError(err).Errorln("Could not generate types for schema: " + targetSchema.Slug)
 			} else {
 				generatedCount++
 			}
@@ -328,6 +361,7 @@ func init() {
 	// Java
 	generateTypesJavaCmd.Flags().Bool("lombok", false, "Generate Java Types with Lombok")
 	generateTypesJavaCmd.Flags().String("package", "suprsend.types", "Package name for Java types")
+	generateTypesJavaCmd.Flags().String("output-file", "SuprsendTypes.java", "Output file for generated Java types")
 	generateTypesCmd.AddCommand(generateTypesJavaCmd)
 	// TypeScript
 	generateTypesTypeScriptCmd.Flags().Bool("zod", false, "Generate Zod types for TypeScript")
@@ -347,7 +381,7 @@ func init() {
 	// Dart
 	generateTypesDartCmd.Flags().String("output-file", "suprsend_types.dart", "Output file for generated Dart types")
 	generateTypesCmd.AddCommand(generateTypesDartCmd)
-	// rootCmd.AddCommand(generateTypesCmd)
+	rootCmd.AddCommand(generateTypesCmd)
 }
 
 func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) error {
@@ -389,4 +423,25 @@ func writeTempExecutable(data []byte) (string, error) {
 	}
 
 	return tmpFile.Name(), nil
+}
+
+func CleanTriggerName(input string) string {
+	// Split on spaces, underscores, or hyphens (1 or more in a row)
+	re := regexp.MustCompile(`[ _-]+`)
+	parts := re.Split(input, -1)
+
+	var result strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue // skip empty parts
+		}
+		// Lowercase everything after the first char
+		first := strings.ToUpper(part[:1])
+		rest := ""
+		if len(part) > 1 {
+			rest = strings.ToLower(part[1:])
+		}
+		result.WriteString(first + rest)
+	}
+	return result.String()
 }

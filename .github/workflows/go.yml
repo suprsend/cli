@@ -21,6 +21,14 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
+    - name: Set up Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: v2.x
+
+    - name: Build type-morph binary
+      run: make build
+
     - name: Build
       run: go build -v ./...
 

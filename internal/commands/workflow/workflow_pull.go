@@ -61,11 +61,14 @@ var workflowPullCmd = &cobra.Command{
 				fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow: %v\n", err)
 				return err
 			}
-			os.WriteFile(filepath.Join(outputDir, fmt.Sprintf("%s.json", slug)), workflowJson, 0644)
+			if err := os.WriteFile(filepath.Join(outputDir, fmt.Sprintf("%s.json", slug)), workflowJson, 0644); err != nil {
+				fmt.Fprintf(os.Stdout, "Error: Failed to write workflow file: %v\n", err)
+				return err
+			}
 			if p != nil {
 				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			}
-			return err
+			return nil
 		}
 
 		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)

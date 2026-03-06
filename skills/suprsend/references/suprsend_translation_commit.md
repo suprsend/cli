@@ -1,20 +1,15 @@
-## suprsend category commit
+# suprsend translation commit
 
-Commit categories
-
-### Synopsis
-
-Commit categories to a workspace
+Commit translation
 
 ```
-suprsend category commit [flags]
+suprsend translation commit [flags]
 ```
 
 ### Options
 
 ```
-      --commit-message string   Commit message
-  -d, --dir string              Output directory for categories (default: ./suprsend/category)
+  -m, --commit-message string   The commit message for the translation
   -h, --help                    help for commit
 ```
 
@@ -25,10 +20,6 @@ suprsend category commit [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace to list translations for (default "staging")
 ```
-
-### SEE ALSO
-
-* [suprsend category](suprsend_category.md)	 - Manage preference categories
 

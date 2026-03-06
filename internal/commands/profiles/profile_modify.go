@@ -29,8 +29,7 @@ var profilesModifyCmd = &cobra.Command{
 		}
 		if modifyName != "" {
 			if _, exists := cfg.Profiles[modifyName]; !exists {
-				log.Infof("Profile %q does not exist. Use the command 'suprsend profile list' to see all profiles.", modifyName)
-				return err
+				return fmt.Errorf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName)
 			}
 		}
 

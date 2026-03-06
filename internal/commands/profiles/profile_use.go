@@ -34,13 +34,13 @@ var profileUseCmd = &cobra.Command{
 			useName = promptForProfileToUse(cfg)
 			if useName == "" {
 				log.Error("No profile name provided")
-				return err
+				return fmt.Errorf("no profile name provided")
 			}
 		}
 
 		if _, exists := cfg.Profiles[useName]; !exists {
 			log.Infof("Profile %q does not exist. Use the command 'suprsend profiles list' to see all profiles.", useName)
-			return err
+			return fmt.Errorf("profile %q does not exist", useName)
 		}
 
 		cfg.ActiveProfile = useName

@@ -14,8 +14,8 @@ var worklowEnableCmd = &cobra.Command{
 	Long:  "Enables a workflow to activate. Example: suprsend workflow enable <slug>",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			log.Error("Category slug is required.")
-			return fmt.Errorf("Category slug is required.")
+			log.Error("workflow_slug is required.")
+			return fmt.Errorf("workflow_slug is required.")
 		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := args[0]

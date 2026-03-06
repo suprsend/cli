@@ -32,8 +32,7 @@ var workflowPullCmd = &cobra.Command{
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
-				return nil
+				return fmt.Errorf("no output directory specified")
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {

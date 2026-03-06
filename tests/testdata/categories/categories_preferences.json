@@ -10,9 +10,9 @@
                     "tags": ["wwr"],
                     "categories": [
                         {
-                            "category": "akhil-system",
-                            "name": "akhil-system",
-                            "description": "akhil-system",
+                            "category": "cat-system",
+                            "name": "cat-system",
+                            "description": "cat-system",
                             "default_preference": "opt_in",
                             "default_mandatory_channels": null,
                             "tags": ["qqq"]

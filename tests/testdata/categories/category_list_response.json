@@ -13,9 +13,9 @@
                     ],
                     "categories": [
                         {
-                            "category": "akhil-system",
-                            "name": "akhil-system",
-                            "description": "akhil-system",
+                            "category": "cat-system",
+                            "name": "cat-system",
+                            "description": "cat-system",
                             "default_preference": "opt_in",
                             "default_mandatory_channels": null,
                             "default_opt_in_channels": null,
@@ -71,8 +71,8 @@
                             "tags": null
                         },
                         {
-                            "category": "sreehari_test",
-                            "name": "sreehari_test",
+                            "category": "bar_test",
+                            "name": "bar_test",
                             "description": null,
                             "default_preference": "cant_unsubscribe",
                             "default_mandatory_channels": [
@@ -134,17 +134,17 @@
                     ]
                 },
                 {
-                    "name": "Sanjeev System 2",
-                    "slug": "sanjeev-system-2",
+                    "name": "foo System 2",
+                    "slug": "foo-system-2",
                     "description": null,
                     "tags": [
-                        "sanjeev:preference:system"
+                        "foo:preference:system"
                     ],
                     "categories": [
                         {
-                            "category": "sanjeev-system",
-                            "name": "Sanjeev System",
-                            "description": "Sanjeev System category",
+                            "category": "foo-system",
+                            "name": "foo System",
+                            "description": "foo System category",
                             "default_preference": "cant_unsubscribe",
                             "default_mandatory_channels": null,
                             "default_opt_in_channels": null,
@@ -155,14 +155,14 @@
                             ]
                         },
                         {
-                            "category": "sanjeev-section-2-category-1",
-                            "name": "Sanjeev Section 2 Category 1",
+                            "category": "foo-section-2-category-1",
+                            "name": "foo Section 2 Category 1",
                             "description": null,
                             "default_preference": "cant_unsubscribe",
                             "default_mandatory_channels": null,
                             "default_opt_in_channels": null,
                             "tags": [
-                                "sanjeev:category"
+                                "foo:category"
                             ]
                         }
                     ]
@@ -413,14 +413,14 @@
                     ]
                 },
                 {
-                    "name": "Sanjeev Section Promotional 1",
-                    "slug": "sanjeev-section-promotional-1",
+                    "name": "foo Section Promotional 1",
+                    "slug": "foo-section-promotional-1",
                     "description": null,
                     "tags": null,
                     "categories": [
                         {
-                            "category": "sanjeev-cat-in-sanjeev-promo-1",
-                            "name": "Sanjeev Cat In sanjeev promo 1",
+                            "category": "foo-cat-in-foo-promo-1",
+                            "name": "foo Cat In foo promo 1",
                             "description": null,
                             "default_preference": "opt_in",
                             "default_mandatory_channels": null,

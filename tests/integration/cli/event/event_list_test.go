@@ -34,7 +34,7 @@ func TestEventList_Success(t *testing.T) {
 	}
 
 	// Verify event names appear in output
-	for _, name := range []string{"ORDER_CREATED", "SANJEEV EVENT", "SREEHARI_TEST"} {
+	for _, name := range []string{"ORDER_CREATED", "foo EVENT", "bar_TEST"} {
 		if !strings.Contains(stdout, name) {
 			t.Errorf("expected event %q in stdout, got: %s", name, stdout)
 		}

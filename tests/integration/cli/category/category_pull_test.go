@@ -36,7 +36,7 @@ func TestCategoryPull_CreatesFile(t *testing.T) {
 		t.Fatalf("expected output file %s to exist: %v", outFile, err)
 	}
 
-	for _, want := range []string{"root_categories", "akhil-system", "return"} {
+	for _, want := range []string{"root_categories", "cat-system", "return"} {
 		if !strings.Contains(string(content), want) {
 			t.Errorf("expected %q in output file, not found", want)
 		}

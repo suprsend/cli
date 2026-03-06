@@ -38,7 +38,7 @@ func TestCategoryList_Live(t *testing.T) {
 	}
 
 	// Verify category names from test data
-	for _, catName := range []string{"akhil-system", "Sub Category", "return", "Refund promotion", "check bug1"} {
+	for _, catName := range []string{"cat-system", "Sub Category", "return", "Refund promotion", "check bug1"} {
 		if !strings.Contains(stdout, catName) {
 			t.Errorf("expected category name %q in stdout, got: %s", catName, stdout)
 		}

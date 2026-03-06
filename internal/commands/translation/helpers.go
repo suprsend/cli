@@ -52,8 +52,7 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 				return stats, err
 			}
 		} else {
-			errMsg := fmt.Sprintf("error accessing '%s': %v", outputDir, err)
-			return stats, fmt.Errorf(errMsg)
+			return stats, fmt.Errorf("error accessing '%s': %v", outputDir, err)
 		}
 	} else if !info.IsDir() {
 		return stats, err

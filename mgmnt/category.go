@@ -98,7 +98,6 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
-	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -109,7 +108,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 	}
 	q := u.Query()
 	q.Add("commit", commit)
-	q.Add("commit_message", urlEncodedCommitMessage)
+	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().
@@ -141,7 +140,6 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
-	encodedCommitMessage := url.QueryEscape(commitMessage)
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "commit", "/")
 	if err != nil {
 		return fmt.Errorf("failed constructing url: %w", err)
@@ -151,7 +149,7 @@ func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage stri
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
-	q.Add("commit_message", encodedCommitMessage)
+	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().

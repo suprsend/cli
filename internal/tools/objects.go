@@ -136,19 +136,18 @@ func getObjectPreferences(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	var objPref interface{}
-	if category == "" {
+	if channel_preferences {
+		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
+		if err != nil {
+			return nil, err
+		}
+	} else if category == "" {
 		objPref, err = suprsendClient.Objects.GetFullPreference(ctx, objIdentifier, nil)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		objPref, err = suprsendClient.Objects.GetCategoryPreference(ctx, objIdentifier, category, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if channel_preferences {
-		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -428,7 +427,6 @@ func newObjectTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of the object to get preferences from, if not provided, it will get all the preferences for the object."),
-				mcp.Required(),
 			),
 			mcp.WithBoolean("channel_preferences",
 				mcp.Description("set this to true to get all the channel preferences for the object."),

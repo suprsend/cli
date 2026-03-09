@@ -610,8 +610,6 @@ func prepareWebpushPayload(webpushDetails map[string]any) (map[string]any, strin
 	payload = map[string]any{"keys": map[string]any{"auth": auth, "p256dh": p256dh}, "endpoint": endpoint}
 	webpushOut = "Webpush added successfully for user with distinct_id: %s and value: %s"
 	return payload, webpushOut, nil
-
-	return payload, webpushOut, nil
 }
 
 func ToStringSlice(in []any) ([]string, error) {

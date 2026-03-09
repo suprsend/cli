@@ -13,7 +13,6 @@ var WorkflowCmd = &cobra.Command{
 	Short: "Manage workflows",
 	Long:  `Manage workflows`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Help()
-		return nil
+		return cmd.Help()
 	},
 }

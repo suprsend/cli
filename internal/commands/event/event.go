@@ -7,7 +7,6 @@ var EventCmd = &cobra.Command{
 	Short: "Manage events",
 	Long:  "Manage events",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Help()
-		return nil
+		return cmd.Help()
 	},
 }

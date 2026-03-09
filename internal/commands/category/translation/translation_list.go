@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
@@ -14,18 +13,17 @@ var translationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List preference translations",
 	Long:  "List preference translations",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputType, _ := cmd.Flags().GetString("output")
 
-		listTranslations(workspace, outputType)
+		return listTranslations(workspace, outputType)
 	},
 }
 
-func listTranslations(workspace, outputType string) {
+func listTranslations(workspace, outputType string) error {
 	if workspace == "" {
-		log.Error("workspace flag is required")
-		return
+		return fmt.Errorf("workspace flag is required")
 	}
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
@@ -42,8 +40,7 @@ func listTranslations(workspace, outputType string) {
 
 	translations, err := mgmntClient.ListPreferenceTranslations(workspace)
 	if err != nil {
-		log.WithError(err).Error("Couldn't fetch translations")
-		return
+		return fmt.Errorf("couldn't fetch translations: %w", err)
 	}
 
 	msg := fmt.Sprintf("Listed %d translation locales from %s", len(translations.Results), workspace)
@@ -53,9 +50,10 @@ func listTranslations(workspace, outputType string) {
 
 	if len(translations.Results) == 0 && utils.IsOutputPiped() {
 		utils.OutputData([]interface{}{}, outputType)
-		return
+		return nil
 	}
 	utils.OutputData(translations.Results, outputType)
+	return nil
 }
 
 func init() {

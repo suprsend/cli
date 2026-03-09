@@ -17,19 +17,18 @@ var translationPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull preference translations",
 	Long:  "Pull preference translations",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 
-		PullTranslations(workspace, outputDir, force)
+		return PullTranslations(workspace, outputDir, force)
 	},
 }
 
-func PullTranslations(workspace, outputDir string, force bool) {
+func PullTranslations(workspace, outputDir string, force bool) error {
 	if workspace == "" {
-		log.Error("workspace flag is required")
-		return
+		return fmt.Errorf("workspace flag is required")
 	}
 
 	if outputDir == "" {
@@ -43,12 +42,11 @@ func PullTranslations(workspace, outputDir string, force bool) {
 		}
 		if outputDir == "" {
 			fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
-			return
+			return nil
 		}
 	}
 	if err := ensureOutputDirectory(outputDir); err != nil {
-		log.WithError(err).Errorf("Error with output directory: %v", err)
-		return
+		return fmt.Errorf("error with output directory: %w", err)
 	}
 
 	var p *pin.Pin
@@ -64,8 +62,7 @@ func PullTranslations(workspace, outputDir string, force bool) {
 	mgmntClient := utils.GetSuprSendMgmntClient()
 	locales, err := mgmntClient.ListPreferenceTranslations(workspace)
 	if err != nil {
-		log.WithError(err).Errorf("Couldn't fetch translation locales from workspace '%s'", workspace)
-		return
+		return fmt.Errorf("couldn't fetch translation locales from workspace '%s': %w", workspace, err)
 	}
 
 	successCount := 0
@@ -114,6 +111,7 @@ func PullTranslations(workspace, outputDir string, force bool) {
 			fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
 		}
 	}
+	return nil
 }
 
 func init() {

@@ -67,7 +67,9 @@ var categoryPullCmd = &cobra.Command{
 		}
 
 		translationDir := filepath.Join(outputDir, "translation")
-		translation.PullTranslations(workspace, translationDir, force)
+		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
+			return err
+		}
 
 		return nil
 	},

@@ -21,8 +21,8 @@ var listProfilesCmd = &cobra.Command{
 		}
 		cfg, _, err := EnsureConfig(path)
 		if err != nil {
-			log.WithError(err)
 			log.WithError(err).Error("Failed to load config")
+			return err
 		}
 
 		var names []string

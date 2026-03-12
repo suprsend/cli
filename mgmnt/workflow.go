@@ -281,7 +281,6 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
 	if err != nil {
 		return fmt.Errorf("failed constructing url: %w", err)
@@ -292,7 +291,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	}
 	q := u.Query()
 	q.Add("commit", commit)
-	q.Add("commit_message", urlEncodedCommitMessage)
+	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	log.Debugf("Pushing workflow to: %s", urlStr)

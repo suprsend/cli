@@ -3,7 +3,6 @@ package category
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 
@@ -62,8 +61,7 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()
-		urlEncodedCommitMessage := url.QueryEscape(commitMessage)
-		err = mgmnt_client.PushCategories(workspace, categories, commit, urlEncodedCommitMessage)
+		err = mgmnt_client.PushCategories(workspace, categories, commit, commitMessage)
 		if err != nil {
 			log.WithError(err).Error("Couldn't push categories")
 			return err

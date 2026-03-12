@@ -18,7 +18,7 @@ var (
 var profilesModifyCmd = &cobra.Command{
 	Use:   "modify",
 	Short: "Modify a profile",
-	Long:  "Modify a profile in the configs",
+	Long:  "Modify a profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 

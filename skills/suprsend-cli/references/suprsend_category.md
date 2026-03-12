@@ -1,13 +1,17 @@
-# suprsend profile
+# suprsend category
 
-Manage Profile
+Manage preference categories
 
-Manage Profile and store credentials
+```
+suprsend category [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for profile
+  -h, --help                   help for category
+  -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
+  -w, --workspace string       Workspace to push categories to (default "staging")
 ```
 
 ### Options inherited from parent commands

@@ -1,6 +1,6 @@
 ---
-name: suprsend
-description: "SuprSend CLI is a command-line interface tool for managing your SuprSend account and resources. It provides a convenient way to interact with the SuprSend API, allowing you to perform various operations such as managing workspaces, users, and more."
+name: suprsend-cli
+description: "SuprSend CLI is a command-line interface tool for managing your SuprSend account and resources. It provides a convenient way to interact with the SuprSend API, allowing you to perform various operations such as managing workspaces, users, workflow, templates and more."
 ---
 
 # suprsend

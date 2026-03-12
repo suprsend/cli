@@ -5,13 +5,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	removeName string
-)
+var removeName string
 
 var profileRemoveCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove a profile",
+	Long:  "Remove a profile from the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if removeName == "" {
 			removeName = promptForProfileName()

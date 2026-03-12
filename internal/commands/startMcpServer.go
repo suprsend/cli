@@ -129,8 +129,8 @@ This server will handle all the requests from user about SuprSend capabilities a
 			}
 		case "http":
 			utils.Banner(info.Version)
-			httpServer := server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/sse"))
-			log.Printf("HTTP server listening on :8080/sse")
+			httpServer := server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/"))
+			log.Printf("HTTP server listening on :8080/")
 			if err := httpServer.Start(":8080"); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}

@@ -52,7 +52,7 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --snapshot
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AWS_KMS_KEY_ID: ${{ secrets.AWS_KMS_KEY_ID }}

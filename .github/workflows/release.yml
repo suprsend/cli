@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write # Required to create releases and upload artifacts
+  id-token: write # Required for OIDC authentication to AWS
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Requests AWS credentials using OIDC to assume the specified role
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2.0.3
+        with:
+          deno-version: latest
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.0.0
+        with:
+          cosign-release: 'v3.0.5'
+
+      # Key setup for homebrew tap deployment
+      - name: Setup tap deploy key
+        run: |
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > /tmp/tap_key
+          chmod 600 /tmp/tap_key
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_KMS_KEY_ID: ${{ secrets.AWS_KMS_KEY_ID }}
+
+          # Environment variables for Homebrew tap deployment and macOS signing/notarization
+          PRIVATE_KEY_PATH: /tmp/tap_key
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f /tmp/tap_key
+
+      - name: Verify signature
+        run: |
+          cosign verify-blob \
+            --key "awskms:///${{ secrets.AWS_KMS_KEY_ID }}" \
+            --bundle dist/checksums.txt.sig \
+            dist/checksums.txt
+

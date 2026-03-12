@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -30,6 +31,8 @@ var workflowGetCmd = &cobra.Command{
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
+			cancel := p.Start(context.Background())
+			defer cancel()
 		}
 
 		workflow, err := mgmntClient.GetWorkflowDetail(workspace, slug, mode)

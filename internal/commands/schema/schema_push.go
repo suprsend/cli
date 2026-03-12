@@ -90,6 +90,8 @@ var schemaPushCmd = &cobra.Command{
 						return err
 					}
 
+					stats.Success++
+
 					if p != nil && cancel != nil {
 						if stats.Success > 0 {
 							p.Stop(fmt.Sprintf("Pushed schema: %s", slug))

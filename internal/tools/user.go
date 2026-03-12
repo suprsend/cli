@@ -102,10 +102,7 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	workspace := request.GetString("workspace", "staging")
-	tenantId, err := request.RequireString("tenant_id")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	tenantId := request.GetString("tenant_id", "default")
 	category, err := request.RequireString("category")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -413,7 +410,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of a category to get."),
-				mcp.Required(),
 			),
 			mcp.WithBoolean("channel_preferences",
 				mcp.Description("Whether to include channel preferences in the response. Default is false."),

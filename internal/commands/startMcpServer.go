@@ -132,8 +132,8 @@ This server will handle all the requests from user about SuprSend capabilities a
 			}
 		case "http":
 			utils.Banner(info.Version)
-			httpServer := server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/sse"))
-			log.Printf("HTTP server listening on :8080/sse")
+			httpServer := server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/"))
+			log.Printf("HTTP server listening on :8080/")
 			if err := httpServer.Start(":8080"); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
@@ -175,7 +175,4 @@ func init() {
 	startMcpServerCmd.PersistentFlags().StringVarP(&tools, "tools", "T", "all", "The types of tools to use. Can be either 'all'/'none' or comma separated list of tool names.")
 	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "The types of events to use. Can be either 'all'/'none' or comma separated list of event slugs.")
 	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "The types of workflows to use. Can be either 'all'/'none' or comma separated list of workflow slugs.")
-	startMcpServerCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
-
-	viper.BindPFlag("service_token", startMcpServerCmd.PersistentFlags().Lookup("service-token"))
 }

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -36,6 +37,8 @@ var workflowTrigger = &cobra.Command{
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
+			cancel := p.Start(context.Background())
+			defer cancel()
 		}
 		wfRequestBody, err := os.ReadFile(path)
 		if err != nil {

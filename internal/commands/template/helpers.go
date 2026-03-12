@@ -154,7 +154,6 @@ func WriteTemplatesToFiles(results []templateResult, outputDir string) (*Templat
 	return stats, nil
 }
 
-// deepCopyMap creates a deep copy of a map[string]any so mutations don't affect the original.
 func deepCopyMap(m map[string]any) map[string]any {
 	b, _ := json.Marshal(m)
 	var out map[string]any
@@ -230,13 +229,7 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 
 		filename := strings.ReplaceAll(path, ".", "_") + ext
 		extractedFiles[filename] = content
-		// Use $ref for objects/arrays (JSON), $file for raw strings (html, txt, etc.)
-		switch val.(type) {
-		case string:
-			parent[lastKey] = map[string]any{"$file": filename}
-		default:
-			parent[lastKey] = map[string]any{"$ref": filename}
-		}
+		delete(parent, lastKey)
 	}
 
 	// Write extracted content files

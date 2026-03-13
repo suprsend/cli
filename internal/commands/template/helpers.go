@@ -14,12 +14,21 @@ import (
 )
 
 // fileRefKeys defines which variant keys should be extracted into separate files.
-// Map key: dot-notation path, value: file extension for the extracted file.
+// Map key: dot-notation path, value: config with file extension and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
-var fileRefKeys = map[string]string{
-	"content":                           ".json",
-	"content.body.designer.design_json": ".json",
-	"content.body.designer.html":        ".html",
+type fileRefConfig struct {
+	Ext     string
+	KeepRef bool // true: replace with @filename, false: delete the key from parent
+}
+
+var fileRefKeys = map[string]fileRefConfig{
+	"content":                           {Ext: ".json", KeepRef: false},
+	"content.body.designer.design_json": {Ext: ".json", KeepRef: true},
+	"content.body.designer.html":        {Ext: ".html", KeepRef: true},
+	"content.body.designer.text":        {Ext: ".txt", KeepRef: true},
+	"content.body.raw.html":             {Ext: ".html", KeepRef: true},
+	"content.body.raw.text":             {Ext: ".txt", KeepRef: true},
+	"content.body_text":                 {Ext: ".txt", KeepRef: true},
 }
 
 type TemplateWriteStats struct {
@@ -137,7 +146,13 @@ func WriteTemplatesToFiles(results []templateResult, outputDir string) (*Templat
 				continue
 			}
 
-			variantDir := filepath.Join(templateDir, channel, variantName)
+			var variantDir string
+			tenantID, _ := variant["tenant_id"].(string)
+			if tenantID != "" {
+				variantDir = filepath.Join(templateDir, channel, "__tenant_overrides__", tenantID, variantName)
+			} else {
+				variantDir = filepath.Join(templateDir, channel, variantName)
+			}
 			if err := os.MkdirAll(variantDir, 0o755); err != nil {
 				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create variant directory '%s': %v", variantDir, err))
 				continue
@@ -216,20 +231,24 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 	})
 
 	for _, path := range sortedPaths {
-		ext := fileRefKeys[path]
+		cfg := fileRefKeys[path]
 		parent, lastKey, val, ok := getNestedValue(variantCopy, path)
 		if !ok || val == nil {
 			continue
 		}
 
-		content, extracted := valueToFileContent(val)
-		if !extracted {
+		content, hasContent := valueToFileContent(val)
+		if !hasContent {
 			continue
 		}
 
-		filename := strings.ReplaceAll(path, ".", "_") + ext
+		filename := strings.ReplaceAll(path, ".", "_") + cfg.Ext
 		extractedFiles[filename] = content
-		delete(parent, lastKey)
+		if cfg.KeepRef {
+			parent[lastKey] = "@" + filename
+		} else {
+			delete(parent, lastKey)
+		}
 	}
 
 	// Write extracted content files

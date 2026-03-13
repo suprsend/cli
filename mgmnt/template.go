@@ -59,6 +59,44 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 	return resp.Result().(*TemplateVariantResponse).Results, nil
 }
 
+func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map[string]any, commit, commitMessage string) error {
+	channel, _ := variant["channel"].(string)
+	variantID, _ := variant["id"].(string)
+	if channel == "" || variantID == "" {
+		return fmt.Errorf("variant is missing required 'channel' or 'id' field")
+	}
+
+	// Deep copy variant so we don't mutate the caller's map
+	b, _ := json.Marshal(variant)
+	var body map[string]any
+	json.Unmarshal(b, &body)
+	body["commit"] = commit
+	body["commit_message"] = commitMessage
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	url := fmt.Sprintf("%sv2/%s/template/%s/channel/%s/variant/%s/", c.mgmnt_base_URL, workspace, slug, channel, variantID)
+
+	log.Debugf("Pushing variant %s/%s for template %s in workspace %s", channel, variantID, slug, workspace)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetBody(body).
+		Post(url)
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return nil
+}
+
 func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)

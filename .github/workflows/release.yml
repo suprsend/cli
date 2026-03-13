@@ -41,6 +41,9 @@ jobs:
         with:
           cosign-release: 'v3.0.5'
 
+      - name: Store public key for signature verification
+        run: cosign public-key --key "awskms:///${{ secrets.AWS_KMS_KEY_ID }}" > /tmp/public_key.pem
+
       # Key setup for homebrew tap deployment
       - name: Setup tap deploy key
         run: |
@@ -65,14 +68,21 @@ jobs:
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
 
-      - name: Clean up SSH key
-        if: always()
-        run: rm -f /tmp/tap_key
-
       - name: Verify signature
         run: |
           cosign verify-blob \
-            --key "awskms:///${{ secrets.AWS_KMS_KEY_ID }}" \
+            --key /tmp/public_key.pem \
             --bundle dist/checksums.txt.sig \
             dist/checksums.txt
+
+      - name: Upload public key to release
+        run: gh release upload "${{ github.ref_name }}" /tmp/public_key.pem --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up keys
+        if: always()
+        run: |
+          rm -f /tmp/tap_key
+          rm -f /tmp/public_key.pem
 

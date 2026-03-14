@@ -3,6 +3,7 @@ package mgmnt
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -59,7 +60,39 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 	return resp.Result().(*TemplateVariantResponse).Results, nil
 }
 
-func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map[string]any, commit, commitMessage string) error {
+func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels []string) error {
+	if slug == "" {
+		return fmt.Errorf("slug cannot be empty")
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr := fmt.Sprintf("%sv2/%s/template/%s/", c.mgmnt_base_URL, workspace, slug)
+
+	log.Debugf("Creating template %s in workspace %s", slug, workspace)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]any{
+			"enabled_channels": enabledChannels,
+		}).
+		Post(urlStr)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return nil
+}
+
+func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map[string]any) error {
 	channel, _ := variant["channel"].(string)
 	variantID, _ := variant["id"].(string)
 	if channel == "" || variantID == "" {
@@ -70,8 +103,6 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 	b, _ := json.Marshal(variant)
 	var body map[string]any
 	json.Unmarshal(b, &body)
-	body["commit"] = commit
-	body["commit_message"] = commitMessage
 
 	client := client.NewHTTPClient()
 	defer client.Close()
@@ -86,6 +117,86 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 		Post(url)
 	if err != nil {
 		return err
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return nil
+}
+
+type PreCommitVariant struct {
+	Channel string                `json:"channel"`
+	ID      string                `json:"id"`
+	HasDiff bool                  `json:"has_diff"`
+	Errors  map[string][]string   `json:"errors"`
+}
+
+type PreCommitValidateResponse struct {
+	IsNew      bool               `json:"is_new"`
+	HasChanges bool               `json:"has_changes"`
+	Variants   []PreCommitVariant `json:"variants"`
+}
+
+func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitValidateResponse, error) {
+	if slug == "" {
+		return nil, fmt.Errorf("slug cannot be empty")
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr := fmt.Sprintf("%sv2/%s/template/%s/pre_commit_validate/", c.mgmnt_base_URL, workspace, slug)
+
+	log.Debugf("Pre-commit validating template %s in workspace %s", slug, workspace)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetHeader("Content-Type", "application/json").
+		SetResult(&PreCommitValidateResponse{}).
+		Post(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return nil, fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return resp.Result().(*PreCommitValidateResponse), nil
+}
+
+func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, variants []map[string]any) error {
+	if slug == "" {
+		return fmt.Errorf("slug cannot be empty")
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
+	urlStr := fmt.Sprintf("%sv2/%s/template/%s/commit/?commit_message=%s", c.mgmnt_base_URL, workspace, slug, urlEncodedCommitMessage)
+
+	log.Debugf("Committing template %s in workspace %s", slug, workspace)
+	req := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetHeader("Content-Type", "application/json")
+
+	if variants != nil {
+		req.SetBody(map[string]any{
+			"variants": variants,
+		})
+	}
+
+	resp, err := req.Patch(urlStr)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
 		var errorResp ErrorResponse

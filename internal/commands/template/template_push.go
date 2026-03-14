@@ -5,6 +5,7 @@ package template
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,8 +13,117 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 	"github.com/yarlson/pin"
 )
+
+func readMainJSON(templateDir string) (map[string]any, error) {
+	mainFile := filepath.Join(templateDir, "main.json")
+	data, err := os.ReadFile(mainFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read main.json: %w", err)
+	}
+	var mainData map[string]any
+	if err := json.Unmarshal(data, &mainData); err != nil {
+		return nil, fmt.Errorf("failed to parse main.json: %w", err)
+	}
+	return mainData, nil
+}
+
+func pushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
+	mainData, err := readMainJSON(templateDir)
+	if err != nil {
+		log.WithError(err).Errorf("Failed to read main.json for template %s", slug)
+		stats.Failed++
+		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read main.json for template %s: %v", slug, err))
+		return
+	}
+
+	variants, err := readTemplateVariants(templateDir)
+	if err != nil {
+		log.WithError(err).Errorf("Failed to read template %s", slug)
+		stats.Failed++
+		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template %s: %v", slug, err))
+		return
+	}
+
+	var enabledChannels []string
+	if channels, ok := mainData["enabled_channels"].([]any); ok {
+		for _, ch := range channels {
+			if s, ok := ch.(string); ok {
+				enabledChannels = append(enabledChannels, s)
+			}
+		}
+	}
+	if err := mgmntClient.CreateTemplate(workspace, slug, enabledChannels); err != nil {
+		log.WithError(err).Errorf("Failed to create template %s", slug)
+		stats.Failed++
+		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create template %s: %v", slug, err))
+		return
+	}
+
+	var pushFailed bool
+	for _, variant := range variants {
+		if err := mgmntClient.PushTemplateVariant(workspace, slug, variant); err != nil {
+			log.WithError(err).Errorf("Failed to push variant for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant for template %s: %v", slug, err))
+			pushFailed = true
+		}
+	}
+
+	if pushFailed {
+		stats.Failed++
+		return
+	}
+
+	if commit {
+		if force {
+			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
+			if err != nil {
+				log.WithError(err).Errorf("Failed to pre-commit validate template %s", slug)
+				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to pre-commit validate template %s: %v", slug, err))
+				stats.Failed++
+				return
+			}
+
+			var validVariants []map[string]any
+			for _, v := range validateResp.Variants {
+				if len(v.Errors) > 0 {
+					log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
+					stats.Errors = append(stats.Errors, fmt.Sprintf("Skipped variant %s/%s for template %s (has errors)", v.Channel, v.ID, slug))
+					continue
+				}
+				validVariants = append(validVariants, map[string]any{
+					"channel": v.Channel,
+					"id":      v.ID,
+				})
+			}
+
+			if len(validVariants) == 0 {
+				log.Errorf("No valid variants to commit for template %s", slug)
+				stats.Errors = append(stats.Errors, fmt.Sprintf("No valid variants to commit for template %s", slug))
+				stats.Failed++
+				return
+			}
+
+			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, validVariants); err != nil {
+				log.WithError(err).Errorf("Failed to commit template %s", slug)
+				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to commit template %s: %v", slug, err))
+				stats.Failed++
+				return
+			}
+		} else {
+			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, nil); err != nil {
+				log.WithError(err).Errorf("Failed to commit template %s", slug)
+				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to commit template %s: %v", slug, err))
+				stats.Failed++
+				return
+			}
+		}
+	}
+
+	stats.Success++
+}
 
 var templatePushCmd = &cobra.Command{
 	Use:   "push",
@@ -22,9 +132,10 @@ var templatePushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
-		commit, _ := cmd.Flags().GetString("commit")
+		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		slug, _ := cmd.Flags().GetString("slug")
+		force, _ := cmd.Flags().GetBool("force")
 
 		if path == "" {
 			path = filepath.Join(".", "suprsend", "templates")
@@ -63,30 +174,11 @@ var templatePushCmd = &cobra.Command{
 					cancel = p.Start(context.Background())
 				}
 
-				variants, err := readTemplateVariants(templateDir)
-				if err != nil {
-					log.WithError(err).Errorf("Failed to read template %s", slug)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template %s: %v", slug, err))
-				} else {
-					var pushFailed bool
-					for _, variant := range variants {
-						if err := mgmntClient.PushTemplateVariant(workspace, slug, variant, commit, commitMessage); err != nil {
-							log.WithError(err).Errorf("Failed to push variant for template %s", slug)
-							stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant for template %s: %v", slug, err))
-							pushFailed = true
-						}
-					}
-					if pushFailed {
-						stats.Failed++
-					} else {
-						stats.Success++
-					}
-				}
+				pushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, stats)
 
 				if p != nil && cancel != nil {
 					if stats.Success > 0 {
-						p.Stop(fmt.Sprintf("Pushed template: %s (%d variants)", slug, len(variants)))
+						p.Stop(fmt.Sprintf("Pushed template: %s", slug))
 					} else {
 						p.Stop("")
 					}
@@ -125,8 +217,10 @@ var templatePushCmd = &cobra.Command{
 					cancel = p.Start(context.Background())
 				}
 
-				variants, err := readTemplateVariants(templateDir)
-				if err != nil {
+				prevFailed := stats.Failed
+				pushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, stats)
+
+				if stats.Failed > prevFailed {
 					if p != nil && cancel != nil {
 						p.Stop("")
 						cancel()
@@ -134,38 +228,11 @@ var templatePushCmd = &cobra.Command{
 						cancel = nil
 					}
 					hasError = true
-					log.WithError(err).Errorf("Failed to read template %s", templateSlug)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template %s: %v", templateSlug, err))
 					continue
 				}
 
-				var pushFailed bool
-				for _, variant := range variants {
-
-					if err := mgmntClient.PushTemplateVariant(workspace, templateSlug, variant, commit, commitMessage); err != nil {
-
-						log.WithError(err).Errorf("Failed to push variant for template %s", templateSlug)
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant for template %s: %v", templateSlug, err))
-						pushFailed = true
-					}
-				}
-
-				if pushFailed {
-					if p != nil && cancel != nil {
-						p.Stop("")
-						cancel()
-						p = nil
-						cancel = nil
-					}
-					hasError = true
-					stats.Failed++
-					continue
-				}
-
-				stats.Success++
 				if p != nil && cancel != nil {
-					p.Stop(fmt.Sprintf("Pushed template: %s (%d variants)", templateSlug, len(variants)))
+					p.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
 					cancel()
 					p = nil
 					cancel = nil
@@ -221,8 +288,9 @@ func readTemplateVariants(templateDir string) ([]map[string]any, error) {
 
 func init() {
 	templatePushCmd.PersistentFlags().StringP("dir", "d", "", "Input directory for templates (default: ./suprsend/templates)")
-	templatePushCmd.PersistentFlags().StringP("commit", "c", "false", "Commit the templates (--commit=true)")
+	templatePushCmd.PersistentFlags().BoolP("commit", "c", false, "Commit the pushed templates to live")
 	templatePushCmd.PersistentFlags().StringP("commit-message", "m", "", "Commit message describing the changes")
 	templatePushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to push")
+	templatePushCmd.PersistentFlags().BoolP("force", "f", false, "Force commit by skipping variants with errors")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

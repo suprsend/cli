@@ -2,6 +2,8 @@
 
 Remove a profile
 
+Remove a profile from the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.
+
 ```
 suprsend profile remove [flags]
 ```

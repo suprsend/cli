@@ -81,6 +81,19 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    args:
+      - "sign-blob"
+      - "--key"
+      - "awskms:///{{ .Env.AWS_KMS_KEY_ID }}"
+      - "--bundle"
+      - "${signature}"
+      - "${artifact}"
+      - "--yes"
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
@@ -135,7 +148,7 @@ notarize:
         # The password to be used to open the certificate.
         #
         # Templates: allowed.
-        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
+        # password: "{{.Env.MACOS_SIGN_PASSWORD}}"
 
       # Then, we notarize the binaries.
       #

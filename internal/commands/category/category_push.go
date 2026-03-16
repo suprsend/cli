@@ -3,7 +3,6 @@ package category
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 
@@ -18,7 +17,7 @@ var categoryPushCmd = &cobra.Command{
 	Use:   "push",
 	Long:  "Push categories to a workspace",
 	Short: "Push categories to a workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
 		commit, _ := cmd.Flags().GetString("commit")
@@ -38,13 +37,13 @@ var categoryPushCmd = &cobra.Command{
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return
+			return err
 		}
 
 		categories, err := ReadFromFile(path)
 		if err != nil {
 			log.WithError(err).Error("Couldn't read categories from file")
-			return
+			return err
 		}
 
 		var p *pin.Pin
@@ -62,15 +61,15 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()
-		urlEncodedCommitMessage := url.QueryEscape(commitMessage)
-		err = mgmnt_client.PushCategories(workspace, categories, commit, urlEncodedCommitMessage)
+		err = mgmnt_client.PushCategories(workspace, categories, commit, commitMessage)
 		if err != nil {
 			log.WithError(err).Error("Couldn't push categories")
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
 		}
+		return nil
 	},
 }
 

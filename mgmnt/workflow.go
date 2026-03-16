@@ -73,11 +73,25 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 		}
 
 		log.Debugf("Getting workflows for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", "/")
+		if err != nil {
+			return nil, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(currentLimit))
+		q.Add("offset", strconv.Itoa(currentOffset))
+		q.Add("mode", mode)
+		u.RawQuery = q.Encode()
+		urlStr = u.String()
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkflowAPIResponse{}).
-			Get(c.mgmnt_base_URL + "v1/" + workspace + "/workflow/?limit=" + strconv.Itoa(currentLimit) + "&offset=" + strconv.Itoa(currentOffset) + "&mode=" + mode)
+			Get(urlStr)
 		if err != nil {
 			log.Errorf("Error getting workflows: %s", err)
 			return nil, err
@@ -120,14 +134,24 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (*map[string]any, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
-
-	url := fmt.Sprintf("%sv1/%s/workflow/%s/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("mode", mode)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&map[string]any{}).
-		Get(url)
+		Get(urlStr)
 	if err != nil {
 		return nil, err
 	}
@@ -145,13 +169,24 @@ func (c *SS_MgmntClient) GetWorkflowDetail(workspace, slug, mode string) (*Workf
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	url := fmt.Sprintf("%sv1/%s/workflow/%s/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("mode", mode)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&WorkflowDetailResponse{}).
-		Get(url)
+		Get(urlStr)
 	if err != nil {
 		return nil, err
 	}
@@ -181,11 +216,25 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 	totalCount := 0
 
 	for {
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", "/")
+		if err != nil {
+			return nil, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
+		q.Add("mode", mode)
+		u.RawQuery = q.Encode()
+		urlStr = u.String()
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkflowsResponse{}).
-			Get(c.mgmnt_base_URL + "v1/" + workspace + "/workflow/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
+			Get(urlStr)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to get workflows: %v\n", err)
 			return nil, err
@@ -232,9 +281,20 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
-	url := fmt.Sprintf("%sv1/%s/workflow/%s/?commit=%s&commit_message=%s", c.mgmnt_base_URL, workspace, slug, commit, urlEncodedCommitMessage)
-	log.Debugf("Pushing workflow to: %s", url)
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
+	if err != nil {
+		return fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("commit", commit)
+	q.Add("commit_message", commitMessage)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
+	log.Debugf("Pushing workflow to: %s", urlStr)
 
 	res, err := client.R().
 		SetDebug(c.debug).
@@ -242,7 +302,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		SetHeader("Content-Type", "application/json").
 		SetBody(workflow).
 		SetResult(&WorkflowPushResponse{}).
-		Post(url)
+		Post(urlStr)
 	if err != nil {
 		log.Errorf("Error pushing workflow: %s", err)
 		return err
@@ -270,9 +330,17 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 
 	client := client.NewHTTPClient()
 	defer client.Close()
-
-	urlStr := fmt.Sprintf("%sv1/%s/workflow/%s/enable/", c.mgmnt_base_URL, workspace, slug)
-
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "enable", "/")
+	if err != nil {
+		return fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	urlStr = u.String()
+	fmt.Println(urlStr)
+	fmt.Println(urlStr)
 	body := map[string]interface{}{
 		"is_enabled": enabled,
 	}

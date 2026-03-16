@@ -16,7 +16,7 @@ var categoryCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit categories",
 	Long:  "Commit categories to a workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMsg, _ := cmd.Flags().GetString("commit-message")
 		dir, _ := cmd.Flags().GetString("dir")
@@ -46,12 +46,12 @@ var categoryCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeCategories(workspace, commitMsg)
 		if err != nil {
 			log.WithError(err).Error("Couldn't commit categories")
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Committed categories to %s", workspace))
 		}
-
+		return nil
 	},
 }
 

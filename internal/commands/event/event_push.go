@@ -16,7 +16,7 @@ var eventPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push linked events",
 	Long:  "Push linked events in schemas",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
 		if path == "" {
@@ -42,13 +42,14 @@ var eventPushCmd = &cobra.Command{
 				p.Stop("")
 			}
 			log.WithError(err).Error("Failed to push events")
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop("Successfully pushed events")
 		} else {
 			fmt.Fprintf(os.Stdout, "Successfully pushed events\n")
 		}
+		return nil
 	},
 }
 

@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Uncomment below to enable automated Go module dependency updates.
+  # - package-ecosystem: gomod
+  #   directory: /
+  #   schedule:
+  #     interval: weekly
+  #   groups:
+  #     go-deps:
+  #       patterns:
+  #         - "*"

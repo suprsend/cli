@@ -12,10 +12,10 @@ var worklowEnableCmd = &cobra.Command{
 	Use:   "enable",
 	Short: "Enables a workflow.",
 	Long:  "Enables a workflow to activate. Example: suprsend workflow enable <slug>",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			log.Error("Category slug is required.")
-			return
+			log.Error("workflow_slug is required.")
+			return fmt.Errorf("workflow_slug is required.")
 		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := args[0]
@@ -24,10 +24,11 @@ var worklowEnableCmd = &cobra.Command{
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, true)
 		if err != nil {
 			log.Error(err.Error())
-			return
+			return err
 		}
 
 		fmt.Printf("Enabled workflow: %s\n", slug)
+		return nil
 	},
 }
 

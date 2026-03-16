@@ -19,19 +19,18 @@ var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push preference translations",
 	Long:  "Push preference translations",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		locale, _ := cmd.Flags().GetString("locale")
 		dir, _ := cmd.Flags().GetString("dir")
 
-		PushTranslations(workspace, locale, dir)
+		return PushTranslations(workspace, locale, dir)
 	},
 }
 
-func PushTranslations(workspace, locale, dir string) {
+func PushTranslations(workspace, locale, dir string) error {
 	if workspace == "" {
-		log.Error("workspace flag is required")
-		return
+		return fmt.Errorf("workspace flag is required")
 	}
 
 	// Determine the translations directory
@@ -43,20 +42,17 @@ func PushTranslations(workspace, locale, dir string) {
 
 	// Check if directory exists
 	if _, err := os.Stat(translationsDir); os.IsNotExist(err) {
-		log.Errorf("Directory %s does not exist", translationsDir)
-		return
+		return fmt.Errorf("directory %s does not exist", translationsDir)
 	}
 
 	// Read all files in the translations directory
 	files, err := os.ReadDir(translationsDir)
 	if err != nil {
-		log.WithError(err).Errorf("Couldn't read directory %s", translationsDir)
-		return
+		return fmt.Errorf("couldn't read directory %s: %w", translationsDir, err)
 	}
 
 	if locale == "en" {
-		log.Warnf("cannot push English translations")
-		return
+		return fmt.Errorf("cannot push English translations")
 	}
 
 	// Filter for locale JSON files (e.g., en.json, es.json)
@@ -83,8 +79,7 @@ func PushTranslations(workspace, locale, dir string) {
 	}
 
 	if len(localeFiles) == 0 {
-		log.Warnf("No locale JSON files found in %s", translationsDir)
-		return
+		return fmt.Errorf("no locale JSON files found in %s", translationsDir)
 	}
 
 	var p *pin.Pin
@@ -158,7 +153,9 @@ func PushTranslations(workspace, locale, dir string) {
 		for _, errMsg := range errors {
 			fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
 		}
+		return fmt.Errorf("%d locale(s) failed to push", failedCount)
 	}
+	return nil
 }
 
 func init() {

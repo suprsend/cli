@@ -16,7 +16,7 @@ var schemaPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull schemas",
 	Long:  `Pull schemas in a workspace`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir, _ := cmd.Flags().GetString("dir")
 		mode, _ := cmd.Flags().GetString("mode")
 		slug, _ := cmd.Flags().GetString("slug")
@@ -32,19 +32,18 @@ var schemaPullCmd = &cobra.Command{
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
-				return
+				return fmt.Errorf("no output directory specified")
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
 			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
-			return
+			return err
 		}
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to create directory: %v\n", err)
-			return
+			return err
 		}
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -61,23 +60,25 @@ var schemaPullCmd = &cobra.Command{
 			schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "Error: Failed to get schema: %v\n", err)
-				return
+				return err
 			}
 			schemaData, err := json.MarshalIndent(schema, "", "  ")
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "Error: Failed to marshal schema: %v\n", err)
-				return
+				return err
 			}
 			if p != nil {
 				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			}
-			os.WriteFile(filepath.Join(outputDir, slug+".json"), schemaData, 0644)
-			return
+			if err := os.WriteFile(filepath.Join(outputDir, slug+".json"), schemaData, 0644); err != nil {
+				return fmt.Errorf("failed to write schema file: %w", err)
+			}
+			return nil
 		}
 		schemas, err := mgmntClient.GetSchemas(workspace, mode)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Pulled %d schemas from %s", len(schemas.Results), workspace))
@@ -85,7 +86,7 @@ var schemaPullCmd = &cobra.Command{
 		stats, err := WriteSchemasToFiles(schemas, outputDir)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to save schemas: %v\n", err)
-			return
+			return err
 		}
 
 		fmt.Fprintf(os.Stdout, "\n=== Schema Pull Summary ===\n")
@@ -99,6 +100,7 @@ var schemaPullCmd = &cobra.Command{
 				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 			}
 		}
+		return nil
 	},
 }
 

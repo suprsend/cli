@@ -18,19 +18,18 @@ var (
 var profilesModifyCmd = &cobra.Command{
 	Use:   "modify",
 	Short: "Modify a profile",
-	Long:  "Modify a profile in the configs",
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  "Modify a profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load or create config")
-			return
+			return err
 		}
 		if modifyName != "" {
 			if _, exists := cfg.Profiles[modifyName]; !exists {
-				log.Infof("Profile %q does not exist. Use the command 'suprsend profile list' to see all profiles.", modifyName)
-				return
+				return fmt.Errorf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName)
 			}
 		}
 
@@ -50,13 +49,14 @@ var profilesModifyCmd = &cobra.Command{
 			err := SaveConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
-				return
+				return err
 			}
 
 			log.Infof("Profile %s modified successfully", modifyName)
 		} else {
 			runModifyInteractive(cfg, path)
 		}
+		return nil
 	},
 }
 

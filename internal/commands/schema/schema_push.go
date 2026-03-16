@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +18,7 @@ var schemaPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push schemas",
 	Long:  "Push schemas in a workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug, _ := cmd.Flags().GetString("slug")
 		commit, _ := cmd.Flags().GetString("commit")
@@ -31,18 +30,18 @@ var schemaPushCmd = &cobra.Command{
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return
+			return err
 		}
 
 		if err := validateInputDirectory(path); err != nil {
 			log.Errorf("Error with input directory: %v\n", err)
-			return
+			return err
 		}
 
 		files, err := os.ReadDir(path)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to read local schema directory")
-			return
+			return err
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -82,15 +81,16 @@ var schemaPushCmd = &cobra.Command{
 					var schema map[string]any
 					if err := json.Unmarshal(data, &schema); err != nil {
 						log.WithError(err).Errorf("Failed to parse JSON for %s", filePath)
-						return
+						return err
 					}
 
-					urlEncodedCommitMessage := url.QueryEscape(commitMessage)
-					err = mgmntClient.PushSchema(workspace, slug, schema, commit, urlEncodedCommitMessage)
+					err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
 					if err != nil {
 						log.WithError(err).Errorf("Failed to push schema %s", slug)
-						return
+						return err
 					}
+
+					stats.Success++
 
 					if p != nil && cancel != nil {
 						if stats.Success > 0 {
@@ -116,7 +116,7 @@ var schemaPushCmd = &cobra.Command{
 					fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 				}
 			}
-			return
+			return nil
 		}
 
 		for _, file := range files {
@@ -206,6 +206,7 @@ var schemaPushCmd = &cobra.Command{
 				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 			}
 		}
+		return nil
 	},
 }
 

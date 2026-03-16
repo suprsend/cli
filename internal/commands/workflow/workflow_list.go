@@ -17,7 +17,7 @@ var workflowListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List workflows for a workspace",
 	Long:  `List workflows for a workspace`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
 			p = pin.New("Loading...",
@@ -37,7 +37,7 @@ var workflowListCmd = &cobra.Command{
 		workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch workflows")
-			return
+			return err
 		}
 
 		msg := fmt.Sprintf("Listed %d workflows from %s with offset %d", len(workflows.Results), workspace, offset)
@@ -48,9 +48,10 @@ var workflowListCmd = &cobra.Command{
 
 		if len(workflows.Results) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)
-			return
+			return nil
 		}
 		utils.OutputData(workflows.Results, outputType)
+		return nil
 	},
 }
 

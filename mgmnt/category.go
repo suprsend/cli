@@ -61,14 +61,24 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 
 	client := client.NewHTTPClient()
 	defer client.Close()
-	url := fmt.Sprintf("%sv1/%s/preference_category/?mode=%s", c.mgmnt_base_URL, workspace, mode)
-
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("mode", mode)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
 		SetResult(PreferenceCategoryResponse{}).
-		Get(url)
+		Get(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
@@ -88,9 +98,19 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
-	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
-	urlStr := fmt.Sprintf("%sv1/%s/preference_category/?commit=%s&commit_message=%s", c.mgmnt_base_URL, workspace, commit, urlEncodedCommitMessage)
-
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("commit", commit)
+	q.Add("commit_message", commitMessage)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
@@ -120,9 +140,18 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
-	encodedCommitMessage := url.QueryEscape(commitMessage)
-
-	urlStr := fmt.Sprintf("%sv1/%s/preference_category/commit/?commit_message=%s", c.mgmnt_base_URL, workspace, encodedCommitMessage)
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "commit", "/")
+	if err != nil {
+		return fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("commit_message", commitMessage)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
 	resp, err := client.R().
 		SetDebug(c.debug).
 		SetHeader("Content-Type", "application/json").

@@ -16,7 +16,7 @@ var workflowPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull workflows from SuprSend workspace to local",
 	Long:  `Pull workflows from SuprSend workspace to local`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -32,13 +32,12 @@ var workflowPullCmd = &cobra.Command{
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
-				return
+				return fmt.Errorf("no output directory specified")
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
 			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
-			return
+			return err
 		}
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -55,24 +54,27 @@ var workflowPullCmd = &cobra.Command{
 			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "Error: Failed to get workflow detail: %v\n", err)
-				return
+				return err
 			}
 			workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow: %v\n", err)
-				return
+				return err
 			}
-			os.WriteFile(filepath.Join(outputDir, fmt.Sprintf("%s.json", slug)), workflowJson, 0644)
+			if err := os.WriteFile(filepath.Join(outputDir, fmt.Sprintf("%s.json", slug)), workflowJson, 0644); err != nil {
+				fmt.Fprintf(os.Stdout, "Error: Failed to write workflow file: %v\n", err)
+				return err
+			}
 			if p != nil {
 				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			}
-			return
+			return nil
 		}
 
 		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to get workflows: %v\n", err)
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Pulled %d workflows from %s", len(workflows_resp.Results), workspace))
@@ -81,7 +83,7 @@ var workflowPullCmd = &cobra.Command{
 		stats, err := WriteWorkflowsToFiles(*workflows_resp, outputDir)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Error: Failed to save workflows: %v\n", err)
-			return
+			return err
 		}
 
 		fmt.Fprintf(os.Stdout, "\n=== Workflow Pull Summary ===\n")
@@ -95,6 +97,7 @@ var workflowPullCmd = &cobra.Command{
 				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 			}
 		}
+		return nil
 	},
 }
 

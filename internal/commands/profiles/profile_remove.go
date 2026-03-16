@@ -5,37 +5,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	removeName string
-)
+var removeName string
 
 var profileRemoveCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove a profile",
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  "Remove a profile from the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if removeName == "" {
 			removeName = promptForProfileName()
 			if removeName == "" {
 				log.Error("No profile name provided")
-				return
+				return nil
 			}
 		}
 
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return
+			return err
 		}
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
-			return
+			return err
 		}
 
 		if _, exists := cfg.Profiles[removeName]; !exists {
 			log.Infof("Profile %q does not exist. Use the command 'suprsend profile list' to see all profiles.", removeName)
-			return
+			return nil
 		}
 
 		delete(cfg.Profiles, removeName)
@@ -53,8 +52,9 @@ var profileRemoveCmd = &cobra.Command{
 
 		if err := SaveConfig(cfg, path); err != nil {
 			log.WithError(err).Error("Failed to save")
-			return
+			return err
 		}
+		return nil
 	},
 }
 

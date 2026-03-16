@@ -17,10 +17,7 @@ func getUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -39,19 +36,19 @@ func getUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 }
 
 func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	distinct_id, err := request.RequireString("distinct_id")
+	distinctId, err := request.RequireString("distinct_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	action, err := request.RequireString("action")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+	if action == "" {
+		return mcp.NewToolResultError("action is required"), nil
 	}
 
 	key := request.GetString("key", "")
@@ -61,7 +58,7 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError("key is required for " + action), nil
 	}
 
-	if utils.RequiresKey(action) && value == "" {
+	if utils.RequiresValue(action) && value == "" {
 		return mcp.NewToolResultError("value is required for " + action), nil
 	}
 
@@ -70,20 +67,29 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	identity_provider := request.GetString("identity_provider", "")
-	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
+	ms_teams_details, err := getMSTeamsDetails(request, action)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	// todo:make everywhere mcp error is returned
 	if err != nil {
 		return nil, err
 	}
-	userInstance := suprsend_client.Users.GetEditInstance(distinct_id)
+	userInstance := suprsendClient.Users.GetEditInstance(distinctId)
 
-	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, identity_provider, distinct_id, workspace)
+	webpush_details, err := getWebpushDetails(request, action)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	out, err := utils.HandleUserAction(ctx, userInstance, action, key, value, slack_details, ms_teams_details, webpush_details, distinctId, workspace)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = suprsend_client.Users.Edit(ctx, suprsend.UserEditRequest{EditInstance: userInstance})
+	_, err = suprsendClient.Users.Edit(ctx, suprsend.UserEditRequest{EditInstance: userInstance})
 	if err != nil {
 		return nil, err
 	}
@@ -91,36 +97,41 @@ func upsertUserHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 }
 
 func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	distinct_id, err := request.RequireString("distinct_id")
+	distinctId, err := request.RequireString("distinct_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
+	tenantId := request.GetString("tenant_id", "default")
 	category, err := request.RequireString("category")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
+	channelPreferences := request.GetBool("channel_preferences", false)
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return nil, err
 	}
 
 	var userPref interface{}
 	if category == "" {
-		userPref, err = suprsend_client.Users.GetFullPreference(ctx, distinct_id, nil)
+		userPref, err = suprsendClient.Users.GetFullPreference(ctx, distinctId, &suprsend.UserFullPreferencesOptions{TenantId: tenantId})
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		userPref, err = suprsend_client.Users.GetCategoryPreference(ctx, distinct_id, category, nil)
+		userPref, err = suprsendClient.Users.GetCategoryPreference(ctx, distinctId, category, &suprsend.UserCategoryPreferenceOptions{TenantId: tenantId})
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	if channelPreferences {
+		userPref, err = suprsendClient.Users.GetGlobalChannelsPreference(ctx, distinctId, &suprsend.UserGlobalChannelsPreferenceOptions{TenantId: tenantId})
+		if err != nil {
+			return nil, err
+		}
+	}
 	yamluser, err := yaml.Marshal(userPref)
 	if err != nil {
 		return nil, err
@@ -128,63 +139,50 @@ func getUserPreferencesHandler(ctx context.Context, request mcp.CallToolRequest)
 	return mcp.NewToolResultText(string(yamluser)), nil
 }
 
-func updateUserCategoryPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	distinctId, err := request.RequireString("distinct_id")
+func updateUserPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	distinctIdsAny, ok := request.GetArguments()["distinct_ids"].([]any)
+	if !ok {
+		return mcp.NewToolResultError("distinct_ids must be an array"), nil
+	}
+	var distinctIds = []string{}
+	err := utils.Remarshal(distinctIdsAny, &distinctIds)
+	if err != nil {
+		return mcp.NewToolResultError("distinct_ids must be an array of strings"), nil
+	}
+
+	channelPreferencesAny, ok := request.GetArguments()["channel_preferences"].([]any)
+	if !ok {
+		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+	}
+	var channelPreferences = []*suprsend.UserGlobalChannelPreference{}
+	err = utils.Remarshal(channelPreferencesAny, &channelPreferences)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	category, err := request.RequireString("category")
+	categoriesAny, ok := request.GetArguments()["categories"].([]any)
+	if !ok {
+		return mcp.NewToolResultError("categories must be an array"), nil
+	}
+	var categories = []*suprsend.UserCategoryPreferenceIn{}
+	err = utils.Remarshal(categoriesAny, &categories)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	args := request.GetArguments()
-
-	rawPayload, ok := args["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
+	prefPayload := suprsend.UserBulkPreferenceUpdateBody{
+		DistinctIDs:        distinctIds,
+		ChannelPreferences: channelPreferences,
+		Categories:         categories,
 	}
 
-	pref, ok := rawPayload["preference"].(string)
-	if !ok {
-		return mcp.NewToolResultError("preference must be a string"), nil
-	}
-
-	optOutAny, ok := rawPayload["opt_out_channels"]
-	if !ok {
-		optOutAny = []any{}
-	}
-	optOutSlice, ok := optOutAny.([]any)
-	if !ok {
-		return mcp.NewToolResultError("opt_out_channels must be an array"), nil
-	}
-
-	optOutChannels := make([]string, 0, len(optOutSlice))
-	for _, v := range optOutSlice {
-		s, ok := v.(string)
-		if !ok {
-			return mcp.NewToolResultError("opt_out_channels must be an array of strings"), nil
-		}
-		optOutChannels = append(optOutChannels, s)
-	}
-
-	prefPayload := suprsend.UserUpdateCategoryPreferenceBody{
-		Preference:     pref,
-		OptOutChannels: optOutChannels,
-	}
-
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
+	workspace := request.GetString("workspace", "staging")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
 		return nil, err
 	}
 
-	userPref, err := suprsendClient.Users.UpdateCategoryPreference(ctx, distinctId, category, prefPayload, nil)
+	userPref, err := suprsendClient.Users.BulkUpdatePreferences(ctx, prefPayload, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +193,89 @@ func updateUserCategoryPreference(ctx context.Context, request mcp.CallToolReque
 	}
 
 	return mcp.NewToolResultText(string(yamlPref)), nil
+}
+
+func updateUserChannelPreferenceHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	channelPreferencesAny, ok := request.GetArguments()["channel_preferences"].([]any)
+	if !ok {
+		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+	}
+	var channelPreferences = []suprsend.UserGlobalChannelPreference{}
+	err := utils.Remarshal(channelPreferencesAny, &channelPreferences)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	prefPayload := suprsend.UserGlobalChannelsPreferenceUpdateBody{
+		ChannelPreferences: channelPreferences,
+	}
+	distinctId, err := request.RequireString("distinct_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+	userPref, err := suprsendClient.Users.UpdateGlobalChannelsPreference(ctx, distinctId, prefPayload, nil)
+	if err != nil {
+		return nil, err
+	}
+	yamlPref, err := yaml.Marshal(userPref)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(yamlPref)), nil
+}
+
+func getUserListSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	distinctId, err := request.RequireString("distinct_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit := request.GetInt("limit", 20)
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	userListSubscriptions, err := suprsendClient.Users.GetListsSubscribedTo(ctx, distinctId, &suprsend.CursorListApiOptions{Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+
+	yamlUserListSubscriptions, err := yaml.Marshal(userListSubscriptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(string(yamlUserListSubscriptions)), nil
+}
+
+func getUserObjectsSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	distinctId, err := request.RequireString("distinct_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit := request.GetInt("limit", 20)
+	workspace := request.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	userObjectsSubscriptions, err := suprsendClient.Users.GetObjectsSubscribedTo(ctx, distinctId, &suprsend.CursorListApiOptions{Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+
+	yamlUserObjectsSubscriptions, err := yaml.Marshal(userObjectsSubscriptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(string(yamlUserObjectsSubscriptions)), nil
 }
 
 func newUserTools() []*Tool {
@@ -209,7 +290,6 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
@@ -227,15 +307,37 @@ func newUserTools() []*Tool {
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
 			),
 			mcp.WithString("action",
-				mcp.Description(`The action to perform.`),
+				mcp.Description(
+					`The action to perform.
+					use action "upsert" to create a new user or update an existing user's properties.
+					use action "remove" to remove a user's properties.
+					use action "set" to set a user's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack use the respective actions.
+					use action "unset" to unset a user's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack use the respective actions.
+					use action "set_once" to set a user's property once, this will only set the property if it is not already set.
+					use action "append" to append a value to a user's property.
+					use action "increment" to increment a user's property.
+					use action "add_email" to add an email to a user.
+					use action "remove_email" to remove an email from a user.
+					use action "add_sms" to add an SMS to a user.
+					use action "remove_sms" to remove an SMS from a user.
+					use action "add_whatsapp" to add a WhatsApp to a user.
+					use action "remove_whatsapp" to remove a WhatsApp from a user.
+					use action "add_androidpush" to add an Android push to a user.
+					use action "remove_androidpush" to remove an Android push from a user.
+					use action "add_iospush" to add an iOS push to a user.
+					use action "remove_iospush" to remove an iOS push from a user.
+					use action "add_slack" to add a Slack to a user.
+					use action "remove_slack" to remove a Slack from a user.
+					use action "set_preferred_language" to set a user's preferred language.
+					use action "set_timezone" to set a user's timezone.`),
 				mcp.Required(),
 				mcp.Enum(
 					"upsert",
 					"remove",
 					"set",
+					"set_once",
 					"unset",
 					"append",
 					"increment",
@@ -253,6 +355,10 @@ func newUserTools() []*Tool {
 					"remove_iospush",
 					"add_slack",
 					"remove_slack",
+					"add_ms_teams",
+					"remove_ms_teams",
+					"add_webpush",
+					"remove_webpush",
 				),
 			),
 			mcp.WithString("key",
@@ -261,12 +367,30 @@ func newUserTools() []*Tool {
 			mcp.WithString("value",
 				mcp.Description(`The value to needs to be added/removed/set/unset/appended/incremented.`),
 			),
-			mcp.WithString("identity_provider",
-				mcp.Description(`This is only applicable for add_androidpush, remove_androidpush, add_iospush, remove_iospush actions.`),
-			),
 			mcp.WithObject("slack_details",
 				mcp.Description(`This is only applicable for add_slack and remove_slack actions.`),
 				mcp.Properties(slackPropertiesSchema),
+			),
+			mcp.WithObject("ms_teams_details",
+				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
+				mcp.Properties(msTeamsPropertiesSchema),
+			),
+			mcp.WithObject("webpush_details",
+				mcp.Description(`This is only applicable for add_webpush and remove_webpush actions.`),
+				mcp.Properties(
+					map[string]interface{}{
+						"keys": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"auth":   utils.StringSchema("The auth key for the webpush"),
+								"p256dh": utils.StringSchema("The p256dh key for the webpush"),
+							},
+							"required":             []string{"auth", "p256dh"},
+							"additionalProperties": false,
+						},
+						"endpoint": utils.StringSchema("The endpoint for the webpush"),
+					},
+				),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
@@ -281,45 +405,152 @@ func newUserTools() []*Tool {
 				mcp.Description(`The distinct_id of the user to get the preferences for.`),
 				mcp.Required(),
 			),
+			mcp.WithString("tenant_id",
+				mcp.Description("The tenant_id of the tenant to get the preferences for."),
+			),
 			mcp.WithString("category",
 				mcp.Description("The category_slug of a category to get."),
 			),
+			mcp.WithBoolean("channel_preferences",
+				mcp.Description("Whether to include channel preferences in the response. Default is false."),
+			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 		),
 		Handler: getUserPreferencesHandler,
 	}
 
-	update_suprsend_category_preference_user := &Tool{
+	update_suprsend_users_preferences := &Tool{
 		Name:        "user.update_preferences",
-		Description: "Enables updating a specific category preference for an user",
-		MCPTool: mcp.NewTool("update_suprsend_category_preference_user",
-			mcp.WithDescription("Use this tool to update a specific category preference for an user"),
-			mcp.WithString("distinct_id",
-				mcp.Description("The distinct_id of the user to update."),
+		Description: "Enables updating preferences for users, controlling notification preferences and channel opt-outs.",
+		MCPTool: mcp.NewTool("update_suprsend_users_preferences",
+			mcp.WithDescription("Use this tool to update preferences for users, controlling notification preferences and channel opt-outs."),
+			mcp.WithArray("distinct_ids",
+				mcp.Description("The distinct_ids of the users to update the preferences for."),
+				mcp.WithStringItems(),
 				mcp.Required(),
 			),
-			mcp.WithString("category",
-				mcp.Description("category_slug of an category to get."),
+			mcp.WithArray("channel_preferences",
+				mcp.Description("The channel preferences to update for the users."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"channel":       utils.StringSchema("The channel identifier"),
+						"is_restricted": utils.BoolSchema("Whether the channel is restricted"),
+					},
+					"required": []string{"channel", "is_restricted"},
+				}),
 				mcp.Required(),
 			),
-			mcp.WithObject("payload",
-				mcp.Description("Payload of an category to update a category preference for an user."),
+			mcp.WithArray("categories",
+				mcp.Description("The categories to update the preferences for."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"category": utils.StringSchema("The category identifier"),
+						"preference": map[string]any{
+							"type":        "string",
+							"description": "The preference to update for the category",
+							"enum": []string{
+								"opt_in",
+								"opt_out",
+							},
+						},
+						"opt_out_channels": utils.ArraySchema("The channels to opt out from for the category"),
+					},
+					"required": []string{"category", "preference", "opt_out_channels"},
+				}),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to run the query from."),
+			),
+			mcp.WithDestructiveHintAnnotation(true),
+		),
+		Handler: updateUserPreference,
+	}
+
+	update_suprsend_user_channel_preference := &Tool{
+		Name:        "users.update_channel_preference",
+		Description: "Enables updating channel preference for a user",
+		MCPTool: mcp.NewTool("update_suprsend_user_channel_preference",
+			mcp.WithDescription("Use this tool to update channel preference for a user."),
+			mcp.WithString("distinct_id",
+				mcp.Description("The distinct_id of the user to update the channel preference for."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to update the channel preference for."),
+			),
+			mcp.WithArray("channel_preferences",
+				mcp.Description("The channel preferences to update for the users."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"channel":       utils.StringSchema("The channel identifier"),
+						"is_restricted": utils.BoolSchema("Whether the channel is restricted"),
+					},
+					"required": []string{"channel", "is_restricted"},
+				}),
 				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
 		),
-		Handler: updateUserCategoryPreference,
+		Handler: updateUserChannelPreferenceHandler,
 	}
 
-	return []*Tool{get_suprsend_user, upsert_suprsend_user, get_suprsend_user_preferences, update_suprsend_category_preference_user}
+	get_suprsend_user_list_subscriptions := &Tool{
+		Name:        "users.get_list_subscriptions",
+		Description: "Enables querying list subscriptions for a user",
+		MCPTool: mcp.NewTool("get_suprsend_user_list_subscriptions",
+			mcp.WithDescription("Use this tool to query list subscriptions for a user."),
+			mcp.WithString("distinct_id",
+				mcp.Description("The distinct_id of the user to get the list subscriptions for."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to run the query from."),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Number of list subscriptions to get for a user."),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+		),
+		Handler: getUserListSubscriptionsHandler,
+	}
+
+	get_suprsend_user_objects_subscriptions := &Tool{
+		Name:        "users.get_objects_subscriptions",
+		Description: "Enables querying object subscriptions for a user",
+		MCPTool: mcp.NewTool("get_suprsend_user_objects_subscriptions",
+			mcp.WithDescription("Use this tool to query object subscriptions for a user."),
+			mcp.WithString("distinct_id",
+				mcp.Description("The distinct_id of the user to get the object subscriptions for."),
+				mcp.Required(),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to run the query from."),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Number of object subscriptions to get for a user."),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+		),
+		Handler: getUserObjectsSubscriptionsHandler,
+	}
+
+	tools := []*Tool{
+		get_suprsend_user,
+		upsert_suprsend_user,
+		get_suprsend_user_preferences,
+		update_suprsend_users_preferences,
+		update_suprsend_user_channel_preference,
+		get_suprsend_user_list_subscriptions,
+		get_suprsend_user_objects_subscriptions,
+	}
+	return tools
 }
 
 func init() {
@@ -336,6 +567,89 @@ var slackPropertiesSchema = map[string]any{
 	"slack_incoming_webhook_url": utils.StringSchema("Incoming webhook URL for the Slack"),
 }
 
+var msTeamsPropertiesSchema = map[string]interface{}{
+	"type": map[string]interface{}{
+		"required": true,
+		"type":     "string",
+		"enum": []string{
+			"incoming_webhook",
+			"channel",
+			"user",
+			"user_id",
+		},
+	},
+	"incoming_webhook": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+		},
+		"required": []string{"url"},
+		"title":    "IncomingWebhook",
+	},
+	"channel": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"tenant_id": map[string]interface{}{
+				"type": "string",
+			},
+			"service_url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+			"conversation_id": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"required": []string{"conversation_id", "service_url", "tenant_id"},
+		"title":    "Channel",
+	},
+	"user": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"tenant_id": map[string]interface{}{
+				"type": "string",
+			},
+			"service_url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+			"conversation_id": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"required": []string{"conversation_id", "service_url", "tenant_id"},
+		"title":    "Channel",
+	},
+	"user_id": map[string]interface{}{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"tenant_id": map[string]interface{}{
+				"type": "string",
+			},
+			"service_url": map[string]interface{}{
+				"type":             "string",
+				"format":           "uri",
+				"qt-uri-protocols": []string{"https"},
+			},
+			"user_id": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"required": []string{"tenant_id", "user_id", "service_url"},
+		"title":    "UserID",
+	},
+}
+
 func getSlackDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {
 	if action != "add_slack" && action != "remove_slack" {
 		return nil, nil
@@ -350,6 +664,41 @@ func getSlackDetails(request mcp.CallToolRequest, action string) (map[string]any
 	if !ok {
 		return nil, errors.New("invalid slack_details")
 	}
-
 	return slackDetails, nil
+}
+
+func getMSTeamsDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {
+	if action != "add_ms_teams" && action != "remove_ms_teams" {
+		return nil, nil
+	}
+
+	msTeamsDetailsRaw, ok := request.GetArguments()["ms_teams_details"]
+	if !ok {
+		return nil, errors.New("required argument 'ms_teams_details' not found")
+	}
+
+	msTeamsDetails, ok := msTeamsDetailsRaw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid ms_teams_details")
+	}
+
+	return msTeamsDetails, nil
+}
+
+func getWebpushDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {
+	if action != "add_webpush" && action != "remove_webpush" {
+		return nil, nil
+	}
+
+	webpushDetailsRaw, ok := request.GetArguments()["webpush_details"]
+	if !ok {
+		return nil, errors.New("required argument 'webpush_details' not found")
+	}
+
+	webpushDetails, ok := webpushDetailsRaw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid webpush_details")
+	}
+
+	return webpushDetails, nil
 }

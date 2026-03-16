@@ -18,7 +18,7 @@ var workflowPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push workflows from local to SuprSend workspace",
 	Long:  `Push workflows from local to SuprSend workspace`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
 		commit, _ := cmd.Flags().GetString("commit")
@@ -31,18 +31,18 @@ var workflowPushCmd = &cobra.Command{
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return
+			return err
 		}
 
 		if err := validateInputDirectory(path); err != nil {
 			log.Errorf("Error with input directory: %v\n", err)
-			return
+			return err
 		}
 
 		files, err := os.ReadDir(path)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to read local workflows directory")
-			return
+			return err
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -117,8 +117,9 @@ var workflowPushCmd = &cobra.Command{
 				for _, errorMsg := range stats.Errors {
 					fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 				}
+				return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
 			}
-			return
+			return nil
 		}
 		for _, file := range files {
 			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
@@ -207,7 +208,9 @@ var workflowPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
 			}
+			return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
 		}
+		return nil
 	},
 }
 

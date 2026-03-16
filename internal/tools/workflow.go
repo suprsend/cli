@@ -68,6 +68,26 @@ func triggerWorkflow(_ context.Context, request mcp.CallToolRequest, workspace, 
 	return mcp.NewToolResultStructured(responseStruct, string(jsonData)), nil
 }
 
+func listWorkflowsHandler(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	workspace, err := request.RequireString("workspace")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit := request.GetInt("limit", 50)
+	offset := request.GetInt("offset", 0)
+	mode := request.GetString("mode", "live")
+	mgmntClient := utils.GetSuprSendMgmntClient()
+	workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	jsonData, err := json.MarshalIndent(workflows, "", "  ")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultStructured(workflows, string(jsonData)), nil
+}
+
 func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 	workflows := utils.FetchWorkflowsMcp(workspace, workflowsFlag)
 	if len(workflows) == 0 {
@@ -153,4 +173,48 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 		RegisterWorkflow(wfTool)
 	}
 	return nil
+}
+
+func newWorkflowTools() []*Tool {
+	list_workflows := &Tool{
+		Name:        "workflows.list",
+		Description: "Enables listing workflows from a workspace",
+		MCPTool: mcp.NewTool("list_workflows",
+			mcp.WithDescription("Use this tool to list workflows from a workspace."),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to list workflows from."),
+				mcp.Required(),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Limit the number of workflows to list."),
+				mcp.Required(),
+				mcp.DefaultNumber(50),
+			),
+			mcp.WithNumber("offset",
+				mcp.Description("Offset the number of workflows to list."),
+				mcp.DefaultNumber(0),
+			),
+			mcp.WithString("mode",
+				mcp.Description("Mode of workflows to list (draft, live), default: live."),
+				mcp.Required(),
+				mcp.DefaultString("live"),
+			),
+			mcp.WithString("workspace",
+				mcp.Description("SuprSend workspace to list workflows from."),
+				mcp.Required(),
+				mcp.DefaultString("staging"),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+		),
+		Handler: listWorkflowsHandler,
+	}
+
+	return []*Tool{list_workflows}
+}
+
+func init() {
+	for _, t := range newWorkflowTools() {
+		RegisterTool(t, "workflows")
+	}
 }

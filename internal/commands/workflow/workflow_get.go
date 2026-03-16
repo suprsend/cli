@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -14,10 +15,10 @@ var workflowGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get workflow details",
 	Long:  "Get workfow details of a specific wf. Example: suprsend workflow get <slug>",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Error("Workflow slug argument is required. Example: suprsend workflow get <slug>")
-			return
+			return fmt.Errorf("Workflow slug argument is required. Example: suprsend workflow get <slug>")
 		}
 		slug := args[0]
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -30,12 +31,14 @@ var workflowGetCmd = &cobra.Command{
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
+			cancel := p.Start(context.Background())
+			defer cancel()
 		}
 
 		workflow, err := mgmntClient.GetWorkflowDetail(workspace, slug, mode)
 		if err != nil {
 			log.WithError(err).Errorf("Error getting workflow detail")
-			return
+			return err
 		}
 		utils.OutputData(workflow, outputType)
 		if p != nil {
@@ -43,6 +46,7 @@ var workflowGetCmd = &cobra.Command{
 		} else {
 			fmt.Fprintf(os.Stdout, "Successfully got details for '%s'", slug)
 		}
+		return nil
 	},
 }
 

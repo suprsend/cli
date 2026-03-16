@@ -20,17 +20,11 @@ func getObjectSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	limit_subscriptions, err := request.RequireInt("limit")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	limit_subscriptions := request.GetInt("limit", 20)
 	cursor_list_api_opts := suprsend.CursorListApiOptions{
 		Limit: limit_subscriptions,
 	}
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -66,10 +60,7 @@ func addObjectSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	recipients, ok := request.GetArguments()["recipients"]
 	if !ok {
@@ -79,11 +70,6 @@ func addObjectSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequ
 	props, ok := request.GetArguments()["properties"]
 	if !ok {
 		return mcp.NewToolResultError("Properties isn't passed as an object"), nil
-	}
-
-	parent_obj_props, ok := request.GetArguments()["parent_object_properties"]
-	if !ok {
-		return mcp.NewToolResultError("Parent object_properties isn't passed properly"), nil
 	}
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
@@ -97,9 +83,8 @@ func addObjectSubscriptionsHandler(ctx context.Context, request mcp.CallToolRequ
 	}
 
 	payload := map[string]any{
-		"recipients":               recipients,
-		"parent_object_properties": parent_obj_props,
-		"properties":               props,
+		"recipients": recipients,
+		"properties": props,
 	}
 
 	obj_subs_resp, err := suprsend_client.Objects.CreateSubscriptions(ctx, obj_identifier, payload)

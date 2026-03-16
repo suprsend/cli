@@ -389,6 +389,7 @@ func newObjectTools() []*Tool {
 			mcp.WithObject("ms_teams_details",
 				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
 				mcp.Properties(msTeamsPropertiesSchema),
+				msTeamsRequiredFields(),
 			),
 			mcp.WithObject("webpush_details",
 				mcp.Description(`This is only applicable for add_webpush and remove_webpush actions.`),

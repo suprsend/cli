@@ -374,6 +374,7 @@ func newUserTools() []*Tool {
 			mcp.WithObject("ms_teams_details",
 				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
 				mcp.Properties(msTeamsPropertiesSchema),
+				msTeamsRequiredFields(),
 			),
 			mcp.WithObject("webpush_details",
 				mcp.Description(`This is only applicable for add_webpush and remove_webpush actions.`),
@@ -569,8 +570,7 @@ var slackPropertiesSchema = map[string]any{
 
 var msTeamsPropertiesSchema = map[string]interface{}{
 	"type": map[string]interface{}{
-		"required": true,
-		"type":     "string",
+		"type": "string",
 		"enum": []string{
 			"incoming_webhook",
 			"channel",
@@ -583,9 +583,8 @@ var msTeamsPropertiesSchema = map[string]interface{}{
 		"additionalProperties": false,
 		"properties": map[string]interface{}{
 			"url": map[string]interface{}{
-				"type":             "string",
-				"format":           "uri",
-				"qt-uri-protocols": []string{"https"},
+				"type":   "string",
+				"format": "uri",
 			},
 		},
 		"required": []string{"url"},
@@ -599,9 +598,8 @@ var msTeamsPropertiesSchema = map[string]interface{}{
 				"type": "string",
 			},
 			"service_url": map[string]interface{}{
-				"type":             "string",
-				"format":           "uri",
-				"qt-uri-protocols": []string{"https"},
+				"type":   "string",
+				"format": "uri",
 			},
 			"conversation_id": map[string]interface{}{
 				"type": "string",
@@ -618,9 +616,8 @@ var msTeamsPropertiesSchema = map[string]interface{}{
 				"type": "string",
 			},
 			"service_url": map[string]interface{}{
-				"type":             "string",
-				"format":           "uri",
-				"qt-uri-protocols": []string{"https"},
+				"type":   "string",
+				"format": "uri",
 			},
 			"conversation_id": map[string]interface{}{
 				"type": "string",
@@ -637,9 +634,8 @@ var msTeamsPropertiesSchema = map[string]interface{}{
 				"type": "string",
 			},
 			"service_url": map[string]interface{}{
-				"type":             "string",
-				"format":           "uri",
-				"qt-uri-protocols": []string{"https"},
+				"type":   "string",
+				"format": "uri",
 			},
 			"user_id": map[string]interface{}{
 				"type": "string",
@@ -648,6 +644,13 @@ var msTeamsPropertiesSchema = map[string]interface{}{
 		"required": []string{"tenant_id", "user_id", "service_url"},
 		"title":    "UserID",
 	},
+}
+
+// msTeamsRequiredFields sets the required fields on the ms_teams_details object schema.
+func msTeamsRequiredFields() mcp.PropertyOption {
+	return func(schema map[string]any) {
+		schema["required"] = []string{"type"}
+	}
 }
 
 func getSlackDetails(request mcp.CallToolRequest, action string) (map[string]any, error) {

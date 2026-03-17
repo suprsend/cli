@@ -119,20 +119,9 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 	return &EventsResponse{Results: allEvents}, nil
 }
 
-func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
+func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]any) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		log.Errorf("Error reading event schema mapping file: %s", err)
-		return err
-	}
-	var events map[string]any
-	if err := json.Unmarshal(data, &events); err != nil {
-		log.Errorf("Error parsing event_schema_mapping.json: %s", err)
-		return err
-	}
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "bulk", "event", "/")
 	if err != nil {
@@ -163,4 +152,22 @@ func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
 		return fmt.Errorf("error pushing event: %s", errorResponse.Message)
 	}
 	return nil
+}
+
+func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Errorf("Error reading event schema mapping file: %s", err)
+		return err
+	}
+	var events map[string]any
+	if err := json.Unmarshal(data, &events); err != nil {
+		log.Errorf("Error parsing event_schema_mapping.json: %s", err)
+		return err
+	}
+	return c.pushEventsPayload(workspace, events)
+}
+
+func (c *SS_MgmntClient) PushEventsFromPayload(workspace string, events map[string]any) error {
+	return c.pushEventsPayload(workspace, events)
 }

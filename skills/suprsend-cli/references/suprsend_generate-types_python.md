@@ -2,6 +2,8 @@
 
 Generate Python types from JSON Schema
 
+Generate Python type definitions from trigger payload schemas. Fetches linked schemas from the workspace and generates a single Python file with type classes. Supports Pydantic models (enabled by default).
+
 ```
 suprsend generate-types python [flags]
 ```
@@ -10,10 +12,10 @@ suprsend generate-types python [flags]
 
 ```
   -h, --help                 help for python
-      --mode string          Mode of schema to fetch (draft, live), default: live (default "live")
-      --output-file string   Output file for generated Python types (default "suprsend_types.py")
-      --pydantic             Generate Pydantic types for Python (default true)
-      --workspace string     Workspace to get schemas from. (default "staging")
+      --mode string          Version mode: draft or live (default "live")
+      --output-file string   Output file path for generated types (default "suprsend_types.py")
+      --pydantic             Generate Pydantic BaseModel classes instead of plain dataclasses (default true)
+      --workspace string     Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

@@ -22,7 +22,10 @@ type CategoryTableRow struct {
 var categoryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List categories",
-	Long:  "List preferences categories in a workspace",
+	Long:  "List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, and mandatory channels. Use --mode to switch between draft and live.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -75,8 +78,8 @@ var categoryListCmd = &cobra.Command{
 }
 
 func init() {
-	categoryListCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of preferences to list (draft, live), default: live")
-	categoryListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output type (pretty, yaml, json)")
+	categoryListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	categoryListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	CategoryCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	CategoryCmd.AddCommand(categoryListCmd)
 }

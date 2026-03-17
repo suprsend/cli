@@ -11,7 +11,7 @@ import (
 var worklowEnableCmd = &cobra.Command{
 	Use:   "enable",
 	Short: "Enables a workflow.",
-	Long:  "Enables a workflow to activate. Example: suprsend workflow enable <slug>",
+	Long:  "Enable a workflow to make it active and ready to receive triggers. Requires a workflow slug as a positional argument.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Error("workflow_slug is required.")

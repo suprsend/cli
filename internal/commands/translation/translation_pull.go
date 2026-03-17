@@ -14,7 +14,7 @@ import (
 var translationPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull Translation files",
-	Long:  "Pull Translation files",
+	Long:  "Download template translation files from a workspace to local JSON files. Saves one JSON file per translation to the output directory.",
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -76,8 +76,8 @@ var translationPullCmd = &cobra.Command{
 }
 
 func init() {
-	translationPullCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of translations to pull from")
-	translationPullCmd.PersistentFlags().BoolP("force", "f", false, "Force using default directory without prompting")
-	translationPullCmd.PersistentFlags().StringP("dir", "d", "", "Output directory for translations")
+	translationPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	translationPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	translationPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save translation files to")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

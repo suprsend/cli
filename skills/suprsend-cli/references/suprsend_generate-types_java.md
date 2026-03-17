@@ -2,7 +2,7 @@
 
 Generate Java types from JSON Schema
 
-Generate Java types from JSON Schema with specified package name
+Generate Java type definitions from trigger payload schemas. Creates one Java file per linked schema in a package directory structure. Supports Lombok annotations with --lombok.
 
 ```
 suprsend generate-types java [flags]
@@ -12,11 +12,11 @@ suprsend generate-types java [flags]
 
 ```
   -h, --help                 help for java
-      --lombok               Generate Java Types with Lombok
-      --mode string          Mode of schema to fetch (draft, live), default: live (default "live")
-      --output-file string   Output file for generated Java types (default "SuprsendTypes.java")
-      --package string       Package name for Java types (default "suprsend.types")
-      --workspace string     Workspace to get schemas from. (default "staging")
+      --lombok               Add Lombok annotations to generated classes
+      --mode string          Version mode: draft or live (default "live")
+      --output-file string   Output file path for generated types (default "SuprsendTypes.java")
+      --package string       Java package name for generated classes (default "suprsend.types")
+      --workspace string     Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

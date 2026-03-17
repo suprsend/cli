@@ -2,6 +2,8 @@
 
 Generate Kotlin types from JSON Schema
 
+Generate Kotlin type definitions from trigger payload schemas. Produces data classes in a single output file with the specified package name.
+
 ```
 suprsend generate-types kotlin [flags]
 ```
@@ -10,10 +12,10 @@ suprsend generate-types kotlin [flags]
 
 ```
   -h, --help                 help for kotlin
-      --mode string          Mode of schema to fetch (draft, live), default: live (default "live")
-      --output-file string   Output file for generated Kotlin types (default "SuprsendTypes.kt")
-      --package string       Package name for Kotlin types (default "suprsend")
-      --workspace string     Workspace to get schemas from. (default "staging")
+      --mode string          Version mode: draft or live (default "live")
+      --output-file string   Output file path for generated types (default "SuprsendTypes.kt")
+      --package string       Kotlin package name for generated data classes (default "suprsend")
+      --workspace string     Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

@@ -58,10 +58,16 @@ Please refer to documentation [here](https://docs.suprsend.com/reference/cli-int
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-### Generating build-artifacts locally
+### Generating build artifacts locally
+
+`make build` compiles the embedded type-morph Deno binary (requires [Deno](https://deno.land/)), then generates CLI documentation in `docs/` and AI skills in `skills/`.
+
 ```bash
 make build
 ```
+
+A CI check on PRs to `main` verifies that `docs/` and `skills/` are up to date. Run `make build` and commit the output before opening a PR.
+
 ### Removing local build artifacts
 ```bash
 make clean

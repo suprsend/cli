@@ -4,7 +4,7 @@ List categories
 
 ### Synopsis
 
-List preferences categories in a workspace
+List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, and mandatory channels. Use --mode to switch between draft and live.
 
 ```
 suprsend category list [flags]
@@ -14,8 +14,8 @@ suprsend category list [flags]
 
 ```
   -h, --help            help for list
-  -m, --mode string     Mode of preferences to list (draft, live), default: live (default "live")
-  -o, --output string   Output type (pretty, yaml, json) (default "pretty")
+  -m, --mode string     Version mode: draft or live (default "live")
+  -o, --output string   Output format: pretty, json, or yaml (default "pretty")
 ```
 
 ### Options inherited from parent commands
@@ -25,7 +25,7 @@ suprsend category list [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### SEE ALSO

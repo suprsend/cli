@@ -4,7 +4,7 @@ Modify a profile
 
 ### Synopsis
 
-Modify a profile in the configs
+Modify a profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.
 
 ```
 suprsend profile modify [flags]

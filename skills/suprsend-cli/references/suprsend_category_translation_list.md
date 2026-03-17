@@ -2,9 +2,15 @@
 
 List preference translations
 
+List available translation locales for preference categories in a workspace. Returns the locale codes that have translations configured.
+
 ```
 suprsend category translation list [flags]
 ```
+
+### Tips
+
+- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
 
 ### Options
 
@@ -19,6 +25,6 @@ suprsend category translation list [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

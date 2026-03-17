@@ -4,14 +4,18 @@ Manage preference categories
 
 ### Synopsis
 
-Manage preference categories
+Manage notification preference categories. Categories organize notification preferences into a hierarchy of root categories, sections, and individual preference items.
+
+```
+suprsend category [flags]
+```
 
 ### Options
 
 ```
   -h, --help                   help for category
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands
@@ -26,6 +30,7 @@ Manage preference categories
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend category commit](suprsend_category_commit.md)	 - Commit categories
+* [suprsend category get](suprsend_category_get.md)	 - Get categories and translations
 * [suprsend category list](suprsend_category_list.md)	 - List categories
 * [suprsend category pull](suprsend_category_pull.md)	 - Pull categories from a workspace
 * [suprsend category push](suprsend_category_push.md)	 - Push categories to a workspace

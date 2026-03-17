@@ -13,7 +13,10 @@ import (
 var translationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List Translations",
-	Long:  "List Translations",
+	Long:  "List template translation files in a workspace. Returns translation file names and metadata. Use --mode to switch between draft and live versions.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -49,12 +52,12 @@ var translationListCmd = &cobra.Command{
 }
 
 func init() {
-	translationListCmd.Flags().StringP("content", "c", "false", "Include content in the output")
-	translationListCmd.Flags().IntP("limit", "l", 20, "Limit the number of translations to list")
-	translationListCmd.Flags().IntP("offset", "f", 0, "Offset the number of translations to list")
-	translationListCmd.Flags().StringP("mode", "m", "live", "Mode to list translations for")
-	translationListCmd.Flags().StringP("output", "o", "pretty", "Output type (pretty, yaml, json)")
-	TranslationCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to list translations for")
+	translationListCmd.Flags().StringP("include-content", "c", "false", "Include translation file content in the response (true/false)")
+	translationListCmd.Flags().IntP("limit", "l", 20, "Maximum number of translations to return")
+	translationListCmd.Flags().IntP("offset", "f", 0, "Number of translations to skip for pagination")
+	translationListCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
+	translationListCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
+	TranslationCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	TranslationCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	TranslationCmd.AddCommand(translationListCmd)
 }

@@ -2,6 +2,8 @@
 
 Pull events from workspace to local directory
 
+Download event definitions from a workspace to local files. Saves event data and an event_schema_mapping.json file to the output directory.
+
 ```
 suprsend event pull [flags]
 ```
@@ -9,8 +11,8 @@ suprsend event pull [flags]
 ### Options
 
 ```
-  -d, --dir string   Directory to pull events to (default: ./suprsend/event)
-  -f, --force        Force using default directory without prompting
+  -d, --dir string   Directory to save event files to (default: ./suprsend/event)
+  -f, --force        Skip directory confirmation prompt, use default path
   -h, --help         help for pull
 ```
 
@@ -21,6 +23,6 @@ suprsend event pull [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to list events from (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

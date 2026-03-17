@@ -2,7 +2,7 @@
 
 Disable a workflow
 
-Disable a workflow to deactivate. Example: suprsend workflow disable <slug>
+Disable a workflow to stop it from processing triggers. Requires a workflow slug as a positional argument.
 
 ```
 suprsend workflow disable [flags]
@@ -21,6 +21,6 @@ suprsend workflow disable [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to list workflows from (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

@@ -2,6 +2,8 @@
 
 Generate Swift types from JSON Schema
 
+Generate Swift type definitions from trigger payload schemas. Produces Codable structs in a single output file.
+
 ```
 suprsend generate-types swift [flags]
 ```
@@ -10,9 +12,9 @@ suprsend generate-types swift [flags]
 
 ```
   -h, --help                 help for swift
-      --mode string          Mode of schema to fetch (draft, live), default: live (default "live")
-      --output-file string   Output file for generated Swift types (default "SuprsendTypes.swift")
-      --workspace string     Workspace to get schemas from. (default "staging")
+      --mode string          Version mode: draft or live (default "live")
+      --output-file string   Output file path for generated types (default "SuprsendTypes.swift")
+      --workspace string     Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

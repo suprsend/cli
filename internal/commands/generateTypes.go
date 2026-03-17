@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -32,12 +33,13 @@ type schemaToBeGeneratedType struct {
 var generateTypesCmd = &cobra.Command{
 	Use:   "generate-types",
 	Short: "Generate type definitions from JSON Schema",
-	Long:  "Generate type definitions from JSON schema for various programming languages",
+	Long:  "Generate typed code from trigger payload JSON schemas. Fetches schemas linked to workflows and events from a workspace and generates type definitions in the target language.",
 }
 
 var generateTypesPythonCmd = &cobra.Command{
 	Use:   "python [flags]",
 	Short: "Generate Python types from JSON Schema",
+	Long:  "Generate Python type definitions from trigger payload schemas. Fetches linked schemas from the workspace and generates a single Python file with type classes. Supports Pydantic models (enabled by default).",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		pydantic, _ := cmd.Flags().GetBool("pydantic")
@@ -53,7 +55,7 @@ var generateTypesPythonCmd = &cobra.Command{
 var generateTypesJavaCmd = &cobra.Command{
 	Use:   "java [flags]",
 	Short: "Generate Java types from JSON Schema",
-	Long:  "Generate Java types from JSON Schema with specified package name",
+	Long:  "Generate Java type definitions from trigger payload schemas. Creates one Java file per linked schema in a package directory structure. Supports Lombok annotations with --lombok.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -176,6 +178,7 @@ var generateTypesJavaCmd = &cobra.Command{
 var generateTypesTypeScriptCmd = &cobra.Command{
 	Use:   "typescript [flags]",
 	Short: "Generate TypeScript types from JSON Schema",
+	Long:  "Generate TypeScript type definitions from trigger payload schemas. Fetches linked schemas and generates types in a single output file. Supports Zod schema generation with --zod.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		zod, _ := cmd.Flags().GetBool("zod")
@@ -191,6 +194,7 @@ var generateTypesTypeScriptCmd = &cobra.Command{
 var generateTypesGoCmd = &cobra.Command{
 	Use:   "go [flags]",
 	Short: "Generate Go types from JSON Schema",
+	Long:  "Generate Go type definitions from trigger payload schemas. Produces struct definitions in a single output file with the specified package name.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		packageName, _ := cmd.Flags().GetString("package")
@@ -202,6 +206,7 @@ var generateTypesGoCmd = &cobra.Command{
 var generateTypesKotlinCmd = &cobra.Command{
 	Use:   "kotlin [flags]",
 	Short: "Generate Kotlin types from JSON Schema",
+	Long:  "Generate Kotlin type definitions from trigger payload schemas. Produces data classes in a single output file with the specified package name.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		packageName, _ := cmd.Flags().GetString("package")
@@ -215,6 +220,7 @@ var generateTypesKotlinCmd = &cobra.Command{
 var generateTypesSwiftCmd = &cobra.Command{
 	Use:   "swift [flags]",
 	Short: "Generate Swift types from JSON Schema",
+	Long:  "Generate Swift type definitions from trigger payload schemas. Produces Codable structs in a single output file.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Flags().Set("build-flags", "coding-keys=true,struct-or-class=struct,initializers=false")
@@ -225,6 +231,7 @@ var generateTypesSwiftCmd = &cobra.Command{
 var generateTypesDartCmd = &cobra.Command{
 	Use:   "dart [flags]",
 	Short: "Generate Dart types from JSON Schema",
+	Long:  "Generate Dart type definitions from trigger payload schemas. Produces null-safe classes in a single output file.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Flags().Set("build-flags", "just-types=true,null-safety=true")
@@ -349,42 +356,45 @@ func init() {
 	}
 
 	for _, cmd := range commonFlags {
-		cmd.Flags().String("workspace", "staging", "Workspace to get schemas from.")
-		cmd.Flags().String("mode", "live", "Mode of schema to fetch (draft, live), default: live")
+		cmd.Flags().String("workspace", "staging", "Workspace name (e.g., staging, production)")
+		cmd.Flags().String("mode", "live", "Version mode: draft or live")
 		cmd.Flags().String("build-flags", "", "Flags to generate types in a certain way.")
 		cmd.Flags().MarkHidden("build-flags")
 	}
 	// Python
-	generateTypesPythonCmd.Flags().Bool("pydantic", true, "Generate Pydantic types for Python")
-	generateTypesPythonCmd.Flags().String("output-file", "suprsend_types.py", "Output file for generated Python types")
+	generateTypesPythonCmd.Flags().Bool("pydantic", true, "Generate Pydantic BaseModel classes instead of plain dataclasses")
+	generateTypesPythonCmd.Flags().String("output-file", "suprsend_types.py", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesPythonCmd)
 	// Java
-	generateTypesJavaCmd.Flags().Bool("lombok", false, "Generate Java Types with Lombok")
-	generateTypesJavaCmd.Flags().String("package", "suprsend.types", "Package name for Java types")
-	generateTypesJavaCmd.Flags().String("output-file", "SuprsendTypes.java", "Output file for generated Java types")
+	generateTypesJavaCmd.Flags().Bool("lombok", false, "Add Lombok annotations to generated classes")
+	generateTypesJavaCmd.Flags().String("package", "suprsend.types", "Java package name for generated classes")
+	generateTypesJavaCmd.Flags().String("output-file", "SuprsendTypes.java", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesJavaCmd)
 	// TypeScript
-	generateTypesTypeScriptCmd.Flags().Bool("zod", false, "Generate Zod types for TypeScript")
-	generateTypesTypeScriptCmd.Flags().String("output-file", "suprsend-types.ts", "Output file for generated TypeScript types")
+	generateTypesTypeScriptCmd.Flags().Bool("zod", false, "Generate Zod schemas instead of plain TypeScript types")
+	generateTypesTypeScriptCmd.Flags().String("output-file", "suprsend-types.ts", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesTypeScriptCmd)
 	// Go
-	generateTypesGoCmd.Flags().String("package", "suprsend", "Package name for Go types")
-	generateTypesGoCmd.Flags().String("output-file", "suprsend_types.go", "Output file for generated Go types")
+	generateTypesGoCmd.Flags().String("package", "suprsend", "Go package name for generated structs")
+	generateTypesGoCmd.Flags().String("output-file", "suprsend_types.go", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesGoCmd)
 	// Kotlin
-	generateTypesKotlinCmd.Flags().String("package", "suprsend", "Package name for Kotlin types")
-	generateTypesKotlinCmd.Flags().String("output-file", "SuprsendTypes.kt", "Output file for generated Kotlin types")
+	generateTypesKotlinCmd.Flags().String("package", "suprsend", "Kotlin package name for generated data classes")
+	generateTypesKotlinCmd.Flags().String("output-file", "SuprsendTypes.kt", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesKotlinCmd)
 	// Swift
-	generateTypesSwiftCmd.Flags().String("output-file", "SuprsendTypes.swift", "Output file for generated Swift types")
+	generateTypesSwiftCmd.Flags().String("output-file", "SuprsendTypes.swift", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesSwiftCmd)
 	// Dart
-	generateTypesDartCmd.Flags().String("output-file", "suprsend_types.dart", "Output file for generated Dart types")
+	generateTypesDartCmd.Flags().String("output-file", "suprsend_types.dart", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesDartCmd)
 	rootCmd.AddCommand(generateTypesCmd)
 }
 
 func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) error {
+	if len(utils.TypeMorphBin) == 0 {
+		return fmt.Errorf("type generation is not supported on %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
 	binaryPath, err := writeTempExecutable(utils.TypeMorphBin)
 	if err != nil {
 		return fmt.Errorf("failed to initialize type generator: %w", err)
@@ -407,7 +417,11 @@ func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) err
 }
 
 func writeTempExecutable(data []byte) (string, error) {
-	tmpFile, err := os.CreateTemp("", "typemorph-*")
+	pattern := "typemorph-*"
+	if runtime.GOOS == "windows" {
+		pattern = "typemorph-*.exe"
+	}
+	tmpFile, err := os.CreateTemp("", pattern)
 	if err != nil {
 		return "", err
 	}

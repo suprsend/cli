@@ -39,9 +39,9 @@ func Execute() error {
 
 func init() {
 	conf := config.Cfg
-	rootCmd.Flags().StringVarP(&conf.Workspace, "workspace", "w", "staging", "Workspace to use")
+	rootCmd.Flags().StringVarP(&conf.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	rootCmd.PersistentFlags().StringVar(&conf.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
-	rootCmd.Flags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output Style (pretty, yaml, json)")
+	rootCmd.Flags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
 	rootCmd.PersistentFlags().StringVarP(&conf.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.Flags().StringVarP(&conf.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	rootCmd.PersistentFlags().BoolVarP(&conf.NoColorOutput, "no-color", "n", false, "Disable color output (default: $NO_COLOR)")
@@ -73,8 +73,8 @@ func init() {
 		if err := config.SetUpLogs(); err != nil {
 			return err
 		}
-		// check the subcommand and return if it is gendocs
-		if cmd.Name() == "gendocs" {
+		// check the subcommand and return if it is gendocs or genskills
+		if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
 			return nil
 		}
 

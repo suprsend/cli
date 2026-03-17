@@ -13,7 +13,10 @@ import (
 var schemaListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List schemas",
-	Long:  `List schemas in a workspace`,
+	Long:  `List trigger payload schemas in a workspace with pagination. Returns schema slug, name, and version info. Use --mode to switch between draft and live versions.`,
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		limit, _ := cmd.Flags().GetInt("limit")
@@ -52,12 +55,12 @@ var schemaListCmd = &cobra.Command{
 }
 
 func init() {
-	schemaListCmd.PersistentFlags().IntP("limit", "l", 20, "Limit the number of schemas to list")
-	schemaListCmd.PersistentFlags().IntP("offset", "f", 0, "Offset the number of schemas to list (default: 0)")
-	schemaListCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of schemas to list (draft, live), default: live")
-	schemaListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output Style (pretty, yaml, json)")
+	schemaListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of schemas to return")
+	schemaListCmd.PersistentFlags().IntP("offset", "f", 0, "Number of schemas to skip for pagination")
+	schemaListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	schemaListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 
-	SchemaCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to use the schemas from")
+	SchemaCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	SchemaCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	SchemaCmd.AddCommand(schemaListCmd)
 }

@@ -2,20 +2,24 @@
 
 List schemas
 
-List schemas in a workspace
+List trigger payload schemas in a workspace with pagination. Returns schema slug, name, and version info. Use --mode to switch between draft and live versions.
 
 ```
 suprsend schema list [flags]
 ```
 
+### Tips
+
+- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
+
 ### Options
 
 ```
   -h, --help            help for list
-  -l, --limit int       Limit the number of schemas to list (default 20)
-  -m, --mode string     Mode of schemas to list (draft, live), default: live (default "live")
-  -f, --offset int      Offset the number of schemas to list (default: 0)
-  -o, --output string   Output Style (pretty, yaml, json) (default "pretty")
+  -l, --limit int       Maximum number of schemas to return (default 20)
+  -m, --mode string     Version mode: draft or live (default "live")
+  -f, --offset int      Number of schemas to skip for pagination
+  -o, --output string   Output format: pretty, json, or yaml (default "pretty")
 ```
 
 ### Options inherited from parent commands
@@ -25,6 +29,6 @@ suprsend schema list [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to use the schemas from (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

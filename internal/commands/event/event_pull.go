@@ -14,6 +14,7 @@ import (
 var eventPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull events from workspace to local directory",
+	Long:  "Download event definitions from a workspace to local files. Saves event data and an event_schema_mapping.json file to the output directory.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		dirPath, _ := cmd.Flags().GetString("dir")
@@ -62,7 +63,7 @@ var eventPullCmd = &cobra.Command{
 }
 
 func init() {
-	eventPullCmd.Flags().StringP("dir", "d", "", "Directory to pull events to (default: ./suprsend/event)")
-	eventPullCmd.PersistentFlags().BoolP("force", "f", false, "Force using default directory without prompting")
+	eventPullCmd.Flags().StringP("dir", "d", "", "Directory to save event files to (default: ./suprsend/event)")
+	eventPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
 	EventCmd.AddCommand(eventPullCmd)
 }

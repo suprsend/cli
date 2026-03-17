@@ -4,7 +4,7 @@ Manage trigger payload schemas
 
 ### Synopsis
 
-Manage trigger payload schemas
+Manage trigger payload schemas. Schemas define the JSON structure for workflow and event trigger payloads. Subcommands let you list, pull, push, and commit schemas.
 
 ```
 suprsend schema [flags]
@@ -15,7 +15,7 @@ suprsend schema [flags]
 ```
   -h, --help                   help for schema
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
-  -w, --workspace string       Workspace to use the schemas from (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands
@@ -30,6 +30,7 @@ suprsend schema [flags]
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend schema commit](suprsend_schema_commit.md)	 - Commit schema from draft to live
+* [suprsend schema get](suprsend_schema_get.md)	 - Get schema details
 * [suprsend schema list](suprsend_schema_list.md)	 - List schemas
 * [suprsend schema pull](suprsend_schema_pull.md)	 - Pull schemas
 * [suprsend schema push](suprsend_schema_push.md)	 - Push schemas

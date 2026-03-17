@@ -8,11 +8,15 @@ List all profiles from the config. Only useful if you have a BYOC/self-hosted Su
 suprsend profile list [flags]
 ```
 
+### Tips
+
+- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
+
 ### Options
 
 ```
   -h, --help            help for list
-  -o, --output string   Output type: pretty, json, yaml (default "pretty")
+  -o, --output string   Output format: pretty, json, or yaml (default "pretty")
 ```
 
 ### Options inherited from parent commands

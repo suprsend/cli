@@ -18,7 +18,7 @@ import (
 var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push preference translations",
-	Long:  "Push preference translations",
+	Long:  "Upload local preference category translation files to a workspace. Reads {locale}.json files from the input directory. English translations cannot be pushed. Use --locale to push a single locale, or omit to push all.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		locale, _ := cmd.Flags().GetString("locale")
@@ -159,7 +159,7 @@ func PushTranslations(workspace, locale, dir string) error {
 }
 
 func init() {
-	translationPushCmd.Flags().StringP("locale", "l", "", "Specific locale to push (if not provided, all locale files will be pushed)")
-	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations to push from (default: "+defaultDir+")")
+	translationPushCmd.Flags().StringP("locale", "l", "", "Locale code to push, e.g., es, fr (omit to push all)")
+	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: "+defaultDir+")")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

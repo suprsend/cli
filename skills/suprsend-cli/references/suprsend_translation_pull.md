@@ -2,6 +2,8 @@
 
 Pull Translation files
 
+Download template translation files from a workspace to local JSON files. Saves one JSON file per translation to the output directory.
+
 ```
 suprsend translation pull [flags]
 ```
@@ -9,10 +11,10 @@ suprsend translation pull [flags]
 ### Options
 
 ```
-  -d, --dir string    Output directory for translations
-  -f, --force         Force using default directory without prompting
+  -d, --dir string    Directory to save translation files to
+  -f, --force         Skip directory confirmation prompt, use default path
   -h, --help          help for pull
-  -m, --mode string   Mode of translations to pull from (default "live")
+  -m, --mode string   Version mode: draft or live (default "live")
 ```
 
 ### Options inherited from parent commands
@@ -22,6 +24,6 @@ suprsend translation pull [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to list translations for (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

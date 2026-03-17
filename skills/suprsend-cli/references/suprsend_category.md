@@ -2,6 +2,8 @@
 
 Manage preference categories
 
+Manage notification preference categories. Categories organize notification preferences into a hierarchy of root categories, sections, and individual preference items.
+
 ```
 suprsend category [flags]
 ```
@@ -11,7 +13,7 @@ suprsend category [flags]
 ```
   -h, --help                   help for category
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

@@ -16,7 +16,7 @@ import (
 var translationPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull preference translations",
-	Long:  "Pull preference translations",
+	Long:  "Download preference category translations from a workspace to local JSON files. Creates one file per locale (e.g., es.json, fr.json) in the output directory.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -115,7 +115,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 }
 
 func init() {
-	translationPullCmd.Flags().StringP("dir", "d", "", "Output directory for translations (default: "+defaultDir+")")
-	translationPullCmd.Flags().BoolP("force", "f", false, "Force using default directory without prompting")
+	translationPullCmd.Flags().StringP("dir", "d", "", "Directory to save translation files to (default: "+defaultDir+")")
+	translationPullCmd.Flags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

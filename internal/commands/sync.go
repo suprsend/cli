@@ -21,7 +21,7 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync SuprSend assets from one workspace to another",
-	Long:  `Sync SuprSend assets from one workspace to another`,
+	Long:  `Sync notification assets from one workspace to another. Pulls assets from the source workspace and pushes them to the destination. Supports syncing all asset types or a specific type (workflow, schema, event, category, translation). Source and destination workspaces must be different.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mode, _ := cmd.Flags().GetString("mode")
 		fromWorkspace, _ := cmd.Flags().GetString("from")
@@ -106,11 +106,11 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 
 	// Flags consumed in Run
-	syncCmd.Flags().StringP("from", "f", "staging", "Source workspace (required)")
-	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace (required)")
-	syncCmd.Flags().StringP("dir", "d", "", "Directory to sync assets to")
-	syncCmd.Flags().StringP("mode", "m", "live", "Mode to sync assets (draft, live), default: live")
-	syncCmd.Flags().StringP("assets", "a", "all", "Assets to sync (all, workflow, schema, event, category, translation)")
+	syncCmd.Flags().StringP("from", "f", "staging", "Source workspace to pull assets from")
+	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace to push assets to")
+	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage during sync")
+	syncCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
+	syncCmd.Flags().StringP("assets", "a", "all", "Asset types to sync: all, workflow, schema, event, category, or translation")
 }
 
 func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {

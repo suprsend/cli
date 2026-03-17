@@ -16,7 +16,10 @@ import (
 var workflowListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List workflows for a workspace",
-	Long:  `List workflows for a workspace`,
+	Long:  `List workflows in a workspace with pagination. Returns workflow slug, name, status, and version info. Use --mode to switch between draft and live versions.`,
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -56,14 +59,14 @@ var workflowListCmd = &cobra.Command{
 }
 
 func init() {
-	workflowListCmd.PersistentFlags().IntP("limit", "l", 20, "Limit the number of workflows to list")
-	workflowListCmd.PersistentFlags().IntP("offset", "f", 0, "Offset the number of workflows to list (default: 0)")
-	workflowListCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of workflows to list (draft, live), default: live")
-	workflowListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output Style (pretty, yaml, json)")
+	workflowListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of workflows to return")
+	workflowListCmd.PersistentFlags().IntP("offset", "f", 0, "Number of workflows to skip for pagination")
+	workflowListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	workflowListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	workflowListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})
-	WorkflowCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to list workflows from")
+	WorkflowCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	WorkflowCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	WorkflowCmd.AddCommand(workflowListCmd)
 }

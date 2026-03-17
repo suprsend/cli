@@ -16,8 +16,8 @@ import (
 
 var translationPushCmd = &cobra.Command{
 	Use:   "push",
-	Short: "push workflows from local to suprsend",
-	Long:  "push workflows from local to suprsend",
+	Short: "Push translation files to a workspace",
+	Long:  "Upload local template translation JSON files to a workspace. Reads all .json files from the input directory and pushes them. Use --commit=true to also finalize the changes immediately.",
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -138,8 +138,8 @@ var translationPushCmd = &cobra.Command{
 }
 
 func init() {
-	translationPushCmd.Flags().StringP("commit", "c", "false", "Commit the translation (--commit=true)")
-	translationPushCmd.Flags().StringP("commit-message", "m", "", "Commit message for the translation")
-	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations pull to (default: ./suprsend/translation)")
+	translationPushCmd.Flags().StringP("commit", "c", "false", "Promote changes from draft to live after pushing (true/false)")
+	translationPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: ./suprsend/translation)")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

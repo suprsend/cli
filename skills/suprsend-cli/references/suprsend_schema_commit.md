@@ -2,7 +2,7 @@
 
 Commit schema from draft to live
 
-Commit schema from draft to live in a workspace. Example: suprsend schema commit <slug>
+Promote a schema from draft to live mode. Requires a schema slug as a positional argument. Once committed, the schema changes become active immediately.
 
 ```
 suprsend schema commit [flags]
@@ -11,7 +11,7 @@ suprsend schema commit [flags]
 ### Options
 
 ```
-  -m, --commit-message string   Commit message describing the changes
+  -m, --commit-message string   Message describing the changes being committed
   -h, --help                    help for commit
 ```
 
@@ -22,6 +22,6 @@ suprsend schema commit [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to use the schemas from (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

@@ -13,7 +13,10 @@ import (
 var eventListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List events",
-	Long:  "List all events",
+	Long:  "List all events in a workspace with pagination. Returns event names and their linked schema information.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -44,10 +47,10 @@ var eventListCmd = &cobra.Command{
 }
 
 func init() {
-	eventListCmd.PersistentFlags().IntP("limit", "l", 20, "Limit the number of events to list.")
-	eventListCmd.PersistentFlags().IntP("offset", "f", 0, "Offset into the list of events(default: 0)")
-	eventListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output Style (pretty, yaml, json)")
-	EventCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to list events from")
+	eventListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of events to return")
+	eventListCmd.PersistentFlags().IntP("offset", "f", 0, "Number of events to skip for pagination")
+	eventListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
+	EventCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	EventCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	EventCmd.AddCommand(eventListCmd)
 }

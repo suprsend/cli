@@ -2,6 +2,8 @@
 
 Pull categories from a workspace
 
+Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.
+
 ```
 suprsend category pull [flags]
 ```
@@ -9,10 +11,10 @@ suprsend category pull [flags]
 ### Options
 
 ```
-  -d, --dir string    Output directory for categories (default: ./suprsend/category)
-  -f, --force         Force using default directory without prompting
+  -d, --dir string    Directory to save category files to (default: ./suprsend/category)
+  -f, --force         Skip directory confirmation prompt, use default path
   -h, --help          help for pull
-  -m, --mode string   Mode to pull categories from (default "live")
+  -m, --mode string   Version mode: draft or live (default "live")
 ```
 
 ### Options inherited from parent commands
@@ -22,6 +24,6 @@ suprsend category pull [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

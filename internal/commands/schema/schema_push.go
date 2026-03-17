@@ -17,7 +17,7 @@ import (
 var schemaPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push schemas",
-	Long:  "Push schemas in a workspace",
+	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are committed immediately (--commit=true). Use --slug to push a single schema.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug, _ := cmd.Flags().GetString("slug")
@@ -211,9 +211,9 @@ var schemaPushCmd = &cobra.Command{
 }
 
 func init() {
-	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory for schemas pull to (default: ./suprsend/schema)")
-	schemaPushCmd.Flags().StringP("commit", "c", "true", "Commit the schemas (--commit=true)")
-	schemaPushCmd.Flags().StringP("commit-message", "m", "", "Commit message describing the changes for --commit=true")
-	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of schema to push")
+	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory containing schema JSON files (default: ./suprsend/schema)")
+	schemaPushCmd.Flags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
+	schemaPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")
 	SchemaCmd.AddCommand(schemaPushCmd)
 }

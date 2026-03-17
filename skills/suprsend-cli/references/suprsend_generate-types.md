@@ -2,7 +2,7 @@
 
 Generate type definitions from JSON Schema
 
-Generate type definitions from JSON schema for various programming languages
+Generate typed code from trigger payload JSON schemas. Fetches schemas linked to workflows and events from a workspace and generates type definitions in the target language.
 
 ### Options
 

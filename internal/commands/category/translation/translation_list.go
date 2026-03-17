@@ -12,7 +12,10 @@ import (
 var translationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List preference translations",
-	Long:  "List preference translations",
+	Long:  "List available translation locales for preference categories in a workspace. Returns the locale codes that have translations configured.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputType, _ := cmd.Flags().GetString("output")

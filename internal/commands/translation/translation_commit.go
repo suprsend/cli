@@ -14,7 +14,7 @@ import (
 var translationCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit translation",
-	Long:  "Commit translation",
+	Long:  "Promote template translation changes from draft to live mode. Finalizes all pending translation changes in the workspace.",
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
@@ -42,6 +42,6 @@ var translationCommitCmd = &cobra.Command{
 }
 
 func init() {
-	translationCommitCmd.Flags().StringP("commit-message", "m", "", "The commit message for the translation")
+	translationCommitCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	TranslationCmd.AddCommand(translationCommitCmd)
 }

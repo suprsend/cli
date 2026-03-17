@@ -14,7 +14,10 @@ import (
 var workflowGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get workflow details",
-	Long:  "Get workfow details of a specific wf. Example: suprsend workflow get <slug>",
+	Long:  "Get detailed information for a specific workflow by its slug. Requires a slug as a positional argument. Returns the full workflow definition including nodes, connections, and configuration.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Error("Workflow slug argument is required. Example: suprsend workflow get <slug>")
@@ -51,6 +54,6 @@ var workflowGetCmd = &cobra.Command{
 }
 
 func init() {
-	workflowGetCmd.PersistentFlags().String("mode", "live", "mode to fetch worklfow from.")
+	workflowGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
 	WorkflowCmd.AddCommand(workflowGetCmd)
 }

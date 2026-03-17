@@ -15,7 +15,7 @@ import (
 var workflowPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull workflows from SuprSend workspace to local",
-	Long:  `Pull workflows from SuprSend workspace to local`,
+	Long:  `Download workflow definitions from a workspace to local JSON files. Saves one JSON file per workflow (named by slug) to the output directory. Use --slug to pull a single workflow, or omit to pull all.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -102,9 +102,9 @@ var workflowPullCmd = &cobra.Command{
 }
 
 func init() {
-	workflowPullCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of workflows to pull from (draft, live)")
-	workflowPullCmd.PersistentFlags().StringP("dir", "d", "", "Output directory for workflows (default: ./suprsend/workflow)")
-	workflowPullCmd.PersistentFlags().StringP("slug", "g", "", "Slug of the workflow to pull")
-	workflowPullCmd.PersistentFlags().BoolP("force", "f", false, "Force using default directory without prompting")
+	workflowPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	workflowPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save workflow files to (default: ./suprsend/workflow)")
+	workflowPullCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to pull (omit to pull all)")
+	workflowPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
 	WorkflowCmd.AddCommand(workflowPullCmd)
 }

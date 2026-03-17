@@ -2,6 +2,8 @@
 
 Generate Dart types from JSON Schema
 
+Generate Dart type definitions from trigger payload schemas. Produces null-safe classes in a single output file.
+
 ```
 suprsend generate-types dart [flags]
 ```
@@ -10,9 +12,9 @@ suprsend generate-types dart [flags]
 
 ```
   -h, --help                 help for dart
-      --mode string          Mode of schema to fetch (draft, live), default: live (default "live")
-      --output-file string   Output file for generated Dart types (default "suprsend_types.dart")
-      --workspace string     Workspace to get schemas from. (default "staging")
+      --mode string          Version mode: draft or live (default "live")
+      --output-file string   Output file path for generated types (default "suprsend_types.dart")
+      --workspace string     Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

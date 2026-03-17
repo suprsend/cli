@@ -15,7 +15,7 @@ import (
 var eventPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push linked events",
-	Long:  "Push linked events in schemas",
+	Long:  "Push event-to-schema mappings from a local event_schema_mapping.json file to a workspace. Reads the mapping file from the specified directory.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
@@ -54,6 +54,6 @@ var eventPushCmd = &cobra.Command{
 }
 
 func init() {
-	eventPushCmd.Flags().StringP("dir", "d", "", "Directory to push events from (default: ./suprsend/event)")
+	eventPushCmd.Flags().StringP("dir", "d", "", "Directory containing event files (default: ./suprsend/event)")
 	EventCmd.AddCommand(eventPushCmd)
 }

@@ -15,7 +15,7 @@ import (
 var schemaPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull schemas",
-	Long:  `Pull schemas in a workspace`,
+	Long:  `Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Use --slug to pull a single schema, or omit to pull all.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir, _ := cmd.Flags().GetString("dir")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -105,9 +105,9 @@ var schemaPullCmd = &cobra.Command{
 }
 
 func init() {
-	schemaPullCmd.Flags().StringP("dir", "d", "", "Directory to pull schemas (default: ./suprsend/schema)")
-	schemaPullCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of schemas to pull (draft, live), default: live")
-	schemaPullCmd.PersistentFlags().StringP("slug", "g", "", "Slug of schema to pull")
-	schemaPullCmd.PersistentFlags().BoolP("force", "f", false, "Force using default directory without prompting")
+	schemaPullCmd.Flags().StringP("dir", "d", "", "Directory to save schema files to (default: ./suprsend/schema)")
+	schemaPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	schemaPullCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to pull (omit to pull all)")
+	schemaPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
 	SchemaCmd.AddCommand(schemaPullCmd)
 }

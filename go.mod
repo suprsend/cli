@@ -91,4 +91,4 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 )
 
-replace github.com/spf13/cobra => github.com/gauravverma/cobra v0.0.0-20260305184229-e3bfd249710a
+replace github.com/spf13/cobra => github.com/gauravverma/cobra v0.0.0-20260317072524-070e50638148

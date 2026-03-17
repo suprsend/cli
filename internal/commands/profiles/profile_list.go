@@ -13,6 +13,9 @@ var listProfilesCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all profiles",
 	Long:  "List all profiles from the config. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
@@ -105,6 +108,6 @@ var listProfilesCmd = &cobra.Command{
 }
 
 func init() {
-	listProfilesCmd.Flags().StringP("output", "o", "pretty", "Output type: pretty, json, yaml")
+	listProfilesCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	ProfileCmd.AddCommand(listProfilesCmd)
 }

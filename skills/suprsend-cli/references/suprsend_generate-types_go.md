@@ -2,6 +2,8 @@
 
 Generate Go types from JSON Schema
 
+Generate Go type definitions from trigger payload schemas. Produces struct definitions in a single output file with the specified package name.
+
 ```
 suprsend generate-types go [flags]
 ```
@@ -10,10 +12,10 @@ suprsend generate-types go [flags]
 
 ```
   -h, --help                 help for go
-      --mode string          Mode of schema to fetch (draft, live), default: live (default "live")
-      --output-file string   Output file for generated Go types (default "suprsend_types.go")
-      --package string       Package name for Go types (default "suprsend")
-      --workspace string     Workspace to get schemas from. (default "staging")
+      --mode string          Version mode: draft or live (default "live")
+      --output-file string   Output file path for generated types (default "suprsend_types.go")
+      --package string       Go package name for generated structs (default "suprsend")
+      --workspace string     Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands

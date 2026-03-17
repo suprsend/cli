@@ -9,6 +9,11 @@ SuprSend is a robust notification infrastructure that helps you deploy multi-cha
 
 This CLI lets you interact with your SuprSend workspace and do actions like fetching/modifying template, workflows etc.
 
+## Notes
+
+- Commands that return data (list, get) support `-o json` for machine-readable JSON output and `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
+- The `profile` command and its subcommands (add, list, modify, remove, use) are only needed for self-hosted/BYOC SuprSend instances or managing multiple accounts. SaaS users do not need them. Profiles are not used for switching between workspaces within the same account; use the `--workspace` flag for that.
+
 ## Available Commands
 
 - [`suprsend category`](references/suprsend_category.md) - Manage preference categories
@@ -56,7 +61,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend translation commit`](references/suprsend_translation_commit.md) - Commit translation
 - [`suprsend translation list`](references/suprsend_translation_list.md) - List Translations
 - [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull Translation files
-- [`suprsend translation push`](references/suprsend_translation_push.md) - push workflows from local to suprsend
+- [`suprsend translation push`](references/suprsend_translation_push.md) - Push translation files to a workspace
 - [`suprsend workflow`](references/suprsend_workflow.md) - Manage workflows
 - [`suprsend workflow disable`](references/suprsend_workflow_disable.md) - Disable a workflow
 - [`suprsend workflow enable`](references/suprsend_workflow_enable.md) - Enables a workflow.

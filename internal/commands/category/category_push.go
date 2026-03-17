@@ -15,7 +15,7 @@ import (
 
 var categoryPushCmd = &cobra.Command{
 	Use:   "push",
-	Long:  "Push categories to a workspace",
+	Long:  "Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are committed immediately (--commit=true).",
 	Short: "Push categories to a workspace",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -74,8 +74,8 @@ var categoryPushCmd = &cobra.Command{
 }
 
 func init() {
-	categoryPushCmd.Flags().StringP("dir", "d", "", "Output directory for categories (default: ./suprsend/category/)")
-	categoryPushCmd.PersistentFlags().StringP("commit", "c", "true", "Commit the categories ")
-	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Commit message for the categories")
+	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./suprsend/category/)")
+	categoryPushCmd.PersistentFlags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
+	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

@@ -2,7 +2,7 @@
 
 Commit categories
 
-Commit categories to a workspace
+Promote preference categories from draft to live mode. Also pushes any local translation files from the translations subdirectory before committing.
 
 ```
 suprsend category commit [flags]
@@ -11,8 +11,8 @@ suprsend category commit [flags]
 ### Options
 
 ```
-      --commit-message string   Commit message
-  -d, --dir string              Output directory for categories (default: ./suprsend/category)
+      --commit-message string   Message describing the changes being committed
+  -d, --dir string              Directory containing category and translation files (default: ./suprsend/category)
   -h, --help                    help for commit
 ```
 
@@ -23,6 +23,6 @@ suprsend category commit [flags]
   -n, --no-color               Disable color output (default: $NO_COLOR)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to push categories to (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

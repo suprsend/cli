@@ -2,8 +2,8 @@
 
 Start SuprSend MCP server
 
-Start SuprSend MCP server.
-This server will handle all the requests from user about SuprSend capabilities and data.
+Start SuprSend MCP server that exposes tools for AI assistants to interact with your SuprSend workspace.
+Supports stdio, SSE, and HTTP transports. Use --tools to select which tools to expose, and --events/--workflows to dynamically register event/workflow-specific tools.
 
 ```
 suprsend start-mcp-server [flags]
@@ -12,12 +12,11 @@ suprsend start-mcp-server [flags]
 ### Options
 
 ```
-  -e, --events string          The types of events to use. Can be either 'all'/'none' or comma separated list of event slugs. (default "none")
-  -h, --help                   help for start-mcp-server
-  -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
-  -T, --tools string           The types of tools to use. Can be either 'all'/'none' or comma separated list of tool names. (default "all")
-  -t, --transport string       The transport to use for the MCP server. Can be stdio/sse/http. (default "stdio")
-  -W, --workflows string       The types of workflows to use. Can be either 'all'/'none' or comma separated list of workflow slugs. (default "none")
+  -e, --events string      Event tools to register: all, none, or comma-separated event slugs (default "none")
+  -h, --help               help for start-mcp-server
+  -T, --tools string       Tools to expose: all, none, or comma-separated tool names (default "all")
+  -t, --transport string   Server transport: stdio, sse, or http (default "stdio")
+  -W, --workflows string   Workflow tools to register: all, none, or comma-separated workflow slugs (default "none")
 ```
 
 ### Options inherited from parent commands

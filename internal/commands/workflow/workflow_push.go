@@ -242,6 +242,6 @@ func init() {
 	workflowPushCmd.PersistentFlags().StringP("commit", "c", "true", "Commit the workflows (--commit=true)")
 	workflowPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Commit message describing the changes for --commit=true")
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of the workflow to push")
-	workflowPushCmd.PersistentFlags().StringP("json", "j", "", "JSON payload to push directly (requires --slug)")
+	workflowPushCmd.PersistentFlags().StringP("json", "j", "", `Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'`)
 	WorkflowCmd.AddCommand(workflowPushCmd)
 }

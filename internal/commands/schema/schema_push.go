@@ -241,6 +241,6 @@ func init() {
 	schemaPushCmd.PersistentFlags().StringP("commit", "c", "true", "Commit the schemas (--commit=true)")
 	schemaPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Commit message describing the changes for --commit=true")
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of schema to push")
-	schemaPushCmd.PersistentFlags().StringP("json", "j", "", "JSON payload to push directly (requires --slug)")
+	schemaPushCmd.PersistentFlags().StringP("json", "j", "", `Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'`)
 	SchemaCmd.AddCommand(schemaPushCmd)
 }

@@ -140,6 +140,6 @@ func init() {
 	categoryPushCmd.Flags().StringP("dir", "d", "", "Output directory for categories (default: ./suprsend/category/)")
 	categoryPushCmd.PersistentFlags().StringP("commit", "c", "true", "Commit the categories ")
 	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Commit message for the categories")
-	categoryPushCmd.Flags().StringP("json", "j", "", "JSON payload to push directly (categories + optional translations)")
+	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

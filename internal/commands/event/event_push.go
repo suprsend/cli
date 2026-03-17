@@ -68,6 +68,6 @@ var eventPushCmd = &cobra.Command{
 
 func init() {
 	eventPushCmd.Flags().StringP("dir", "d", "", "Directory to push events from (default: ./suprsend/event)")
-	eventPushCmd.Flags().StringP("json", "j", "", "JSON payload to push directly")
+	eventPushCmd.Flags().StringP("json", "j", "", `Events payload as a JSON object with an "events" array, matching the format produced by pull, e.g. '{"events":[{"name":"user_signed_up","description":"...","payload_schema":{...}}]}'`)
 	EventCmd.AddCommand(eventPushCmd)
 }

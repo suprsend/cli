@@ -194,6 +194,6 @@ func init() {
 	translationPushCmd.Flags().StringP("commit", "c", "false", "Commit the translation (--commit=true)")
 	translationPushCmd.Flags().StringP("commit-message", "m", "", "Commit message for the translation")
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory for translations pull to (default: ./suprsend/translation)")
-	translationPushCmd.Flags().StringP("json", "j", "", `JSON payload mapping locales to content, e.g. '{"en":{...},"fr":{...}}'`)
+	translationPushCmd.Flags().StringP("json", "j", "", `Translations as a JSON object mapping locale codes (without .json extension) to their translation content objects, e.g. '{"en":{"key":"value"},"fr":{"key":"valeur"}}'`)
 	TranslationCmd.AddCommand(translationPushCmd)
 }

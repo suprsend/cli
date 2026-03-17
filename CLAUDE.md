@@ -46,7 +46,7 @@ This is a Go CLI tool built with [cobra](https://github.com/spf13/cobra) for int
 Each resource follows a consistent pattern:
 - `helpers.go` — Shared file I/O functions (read/write JSON files)
 - `<resource>.go` — Parent cobra command
-- `<resource>_list.go`, `<resource>_pull.go`, `<resource>_push.go`, `<resource>_commit.go` — CRUD subcommands
+- `<resource>_get.go`, `<resource>_list.go`, `<resource>_pull.go`, `<resource>_push.go`, `<resource>_commit.go` — CRUD subcommands
 
 ### Authentication
 

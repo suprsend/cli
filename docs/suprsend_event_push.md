@@ -13,8 +13,9 @@ suprsend event push [flags]
 ### Options
 
 ```
-  -d, --dir string   Directory containing event files (default: ./suprsend/event)
-  -h, --help         help for push
+  -d, --dir string    Directory containing event files (default: ./suprsend/event)
+  -h, --help          help for push
+  -j, --json string   Events payload as a JSON object with an "events" array, matching the format produced by pull, e.g. '{"events":[{"name":"user_signed_up","description":"...","payload_schema":{...}}]}'
 ```
 
 ### Options inherited from parent commands

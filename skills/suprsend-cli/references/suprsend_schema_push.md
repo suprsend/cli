@@ -15,6 +15,7 @@ suprsend schema push [flags]
   -m, --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing schema JSON files (default: ./suprsend/schema)
   -h, --help                    help for push
+  -j, --json string             Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
   -g, --slug string             Schema slug to push (omit to push all)
 ```
 

@@ -1,24 +1,22 @@
-# suprsend workflow get
+# suprsend event get
 
-Get workflow details
+Get events
 
-Retrieve detailed information for a specific workflow by its slug. Requires --slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.
+Retrieve all events and their schema mappings from a workspace. Returns event definitions including names, descriptions, and payload schemas.
 
 ```
-suprsend workflow get [flags]
+suprsend event get [flags]
 ```
 
 ### Tips
 
-- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
+- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.
 
 ### Options
 
 ```
   -h, --help            help for get
-      --mode string     Version mode: draft or live (default "live")
   -o, --output string   Output format: json or yaml (default "json")
-  -g, --slug string     Workflow slug to retrieve (required)
 ```
 
 ### Options inherited from parent commands

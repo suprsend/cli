@@ -1,16 +1,14 @@
-# suprsend workflow get
+## suprsend translation get
 
-Get workflow details
+Get translations
 
-Retrieve detailed information for a specific workflow by its slug. Requires --slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.
+### Synopsis
+
+Retrieve all template translations from a workspace. Returns translation content keyed by locale code. Use --mode to switch between draft and live versions.
 
 ```
-suprsend workflow get [flags]
+suprsend translation get [flags]
 ```
-
-### Tips
-
-- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
 
 ### Options
 
@@ -18,7 +16,6 @@ suprsend workflow get [flags]
   -h, --help            help for get
       --mode string     Version mode: draft or live (default "live")
   -o, --output string   Output format: json or yaml (default "json")
-  -g, --slug string     Workflow slug to retrieve (required)
 ```
 
 ### Options inherited from parent commands
@@ -30,4 +27,8 @@ suprsend workflow get [flags]
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
+
+### SEE ALSO
+
+* [suprsend translation](suprsend_translation.md)	 - Manage Translations
 

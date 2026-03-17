@@ -1,16 +1,14 @@
-# suprsend workflow get
+## suprsend schema get
 
-Get workflow details
+Get schema details
 
-Retrieve detailed information for a specific workflow by its slug. Requires --slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.
+### Synopsis
+
+Retrieve the full definition of a specific schema by its slug. Returns the JSON Schema object including type, properties, and validation rules. Requires --slug. Use --mode to switch between draft and live versions.
 
 ```
-suprsend workflow get [flags]
+suprsend schema get [flags]
 ```
-
-### Tips
-
-- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.
 
 ### Options
 
@@ -18,7 +16,7 @@ suprsend workflow get [flags]
   -h, --help            help for get
       --mode string     Version mode: draft or live (default "live")
   -o, --output string   Output format: json or yaml (default "json")
-  -g, --slug string     Workflow slug to retrieve (required)
+  -g, --slug string     Schema slug to retrieve (required)
 ```
 
 ### Options inherited from parent commands
@@ -30,4 +28,8 @@ suprsend workflow get [flags]
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
+
+### SEE ALSO
+
+* [suprsend schema](suprsend_schema.md)	 - Manage trigger payload schemas
 

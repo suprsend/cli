@@ -18,6 +18,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 
 - [`suprsend category`](references/suprsend_category.md) - Manage preference categories
 - [`suprsend category commit`](references/suprsend_category_commit.md) - Commit categories
+- [`suprsend category get`](references/suprsend_category_get.md) - Get categories and translations
 - [`suprsend category list`](references/suprsend_category_list.md) - List categories
 - [`suprsend category pull`](references/suprsend_category_pull.md) - Pull categories from a workspace
 - [`suprsend category push`](references/suprsend_category_push.md) - Push categories to a workspace
@@ -31,6 +32,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend completion powershell`](references/suprsend_completion_powershell.md) - Generate the autocompletion script for powershell
 - [`suprsend completion zsh`](references/suprsend_completion_zsh.md) - Generate the autocompletion script for zsh
 - [`suprsend event`](references/suprsend_event.md) - Manage events
+- [`suprsend event get`](references/suprsend_event_get.md) - Get events
 - [`suprsend event list`](references/suprsend_event_list.md) - List events
 - [`suprsend event pull`](references/suprsend_event_pull.md) - Pull events from workspace to local directory
 - [`suprsend event push`](references/suprsend_event_push.md) - Push linked events
@@ -51,6 +53,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend profile use`](references/suprsend_profile_use.md) - Set the active profile
 - [`suprsend schema`](references/suprsend_schema.md) - Manage trigger payload schemas
 - [`suprsend schema commit`](references/suprsend_schema_commit.md) - Commit schema from draft to live
+- [`suprsend schema get`](references/suprsend_schema_get.md) - Get schema details
 - [`suprsend schema list`](references/suprsend_schema_list.md) - List schemas
 - [`suprsend schema pull`](references/suprsend_schema_pull.md) - Pull schemas
 - [`suprsend schema push`](references/suprsend_schema_push.md) - Push schemas
@@ -59,6 +62,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend sync`](references/suprsend_sync.md) - Sync SuprSend assets from one workspace to another
 - [`suprsend translation`](references/suprsend_translation.md) - Manage Translations
 - [`suprsend translation commit`](references/suprsend_translation_commit.md) - Commit translation
+- [`suprsend translation get`](references/suprsend_translation_get.md) - Get translations
 - [`suprsend translation list`](references/suprsend_translation_list.md) - List Translations
 - [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull Translation files
 - [`suprsend translation push`](references/suprsend_translation_push.md) - Push translation files to a workspace

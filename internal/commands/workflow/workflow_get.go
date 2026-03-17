@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -14,46 +13,53 @@ import (
 var workflowGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get workflow details",
-	Long:  "Get detailed information for a specific workflow by its slug. Requires a slug as a positional argument. Returns the full workflow definition including nodes, connections, and configuration.",
+	Long:  "Retrieve detailed information for a specific workflow by its slug. Requires --slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.",
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("Workflow slug argument is required. Example: suprsend workflow get <slug>")
-			return fmt.Errorf("Workflow slug argument is required. Example: suprsend workflow get <slug>")
+		slug, _ := cmd.Flags().GetString("slug")
+		if slug == "" {
+			log.Error("Workflow slug is required. Example: suprsend workflow get --slug <slug>")
+			return fmt.Errorf("workflow slug is required. Example: suprsend workflow get --slug <slug>")
 		}
-		slug := args[0]
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
+		var cancel context.CancelFunc
 		if !utils.IsOutputPiped() {
 			p = pin.New("Getting details...",
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+			cancel = p.Start(context.Background())
 		}
 
-		workflow, err := mgmntClient.GetWorkflowDetail(workspace, slug, mode)
+		workflow, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error getting workflow detail")
 			return err
 		}
-		utils.OutputData(workflow, outputType)
+
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully got details for '%s'", slug))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully got details for '%s'", slug)
+			cancel()
 		}
+
+		utils.OutputData(workflow, outputType)
 		return nil
 	},
 }
 
 func init() {
+	workflowGetCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to retrieve (required)")
 	workflowGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
+	workflowGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	WorkflowCmd.AddCommand(workflowGetCmd)
 }

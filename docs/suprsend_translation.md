@@ -30,6 +30,7 @@ suprsend translation [flags]
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend translation commit](suprsend_translation_commit.md)	 - Commit translation
+* [suprsend translation get](suprsend_translation_get.md)	 - Get translations
 * [suprsend translation list](suprsend_translation_list.md)	 - List Translations
 * [suprsend translation pull](suprsend_translation_pull.md)	 - Pull Translation files
 * [suprsend translation push](suprsend_translation_push.md)	 - Push translation files to a workspace

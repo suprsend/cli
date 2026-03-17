@@ -15,6 +15,7 @@ suprsend workflow push [flags]
   -m, --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing workflow JSON files (default: ./suprsend/workflow)
   -h, --help                    help for push
+  -j, --json string             Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'
   -g, --slug string             Workflow slug to push (omit to push all)
 ```
 

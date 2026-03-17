@@ -30,6 +30,7 @@ suprsend schema [flags]
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend schema commit](suprsend_schema_commit.md)	 - Commit schema from draft to live
+* [suprsend schema get](suprsend_schema_get.md)	 - Get schema details
 * [suprsend schema list](suprsend_schema_list.md)	 - List schemas
 * [suprsend schema pull](suprsend_schema_pull.md)	 - Pull schemas
 * [suprsend schema push](suprsend_schema_push.md)	 - Push schemas

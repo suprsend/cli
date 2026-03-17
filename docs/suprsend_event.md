@@ -29,6 +29,7 @@ suprsend event [flags]
 ### SEE ALSO
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
+* [suprsend event get](suprsend_event_get.md)	 - Get events
 * [suprsend event list](suprsend_event_list.md)	 - List events
 * [suprsend event pull](suprsend_event_pull.md)	 - Pull events from workspace to local directory
 * [suprsend event push](suprsend_event_push.md)	 - Push linked events

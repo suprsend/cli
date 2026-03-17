@@ -18,6 +18,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Create placeholder for embedded binary
+        run: mkdir -p internal/utils/embedded-binaries && touch internal/utils/embedded-binaries/type-morph
+
       - name: Generate docs and skills
         run: |
           go run ./cmd/suprsend/main.go gendocs docs/

@@ -11,18 +11,15 @@ go run ./cmd/suprsend/main.go
 # Build binary
 cd cmd/suprsend && go build -o suprsend
 
-# Build type-morph embedded binary (requires deno)
+# Full build: compile type-morph binary (requires deno), generate docs and skills
 make build
+
+# Clean build artifacts
+make clean
 
 # Full release build with goreleaser (generates docs, builds all platforms)
 ./scripts/build.sh              # snapshot build
 ./scripts/build.sh release      # release build
-
-# Generate CLI documentation
-go run ./cmd/suprsend/main.go gendocs docs/
-
-# Generate AI skills file
-go run ./cmd/suprsend/main.go genskills skills/suprsend/
 ```
 
 There are no tests in this project.

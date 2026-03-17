@@ -14,5 +14,7 @@ build:
 		--allow-env \
 		--output $(OUT) \
 		$(SRC)
+	go run ./cmd/suprsend/main.go gendocs docs/
+	go run ./cmd/suprsend/main.go genskills skills/
 clean:
 	rm -f $(OUT)

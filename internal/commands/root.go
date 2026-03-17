@@ -71,8 +71,8 @@ func init() {
 		if err := config.SetUpLogs(); err != nil {
 			return err
 		}
-		// check the subcommand and return if it is gendocs
-		if cmd.Name() == "gendocs" {
+		// check the subcommand and return if it is gendocs or genskills
+		if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
 			return nil
 		}
 

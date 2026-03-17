@@ -19,7 +19,7 @@ jobs:
           cache: true
 
       - name: Create placeholder for embedded binary
-        run: mkdir -p internal/utils/embedded-binaries && touch internal/utils/embedded-binaries/type-morph
+        run: mkdir -p internal/utils/embedded-binaries && touch internal/utils/embedded-binaries/type-morph-linux-amd64
 
       - name: Generate docs and skills
         run: |

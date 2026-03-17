@@ -1,4 +1,4 @@
-package workflow
+package schema
 
 import (
 	"context"
@@ -11,15 +11,15 @@ import (
 	"github.com/yarlson/pin"
 )
 
-var workflowGetCmd = &cobra.Command{
+var schemaGetCmd = &cobra.Command{
 	Use:   "get",
-	Short: "Get workflow details",
-	Long:  "Get workfow details of a specific wf. Example: suprsend workflow get --slug <slug>",
+	Short: "Get schema details",
+	Long:  "Get schema details for a specific schema. Example: suprsend schema get --slug <slug>",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug, _ := cmd.Flags().GetString("slug")
 		if slug == "" {
-			log.Error("Workflow slug is required. Example: suprsend workflow get --slug <slug>")
-			return fmt.Errorf("workflow slug is required. Example: suprsend workflow get --slug <slug>")
+			log.Error("Schema slug is required. Example: suprsend schema get --slug <slug>")
+			return fmt.Errorf("schema slug is required. Example: suprsend schema get --slug <slug>")
 		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -35,12 +35,12 @@ var workflowGetCmd = &cobra.Command{
 			defer cancel()
 		}
 
-		workflow, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+		schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
 		if err != nil {
-			log.WithError(err).Errorf("Error getting workflow detail")
+			log.WithError(err).Errorf("Error getting schema detail")
 			return err
 		}
-		utils.OutputData(workflow, outputType)
+		utils.OutputData(schema, outputType)
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully got details for '%s'", slug))
 		} else {
@@ -51,8 +51,8 @@ var workflowGetCmd = &cobra.Command{
 }
 
 func init() {
-	workflowGetCmd.PersistentFlags().StringP("slug", "g", "", "Slug of the workflow to get")
-	workflowGetCmd.PersistentFlags().String("mode", "live", "mode to fetch worklfow from.")
-	workflowGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format (json, yaml)")
-	WorkflowCmd.AddCommand(workflowGetCmd)
+	schemaGetCmd.PersistentFlags().StringP("slug", "g", "", "Slug of the schema to get")
+	schemaGetCmd.PersistentFlags().String("mode", "live", "mode to fetch schema from.")
+	schemaGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format (json, yaml)")
+	SchemaCmd.AddCommand(schemaGetCmd)
 }

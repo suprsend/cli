@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -391,6 +392,9 @@ func init() {
 }
 
 func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) error {
+	if len(utils.TypeMorphBin) == 0 {
+		return fmt.Errorf("type generation is not supported on %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
 	binaryPath, err := writeTempExecutable(utils.TypeMorphBin)
 	if err != nil {
 		return fmt.Errorf("failed to initialize type generator: %w", err)
@@ -413,7 +417,11 @@ func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) err
 }
 
 func writeTempExecutable(data []byte) (string, error) {
-	tmpFile, err := os.CreateTemp("", "typemorph-*")
+	pattern := "typemorph-*"
+	if runtime.GOOS == "windows" {
+		pattern = "typemorph-*.exe"
+	}
+	tmpFile, err := os.CreateTemp("", pattern)
 	if err != nil {
 		return "", err
 	}

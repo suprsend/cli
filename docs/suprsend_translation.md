@@ -4,7 +4,7 @@ Manage Translations
 
 ### Synopsis
 
-Manage Translation
+Manage template translations. Subcommands let you list, pull, push, and commit translations for notification templates.
 
 ```
 suprsend translation [flags]
@@ -15,7 +15,7 @@ suprsend translation [flags]
 ```
   -h, --help                   help for translation
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
-  -w, --workspace string       Workspace to list translations for (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands
@@ -32,5 +32,5 @@ suprsend translation [flags]
 * [suprsend translation commit](suprsend_translation_commit.md)	 - Commit translation
 * [suprsend translation list](suprsend_translation_list.md)	 - List Translations
 * [suprsend translation pull](suprsend_translation_pull.md)	 - Pull Translation files
-* [suprsend translation push](suprsend_translation_push.md)	 - push workflows from local to suprsend
+* [suprsend translation push](suprsend_translation_push.md)	 - Push translation files to a workspace
 

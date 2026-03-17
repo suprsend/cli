@@ -2,7 +2,7 @@
 
 List all the tools supported by the server
 
-List all available MCP tools that the server can expose, including their types and descriptions. Useful for discovering which tools can be enabled via the --tools flag.
+List all available MCP tools with their type, name, and description. Includes built-in tools and any dynamically registered event/workflow trigger tools. Use this to discover tool names for the --tools flag.
 
 ```
 suprsend start-mcp-server list-tools [flags]

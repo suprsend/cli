@@ -4,7 +4,7 @@ List all profiles
 
 ### Synopsis
 
-List all profiles from the config
+List all profiles from the config. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.
 
 ```
 suprsend profile list [flags]
@@ -14,7 +14,7 @@ suprsend profile list [flags]
 
 ```
   -h, --help            help for list
-  -o, --output string   Output type: pretty, json, yaml (default "pretty")
+  -o, --output string   Output format: pretty, json, or yaml (default "pretty")
 ```
 
 ### Options inherited from parent commands

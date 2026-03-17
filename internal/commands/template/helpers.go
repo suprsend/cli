@@ -124,6 +124,22 @@ func WriteTemplatesToFiles(results []templateResult, outputDir string) (*Templat
 		debugLog("Wrote: %s", mainFile)
 		fmt.Fprintf(os.Stdout, "Wrote template metadata to %s\n", mainFile)
 
+		// Write mock_data.json if present
+		if tmpl.MockData != nil {
+			mockJSON, err := json.MarshalIndent(tmpl.MockData, "", "  ")
+			if err != nil {
+				debugErrorLog("Error marshaling mock_data.json for '%s': %s", tmpl.Slug, err)
+			} else {
+				mockFile := filepath.Join(templateDir, "mock_data.json")
+				if err := os.WriteFile(mockFile, mockJSON, 0o644); err != nil {
+					debugErrorLog("Error writing mock_data.json for '%s': %s", tmpl.Slug, err)
+				} else {
+					debugLog("Wrote: %s", mockFile)
+					fmt.Fprintf(os.Stdout, "Wrote mock data to %s\n", mockFile)
+				}
+			}
+		}
+
 		// Write each variant
 		for _, variant := range tmpl.Variants {
 			channel, _ := variant["channel"].(string)

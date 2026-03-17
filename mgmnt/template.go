@@ -208,6 +208,65 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 	return nil
 }
 
+func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string]any, error) {
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
+
+	log.Debugf("Getting mock data for template: %s, workspace: %s", slug, workspace)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() == 404 {
+		return nil, nil
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return nil, fmt.Errorf("request failed: %s", resp.Status())
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal([]byte(resp.String()), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	data, _ := result["data"].(map[string]any)
+	return data, nil
+}
+
+func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) error {
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
+
+	log.Debugf("Patching mock data for template: %s, workspace: %s", slug, workspace)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]any{"data": mockData}).
+		Patch(url)
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return nil
+}
+
 func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)

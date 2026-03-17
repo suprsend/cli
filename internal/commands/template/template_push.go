@@ -76,6 +76,24 @@ func pushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		return
 	}
 
+	// Push mock_data.json if it exists
+	mockDataFile := filepath.Join(templateDir, "mock_data.json")
+	if mockDataBytes, err := os.ReadFile(mockDataFile); err == nil {
+		var mockData map[string]any
+		if err := json.Unmarshal(mockDataBytes, &mockData); err != nil {
+			log.WithError(err).Errorf("Failed to parse mock_data.json for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse mock_data.json for template %s: %v", slug, err))
+			stats.Failed++
+			return
+		}
+		if err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData); err != nil {
+			log.WithError(err).Errorf("Failed to push mock data for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push mock data for template %s: %v", slug, err))
+			stats.Failed++
+			return
+		}
+	}
+
 	if commit {
 		if force {
 			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)

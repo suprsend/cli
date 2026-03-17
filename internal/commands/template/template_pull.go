@@ -21,6 +21,7 @@ type templateResult struct {
 	Name            string           `json:"name"`
 	EnabledChannels []string         `json:"enabled_channels"`
 	Variants        []map[string]any `json:"variants"`
+	MockData        map[string]any   `json:"mock_data,omitempty"`
 }
 
 var templatePullCmd = &cobra.Command{
@@ -78,7 +79,11 @@ var templatePullCmd = &cobra.Command{
 				log.WithError(err).Error("Couldn't fetch template variants")
 				return
 			}
-			results = append(results, templateResult{Slug: slug, Variants: variants})
+			mockData, err := mgmntClient.GetTemplateMockData(workspace, slug)
+			if err != nil {
+				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
+			}
+			results = append(results, templateResult{Slug: slug, Variants: variants, MockData: mockData})
 		} else {
 			// Fetch all template slugs
 			templates, err := mgmntClient.ListTemplates(workspace, math.MaxInt32, 0, mode)
@@ -96,11 +101,16 @@ var templatePullCmd = &cobra.Command{
 					log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
 					continue
 				}
+				mockData, err := mgmntClient.GetTemplateMockData(workspace, t.Slug)
+				if err != nil {
+					log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
+				}
 				results = append(results, templateResult{
 					Slug:            t.Slug,
 					Name:            t.Name,
 					EnabledChannels: t.EnabledChannels,
 					Variants:        variants,
+					MockData:        mockData,
 				})
 			}
 		}

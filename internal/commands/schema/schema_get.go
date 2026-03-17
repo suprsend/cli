@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -26,26 +25,31 @@ var schemaGetCmd = &cobra.Command{
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
+		var cancel context.CancelFunc
 		if !utils.IsOutputPiped() {
 			p = pin.New("Getting details...",
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+			cancel = p.Start(context.Background())
 		}
 
 		schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error getting schema detail")
 			return err
 		}
-		utils.OutputData(schema, outputType)
+
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully got details for '%s'", slug))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully got details for '%s'", slug)
+			cancel()
 		}
+
+		utils.OutputData(schema, outputType)
 		return nil
 	},
 }

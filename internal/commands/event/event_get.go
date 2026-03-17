@@ -3,7 +3,6 @@ package event
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -20,27 +19,32 @@ var eventGetCmd = &cobra.Command{
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
+		var cancel context.CancelFunc
 		if !utils.IsOutputPiped() {
 			p = pin.New("Getting events...",
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+			cancel = p.Start(context.Background())
 		}
 
 		eventsResp, err := mgmntClient.GetEvents(workspace)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error getting events")
 			return err
 		}
-		output := map[string]any{"events": eventsResp.Results}
-		utils.OutputData(output, outputType)
+
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully got %d event(s)", len(eventsResp.Results)))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully got %d event(s)", len(eventsResp.Results))
+			cancel()
 		}
+
+		output := map[string]any{"events": eventsResp.Results}
+		utils.OutputData(output, outputType)
 		return nil
 	},
 }

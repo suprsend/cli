@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -26,26 +25,31 @@ var workflowGetCmd = &cobra.Command{
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
+		var cancel context.CancelFunc
 		if !utils.IsOutputPiped() {
 			p = pin.New("Getting details...",
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+			cancel = p.Start(context.Background())
 		}
 
 		workflow, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error getting workflow detail")
 			return err
 		}
-		utils.OutputData(workflow, outputType)
+
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully got details for '%s'", slug))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully got details for '%s'", slug)
+			cancel()
 		}
+
+		utils.OutputData(workflow, outputType)
 		return nil
 	},
 }

@@ -3,7 +3,6 @@ package translation
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -22,17 +21,21 @@ var translationGetCmd = &cobra.Command{
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
+		var cancel context.CancelFunc
 		if !utils.IsOutputPiped() {
 			p = pin.New("Getting translations...",
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+			cancel = p.Start(context.Background())
 		}
 
 		translationsResp, err := mgmntClient.GetTranslations(workspace, mode)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error getting translations")
 			return err
 		}
@@ -48,12 +51,12 @@ var translationGetCmd = &cobra.Command{
 			output[locale] = obj["content"]
 		}
 
-		utils.OutputData(output, outputType)
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully got %d translation(s)", len(output)))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully got %d translation(s)", len(output))
+			cancel()
 		}
+
+		utils.OutputData(output, outputType)
 		return nil
 	},
 }

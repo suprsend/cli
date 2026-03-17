@@ -3,7 +3,6 @@ package category
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -21,23 +20,31 @@ var categoryGetCmd = &cobra.Command{
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
+		var cancel context.CancelFunc
 		if !utils.IsOutputPiped() {
 			p = pin.New("Getting categories...",
 				pin.WithSpinnerColor(pin.ColorCyan),
 				pin.WithTextColor(pin.ColorYellow),
 			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+			cancel = p.Start(context.Background())
 		}
 
 		categoriesResp, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error getting categories")
 			return err
 		}
 
 		localesResp, err := mgmntClient.ListPreferenceTranslations(workspace)
 		if err != nil {
+			if p != nil {
+				p.Stop("")
+				cancel()
+			}
 			log.WithError(err).Errorf("Error listing preference translations")
 			return err
 		}
@@ -50,10 +57,19 @@ var categoryGetCmd = &cobra.Command{
 			}
 			content, err := mgmntClient.GetPreferenceTranslationsForLocale(workspace, locale)
 			if err != nil {
+				if p != nil {
+					p.Stop("")
+					cancel()
+				}
 				log.WithError(err).Errorf("Error getting translations for locale %s", locale)
 				return err
 			}
 			translations[locale] = content
+		}
+
+		if p != nil {
+			p.Stop(fmt.Sprintf("Successfully got categories for '%s'", workspace))
+			cancel()
 		}
 
 		output := map[string]any{
@@ -61,11 +77,6 @@ var categoryGetCmd = &cobra.Command{
 			"translations": translations,
 		}
 		utils.OutputData(output, outputType)
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully got categories for '%s'", workspace))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully got categories for '%s'", workspace)
-		}
 		return nil
 	},
 }

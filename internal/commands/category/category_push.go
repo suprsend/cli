@@ -22,7 +22,7 @@ type jsonCategoryInput struct {
 
 var categoryPushCmd = &cobra.Command{
 	Use:   "push",
-	Long: `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are committed immediately (--commit=true).
+	Long: `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. Use --commit=true to promote changes to live after pushing.
 
 Examples:
   # Push from local files (default)
@@ -138,7 +138,7 @@ Examples:
 
 func init() {
 	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./suprsend/category/)")
-	categoryPushCmd.PersistentFlags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
+	categoryPushCmd.PersistentFlags().StringP("commit", "c", "false", "Promote changes from draft to live after pushing (true/false)")
 	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
 	CategoryCmd.AddCommand(categoryPushCmd)

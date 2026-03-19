@@ -17,7 +17,7 @@ import (
 var workflowPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push workflows from local to SuprSend workspace",
-	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are committed immediately (--commit=true). Use --slug to push a single workflow, or omit to push all.`,
+	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. Use --commit=true to promote changes to live after pushing. Use --slug to push a single workflow, or omit to push all.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
@@ -239,7 +239,7 @@ var workflowPushCmd = &cobra.Command{
 
 func init() {
 	workflowPushCmd.PersistentFlags().StringP("dir", "d", "", "Directory containing workflow JSON files (default: ./suprsend/workflow)")
-	workflowPushCmd.PersistentFlags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
+	workflowPushCmd.PersistentFlags().StringP("commit", "c", "false", "Promote changes from draft to live after pushing (true/false)")
 	workflowPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to push (omit to push all)")
 	workflowPushCmd.PersistentFlags().StringP("json", "j", "", `Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'`)

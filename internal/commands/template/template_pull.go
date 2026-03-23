@@ -13,15 +13,17 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 	"github.com/yarlson/pin"
 )
 
 type templateResult struct {
-	Slug            string           `json:"slug"`
-	Name            string           `json:"name"`
-	EnabledChannels []string         `json:"enabled_channels"`
-	Variants        []map[string]any `json:"variants"`
-	MockData        map[string]any   `json:"mock_data,omitempty"`
+	Slug            string                      `json:"slug"`
+	Name            string                      `json:"name"`
+	EnabledChannels []string                    `json:"enabled_channels"`
+	Variants        []map[string]any            `json:"variants"`
+	MockData        map[string]any              `json:"mock_data,omitempty"`
+	VariantOrder    *mgmnt.VariantOrderResponse `json:"variant_order,omitempty"`
 }
 
 var templatePullCmd = &cobra.Command{
@@ -83,7 +85,11 @@ var templatePullCmd = &cobra.Command{
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 			}
-			results = append(results, templateResult{Slug: slug, Variants: variants, MockData: mockData})
+			variantOrder, err := mgmntClient.GetVariantOrder(workspace, slug, mode)
+			if err != nil {
+				log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", slug)
+			}
+			results = append(results, templateResult{Slug: slug, Variants: variants, MockData: mockData, VariantOrder: variantOrder})
 		} else {
 			// Fetch all template slugs
 			templates, err := mgmntClient.ListTemplates(workspace, math.MaxInt32, 0, mode)
@@ -105,12 +111,17 @@ var templatePullCmd = &cobra.Command{
 				if err != nil {
 					log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
 				}
+				variantOrder, err := mgmntClient.GetVariantOrder(workspace, t.Slug, mode)
+				if err != nil {
+					log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
+				}
 				results = append(results, templateResult{
 					Slug:            t.Slug,
 					Name:            t.Name,
 					EnabledChannels: t.EnabledChannels,
 					Variants:        variants,
 					MockData:        mockData,
+					VariantOrder:    variantOrder,
 				})
 			}
 		}

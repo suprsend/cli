@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,6 +29,72 @@ func readMainJSON(templateDir string) (map[string]any, error) {
 		return nil, fmt.Errorf("failed to parse main.json: %w", err)
 	}
 	return mainData, nil
+}
+
+// readVariantOrder walks a template directory for variants_order.json files and
+// reconstructs the API payload structure.
+func readVariantOrder(templateDir string) (*mgmnt.VariantOrderResponse, error) {
+	channelMap := map[string]*mgmnt.VariantOrderChannel{}
+
+	err := filepath.WalkDir(templateDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || d.Name() != "variants_order.json" {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", path, err)
+		}
+
+		var orderData struct {
+			IDs []string `json:"ids"`
+		}
+		if err := json.Unmarshal(data, &orderData); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", path, err)
+		}
+
+		// Determine channel and tenant from the path relative to templateDir
+		rel, _ := filepath.Rel(templateDir, filepath.Dir(path))
+		parts := strings.Split(rel, string(filepath.Separator))
+
+		// parts[0] = channel
+		// If len(parts) == 1: no tenant (tenant_id = null)
+		// If parts[1] == "__tenant_overrides__" && len(parts) >= 3: tenant_id = parts[2]
+		channel := parts[0]
+		var tenantID *string
+		if len(parts) >= 3 && parts[1] == "__tenant_overrides__" {
+			tid := parts[2]
+			tenantID = &tid
+		}
+
+		ch, exists := channelMap[channel]
+		if !exists {
+			ch = &mgmnt.VariantOrderChannel{Channel: channel}
+			channelMap[channel] = ch
+		}
+		ch.Tenants = append(ch.Tenants, mgmnt.VariantOrderTenant{
+			TenantID: tenantID,
+			Variants: orderData.IDs,
+		})
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(channelMap) == 0 {
+		return nil, nil
+	}
+
+	resp := &mgmnt.VariantOrderResponse{}
+	for _, ch := range channelMap {
+		resp.Channels = append(resp.Channels, *ch)
+	}
+	return resp, nil
 }
 
 func pushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
@@ -89,6 +156,23 @@ func pushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		if err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData); err != nil {
 			log.WithError(err).Errorf("Failed to push mock data for template %s", slug)
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push mock data for template %s: %v", slug, err))
+			stats.Failed++
+			return
+		}
+	}
+
+	// Push variant order if variants_order.json files exist
+	variantOrder, err := readVariantOrder(templateDir)
+	if err != nil {
+		log.WithError(err).Errorf("Failed to read variant order for template %s", slug)
+		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read variant order for template %s: %v", slug, err))
+		stats.Failed++
+		return
+	}
+	if variantOrder != nil {
+		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", variantOrder); err != nil {
+			log.WithError(err).Errorf("Failed to push variant order for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant order for template %s: %v", slug, err))
 			stats.Failed++
 			return
 		}

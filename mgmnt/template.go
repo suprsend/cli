@@ -358,3 +358,76 @@ func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, 
 		},
 	}, nil
 }
+
+type VariantOrderTenant struct {
+	TenantID *string  `json:"tenant_id"`
+	Variants []string `json:"variants"`
+}
+
+type VariantOrderChannel struct {
+	Channel string               `json:"channel"`
+	Tenants []VariantOrderTenant `json:"tenants"`
+}
+
+type VariantOrderResponse struct {
+	Channels []VariantOrderChannel `json:"channels"`
+}
+
+func (c *SS_MgmntClient) GetVariantOrder(workspace, slug, mode string) (*VariantOrderResponse, error) {
+	if mode != "live" && mode != "draft" {
+		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/order/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
+
+	log.Debugf("Getting variant order for template: %s, workspace: %s, mode: %s", slug, workspace, mode)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetResult(&VariantOrderResponse{}).
+		Get(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return nil, fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return resp.Result().(*VariantOrderResponse), nil
+}
+
+func (c *SS_MgmntClient) PostVariantOrder(workspace, slug, mode string, order *VariantOrderResponse) error {
+	if mode != "live" && mode != "draft" {
+		return fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
+	}
+
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/order/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
+
+	log.Debugf("Posting variant order for template: %s, workspace: %s, mode: %s", slug, workspace, mode)
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetHeader("Content-Type", "application/json").
+		SetBody(order).
+		Post(urlStr)
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+			return fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return fmt.Errorf("request failed: %s", resp.Status())
+	}
+	return nil
+}

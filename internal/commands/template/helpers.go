@@ -140,6 +140,40 @@ func WriteTemplatesToFiles(results []templateResult, outputDir string) (*Templat
 			}
 		}
 
+		// Write variants_order.json files per channel+tenant
+		if tmpl.VariantOrder != nil {
+			for _, ch := range tmpl.VariantOrder.Channels {
+				for _, tenant := range ch.Tenants {
+					var orderDir string
+					if tenant.TenantID != nil {
+						orderDir = filepath.Join(templateDir, ch.Channel, "__tenant_overrides__", *tenant.TenantID)
+					} else {
+						orderDir = filepath.Join(templateDir, ch.Channel)
+					}
+					if err := os.MkdirAll(orderDir, 0o755); err != nil {
+						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create directory for variant order '%s': %v", orderDir, err))
+						continue
+					}
+					orderData := map[string]any{
+						"ids": tenant.Variants,
+					}
+					orderJSON, err := json.MarshalIndent(orderData, "", "  ")
+					if err != nil {
+						debugErrorLog("Error marshaling variants_order.json: %s", err)
+						continue
+					}
+					orderFile := filepath.Join(orderDir, "variants_order.json")
+					if err := os.WriteFile(orderFile, orderJSON, 0o644); err != nil {
+						debugErrorLog("Error writing variants_order.json: %s", err)
+						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write variants_order.json at '%s': %v", orderFile, err))
+						continue
+					}
+					debugLog("Wrote: %s", orderFile)
+					fmt.Fprintf(os.Stdout, "Wrote variant order to %s\n", orderFile)
+				}
+			}
+		}
+
 		// Write each variant
 		for _, variant := range tmpl.Variants {
 			channel, _ := variant["channel"].(string)

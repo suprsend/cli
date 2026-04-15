@@ -391,7 +391,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 			continue
 		}
 
-		err = mgmntClient.PushTranslation(toWorkspace, file.Name(), translation)
+		err = mgmntClient.PushTranslation(toWorkspace, file.Name(), map[string]any{"content": translation})
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to push translation %s: %v", file.Name(), err))
 			log.WithError(err).Errorf("Failed to push translation %s", file.Name())

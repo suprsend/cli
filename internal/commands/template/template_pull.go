@@ -73,6 +73,14 @@ var templatePullCmd = &cobra.Command{
 		var results []templateResult
 
 		if slug != "" {
+			tmpl, err := mgmntClient.GetTemplate(workspace, slug, mode)
+			if err != nil {
+				if p != nil {
+					p.Stop("Failed")
+				}
+				log.WithError(err).Error("Couldn't fetch template")
+				return
+			}
 			variants, err := mgmntClient.GetTemplateVariants(workspace, slug, mode)
 			if err != nil {
 				if p != nil {
@@ -89,7 +97,7 @@ var templatePullCmd = &cobra.Command{
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", slug)
 			}
-			results = append(results, templateResult{Slug: slug, Variants: variants, MockData: mockData, VariantOrder: variantOrder})
+			results = append(results, templateResult{Slug: slug, Name: tmpl.Name, EnabledChannels: tmpl.EnabledChannels, Variants: variants, MockData: mockData, VariantOrder: variantOrder})
 		} else {
 			// Fetch all template slugs
 			templates, err := mgmntClient.ListTemplates(workspace, math.MaxInt32, 0, mode)

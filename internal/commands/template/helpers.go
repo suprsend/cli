@@ -74,7 +74,7 @@ func ensureOutputDirectory(dirPath string) error {
 	return nil
 }
 
-func WriteTemplatesToFiles(results []templateResult, outputDir string) (*TemplateWriteStats, error) {
+func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*TemplateWriteStats, error) {
 	stats := &TemplateWriteStats{
 		Total:  len(results),
 		Errors: []string{},

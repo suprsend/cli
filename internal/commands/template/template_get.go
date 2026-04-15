@@ -72,7 +72,7 @@ var templateGetCmd = &cobra.Command{
 			cancel()
 		}
 
-		result := templateResult{
+		result := TemplateResult{
 			Slug:            template.Slug,
 			Name:            template.Name,
 			EnabledChannels: template.EnabledChannels,

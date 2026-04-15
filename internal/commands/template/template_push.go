@@ -105,7 +105,7 @@ func readVariantOrder(templateDir string) (*mgmnt.VariantOrderResponse, error) {
 	return resp, nil
 }
 
-func pushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
+func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
 	mainData, err := readMainJSON(templateDir)
 	if err != nil {
 		log.WithError(err).Errorf("Failed to read main.json for template %s", slug)
@@ -210,9 +210,7 @@ func pushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 			}
 
 			if len(validVariants) == 0 {
-				log.Errorf("No valid variants to commit for template %s", slug)
-				stats.Errors = append(stats.Errors, fmt.Sprintf("No valid variants to commit for template %s", slug))
-				stats.Failed++
+				log.Warnf("No valid variants to commit for template %s", slug)
 				return
 			}
 
@@ -284,7 +282,7 @@ var templatePushCmd = &cobra.Command{
 					cancel = p.Start(context.Background())
 				}
 
-				pushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, stats)
+				PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, stats)
 
 				if p != nil && cancel != nil {
 					if stats.Success > 0 {
@@ -328,7 +326,7 @@ var templatePushCmd = &cobra.Command{
 				}
 
 				prevFailed := stats.Failed
-				pushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, stats)
+				PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, stats)
 
 				if stats.Failed > prevFailed {
 					if p != nil && cancel != nil {

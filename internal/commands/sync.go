@@ -12,6 +12,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/category"
 	"github.com/suprsend/cli/internal/commands/event"
 	"github.com/suprsend/cli/internal/commands/schema"
+	"github.com/suprsend/cli/internal/commands/template"
 	"github.com/suprsend/cli/internal/commands/translation"
 	"github.com/suprsend/cli/internal/commands/workflow"
 	"github.com/suprsend/cli/internal/utils"
@@ -21,7 +22,7 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync SuprSend assets from one workspace to another",
-	Long:  `Sync notification assets from one workspace to another. Pulls assets from the source workspace and pushes them to the destination. Supports syncing all asset types or a specific type (workflow, schema, event, category, translation). Source and destination workspaces must be different.`,
+	Long:  `Sync notification assets from one workspace to another. Pulls assets from the source workspace and pushes them to the destination. Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mode, _ := cmd.Flags().GetString("mode")
 		fromWorkspace, _ := cmd.Flags().GetString("from")
@@ -36,7 +37,7 @@ var syncCmd = &cobra.Command{
 		var assetsToSync []string
 		switch assets {
 		case "all":
-			assetsToSync = []string{"category", "schema", "event", "workflow", "translation"}
+			assetsToSync = []string{"category", "schema", "event", "template", "workflow", "translation"}
 		case "workflow":
 			assetsToSync = []string{"workflow"}
 		case "schema":
@@ -47,8 +48,10 @@ var syncCmd = &cobra.Command{
 			assetsToSync = []string{"category"}
 		case "translation":
 			assetsToSync = []string{"translation"}
+		case "template":
+			assetsToSync = []string{"template"}
 		default:
-			log.Errorf("Invalid asset type: '%s'. Valid options are: all, workflow, schema, event, category, translation", assets)
+			log.Errorf("Invalid asset type: '%s'. Valid options are: all, workflow, schema, event, category, translation, template", assets)
 			return
 		}
 
@@ -90,6 +93,12 @@ var syncCmd = &cobra.Command{
 					log.WithError(err).Errorf("Failed to sync translations")
 					hasErrors = true
 				}
+			case "template":
+				err := syncTemplates(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath)
+				if err != nil {
+					log.WithError(err).Errorf("Failed to sync templates")
+					hasErrors = true
+				}
 			default:
 				log.Errorf("Invalid asset type: %s", assetType)
 			}
@@ -110,7 +119,7 @@ func init() {
 	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace to push assets to")
 	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage during sync")
 	syncCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
-	syncCmd.Flags().StringP("assets", "a", "all", "Asset types to sync: all, workflow, schema, event, category, or translation")
+	syncCmd.Flags().StringP("assets", "a", "all", "Asset types to sync: all, workflow, schema, event, category, translation, or template")
 }
 
 func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
@@ -402,6 +411,60 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	}
 	if len(errors) > 0 {
 		return fmt.Errorf("one or more translations failed to sync:\n%s", strings.Join(errors, "\n"))
+	}
+	return nil
+}
+
+func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
+	if dirPath == "" {
+		dirPath = filepath.Join(".", "suprsend", "templates")
+	} else {
+		dirPath = filepath.Join(dirPath, "templates")
+	}
+
+	log.Infof("Pulling templates from %s ...", fromWorkspace)
+	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "")
+	if err != nil {
+		return fmt.Errorf("error getting templates: %w", err)
+	}
+
+	writeStats, err := template.WriteTemplatesToFiles(results, dirPath)
+	if err != nil {
+		return fmt.Errorf("error writing templates to files: %w", err)
+	}
+	log.Infof("Wrote %d templates locally (%d failed)", writeStats.Success, writeStats.Failed)
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return fmt.Errorf("error reading local templates directory: %w", err)
+	}
+
+	pushStats := &template.TemplatePushStats{Errors: []string{}}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pushStats.Total++
+		slug := entry.Name()
+		templateDir := filepath.Join(dirPath, slug)
+		log.Infof("Pushing template %s to %s ...", slug, toWorkspace)
+		template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, "", true, true, pushStats)
+	}
+
+	if pushStats.Success > 0 {
+		log.Printf("Pushed %d template(s) to %s", pushStats.Success, toWorkspace)
+	}
+
+	var errors []string
+	for _, e := range writeStats.Errors {
+		errors = append(errors, fmt.Sprintf("local write: %s", e))
+	}
+	for _, e := range pushStats.Errors {
+		errors = append(errors, fmt.Sprintf("push: %s", e))
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("one or more templates failed to sync (%d local-write failures, %d push failures):\n%s",
+			writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n"))
 	}
 	return nil
 }

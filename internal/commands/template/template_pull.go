@@ -17,13 +17,80 @@ import (
 	"github.com/yarlson/pin"
 )
 
-type templateResult struct {
+type TemplateResult struct {
 	Slug            string                      `json:"slug"`
 	Name            string                      `json:"name"`
 	EnabledChannels []string                    `json:"enabled_channels"`
 	Variants        []map[string]any            `json:"variants"`
 	MockData        map[string]any              `json:"mock_data,omitempty"`
 	VariantOrder    *mgmnt.VariantOrderResponse `json:"variant_order,omitempty"`
+}
+
+// FetchTemplates fetches either one template (when slug != "") or all templates
+// from the workspace, returning the assembled results ready to hand to
+// WriteTemplatesToFiles. Per-template fetch errors when slug == "" are logged
+// and the offending template is skipped; only failures while listing templates
+// or fetching a specifically requested slug are returned.
+func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) ([]TemplateResult, error) {
+	var results []TemplateResult
+
+	if slug != "" {
+		tmpl, err := client.GetTemplate(workspace, slug, mode)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't fetch template %s: %w", slug, err)
+		}
+		variants, err := client.GetTemplateVariants(workspace, slug, mode)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't fetch variants for template %s: %w", slug, err)
+		}
+		mockData, err := client.GetTemplateMockData(workspace, slug)
+		if err != nil {
+			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
+		}
+		variantOrder, err := client.GetVariantOrder(workspace, slug, mode)
+		if err != nil {
+			log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", slug)
+		}
+		results = append(results, TemplateResult{
+			Slug:            slug,
+			Name:            tmpl.Name,
+			EnabledChannels: tmpl.EnabledChannels,
+			Variants:        variants,
+			MockData:        mockData,
+			VariantOrder:    variantOrder,
+		})
+		return results, nil
+	}
+
+	templates, err := client.ListTemplates(workspace, math.MaxInt32, 0, mode)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't fetch templates: %w", err)
+	}
+
+	for _, t := range templates.Results {
+		variants, err := client.GetTemplateVariants(workspace, t.Slug, mode)
+		if err != nil {
+			log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
+			continue
+		}
+		mockData, err := client.GetTemplateMockData(workspace, t.Slug)
+		if err != nil {
+			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
+		}
+		variantOrder, err := client.GetVariantOrder(workspace, t.Slug, mode)
+		if err != nil {
+			log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
+		}
+		results = append(results, TemplateResult{
+			Slug:            t.Slug,
+			Name:            t.Name,
+			EnabledChannels: t.EnabledChannels,
+			Variants:        variants,
+			MockData:        mockData,
+			VariantOrder:    variantOrder,
+		})
+	}
+	return results, nil
 }
 
 var templatePullCmd = &cobra.Command{
@@ -70,68 +137,13 @@ var templatePullCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
-		var results []templateResult
-
-		if slug != "" {
-			tmpl, err := mgmntClient.GetTemplate(workspace, slug, mode)
-			if err != nil {
-				if p != nil {
-					p.Stop("Failed")
-				}
-				log.WithError(err).Error("Couldn't fetch template")
-				return
+		results, err := FetchTemplates(mgmntClient, workspace, mode, slug)
+		if err != nil {
+			if p != nil {
+				p.Stop("Failed")
 			}
-			variants, err := mgmntClient.GetTemplateVariants(workspace, slug, mode)
-			if err != nil {
-				if p != nil {
-					p.Stop("Failed")
-				}
-				log.WithError(err).Error("Couldn't fetch template variants")
-				return
-			}
-			mockData, err := mgmntClient.GetTemplateMockData(workspace, slug)
-			if err != nil {
-				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
-			}
-			variantOrder, err := mgmntClient.GetVariantOrder(workspace, slug, mode)
-			if err != nil {
-				log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", slug)
-			}
-			results = append(results, templateResult{Slug: slug, Name: tmpl.Name, EnabledChannels: tmpl.EnabledChannels, Variants: variants, MockData: mockData, VariantOrder: variantOrder})
-		} else {
-			// Fetch all template slugs
-			templates, err := mgmntClient.ListTemplates(workspace, math.MaxInt32, 0, mode)
-			if err != nil {
-				if p != nil {
-					p.Stop("Failed")
-				}
-				log.WithError(err).Error("Couldn't fetch templates")
-				return
-			}
-
-			for _, t := range templates.Results {
-				variants, err := mgmntClient.GetTemplateVariants(workspace, t.Slug, mode)
-				if err != nil {
-					log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
-					continue
-				}
-				mockData, err := mgmntClient.GetTemplateMockData(workspace, t.Slug)
-				if err != nil {
-					log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
-				}
-				variantOrder, err := mgmntClient.GetVariantOrder(workspace, t.Slug, mode)
-				if err != nil {
-					log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
-				}
-				results = append(results, templateResult{
-					Slug:            t.Slug,
-					Name:            t.Name,
-					EnabledChannels: t.EnabledChannels,
-					Variants:        variants,
-					MockData:        mockData,
-					VariantOrder:    variantOrder,
-				})
-			}
+			log.WithError(err).Error(err.Error())
+			return
 		}
 
 		totalVariants := 0

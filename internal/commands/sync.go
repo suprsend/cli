@@ -412,6 +412,14 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	if len(errors) > 0 {
 		return fmt.Errorf("one or more translations failed to sync:\n%s", strings.Join(errors, "\n"))
 	}
+
+	// Commit translations as live on the destination workspace
+	commitMessage := fmt.Sprintf("Synced translations from %s", fromWorkspace)
+	if err := mgmntClient.FinalizeTranslation(toWorkspace, commitMessage); err != nil {
+		return fmt.Errorf("failed to commit translations on %s: %w", toWorkspace, err)
+	}
+	log.Infof("Committed translations as live on %s", toWorkspace)
+
 	return nil
 }
 

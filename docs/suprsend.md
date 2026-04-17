@@ -31,6 +31,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 * [suprsend schema](suprsend_schema.md)	 - Manage trigger payload schemas
 * [suprsend start-mcp-server](suprsend_start-mcp-server.md)	 - Start SuprSend MCP server
 * [suprsend sync](suprsend_sync.md)	 - Sync SuprSend assets from one workspace to another
+* [suprsend template](suprsend_template.md)	 - Manage templates
 * [suprsend translation](suprsend_translation.md)	 - Manage Translations
 * [suprsend workflow](suprsend_workflow.md)	 - Manage workflows
 

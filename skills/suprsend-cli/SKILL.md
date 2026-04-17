@@ -60,6 +60,12 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend start-mcp-server`](references/suprsend_start-mcp-server.md) - Start SuprSend MCP server
 - [`suprsend start-mcp-server list-tools`](references/suprsend_start-mcp-server_list-tools.md) - List all the tools supported by the server
 - [`suprsend sync`](references/suprsend_sync.md) - Sync SuprSend assets from one workspace to another
+- [`suprsend template`](references/suprsend_template.md) - Manage templates
+- [`suprsend template commit`](references/suprsend_template_commit.md) - Commit a template from draft to live
+- [`suprsend template get`](references/suprsend_template_get.md) - Get template details including variants
+- [`suprsend template list`](references/suprsend_template_list.md) - List templates for a workspace
+- [`suprsend template pull`](references/suprsend_template_pull.md) - Pull templates and their variants from SuprSend workspace
+- [`suprsend template push`](references/suprsend_template_push.md) - Push templates and their variants from local to SuprSend workspace
 - [`suprsend translation`](references/suprsend_translation.md) - Manage Translations
 - [`suprsend translation commit`](references/suprsend_translation_commit.md) - Commit translation
 - [`suprsend translation get`](references/suprsend_translation_get.md) - Get translations

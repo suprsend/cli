@@ -248,16 +248,6 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 		parent, lastKey, val, ok := getNestedValue(variant, path)
 
 		if !ok {
-			// For keys with KeepRef=false (like "content"), the key was deleted from variant.json.
-			// Check if the extracted file exists and re-inline it.
-			if !cfg.KeepRef {
-				filename := cfg.Filename
-				content, readErr := readExtractedFile(variantDir, filename, filepath.Ext(cfg.Filename))
-				if readErr == nil {
-					setNestedValue(variant, path, content)
-				}
-			}
-			//todo: may be we need to log missing file for non-keepRef keys?
 			continue
 		}
 

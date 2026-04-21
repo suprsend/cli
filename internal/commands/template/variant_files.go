@@ -14,21 +14,21 @@ import (
 
 // fileRefConfig defines how a variant field is extracted to / reassembled from a separate file.
 type fileRefConfig struct {
-	Ext     string
-	KeepRef bool // true: replace with @filename, false: delete the key from parent
-	Inline  bool // true: accept literal values (not just @file refs) during reassembly
+	Filename string
+	KeepRef  bool // true: replace with @filename, false: delete the key from parent
+	Inline   bool // true: accept literal values (not just @file refs) during reassembly
 }
 
 // fileRefKeys defines which variant keys should be extracted into separate files.
-// Map key: dot-notation path, value: config with file extension and whether to keep a @ref or delete the key.
+// Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
 var fileRefKeys = map[string]fileRefConfig{
-	"content.body.designer.design_json": {Ext: ".json", KeepRef: true, Inline: true},
-	"content.body.designer.html":        {Ext: ".html", KeepRef: true, Inline: true},
-	"content.body.designer.text":        {Ext: ".txt", KeepRef: true, Inline: true},
-	"content.body.raw.html":             {Ext: ".html", KeepRef: true, Inline: true},
-	"content.body.raw.text":             {Ext: ".txt", KeepRef: true, Inline: true},
-	"content.body_text":                 {Ext: ".txt", KeepRef: true, Inline: true},
+	"content.body.designer.design_json": {Filename: "design_json.json", KeepRef: true, Inline: true},
+	"content.body.designer.html":        {Filename: "designer.html", KeepRef: true, Inline: true},
+	"content.body.designer.text":        {Filename: "designer.txt", KeepRef: true, Inline: true},
+	"content.body.raw.html":             {Filename: "raw.html", KeepRef: true, Inline: true},
+	"content.body.raw.text":             {Filename: "raw.txt", KeepRef: true, Inline: true},
+	"content.body_text":                 {Filename: "body_text.txt", KeepRef: true, Inline: true},
 }
 
 // sortedFileRefPaths returns fileRefKeys paths sorted by depth.
@@ -136,7 +136,7 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 			continue
 		}
 
-		filename := strings.ReplaceAll(path, ".", "_") + cfg.Ext
+		filename := cfg.Filename
 		extractedFiles[filename] = content
 		if cfg.KeepRef {
 			parent[lastKey] = "@" + filename
@@ -200,8 +200,8 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 			// For keys with KeepRef=false (like "content"), the key was deleted from variant.json.
 			// Check if the extracted file exists and re-inline it.
 			if !cfg.KeepRef {
-				filename := strings.ReplaceAll(path, ".", "_") + cfg.Ext
-				content, readErr := readExtractedFile(variantDir, filename, cfg.Ext)
+				filename := cfg.Filename
+				content, readErr := readExtractedFile(variantDir, filename, filepath.Ext(cfg.Filename))
 				if readErr == nil {
 					setNestedValue(variant, path, content)
 				}
@@ -214,7 +214,7 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 		strVal, isStr := val.(string)
 		if !isStr {
 			// Non-string value: if inline is enabled and ext is JSON, accept structured data as-is
-			if cfg.Inline && cfg.Ext == ".json" {
+			if cfg.Inline && filepath.Ext(cfg.Filename) == ".json" {
 				switch val.(type) {
 				case map[string]any, []any:
 					// valid JSON structure, keep it
@@ -228,7 +228,7 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 		if !isFileRef(variantDir, strVal) {
 			// Not a valid file ref: if inline is enabled, accept the literal value
 			if cfg.Inline {
-				if cfg.Ext == ".json" {
+				if filepath.Ext(cfg.Filename) == ".json" {
 					var jsonVal any
 					if err := json.Unmarshal([]byte(strVal), &jsonVal); err != nil {
 						debugErrorLog("Inline JSON value at %s is not valid JSON: %v", path, err)
@@ -242,7 +242,7 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 		}
 
 		filename := strings.TrimPrefix(strVal, "@")
-		content, readErr := readExtractedFile(variantDir, filename, cfg.Ext)
+		content, readErr := readExtractedFile(variantDir, filename, filepath.Ext(filename))
 		if readErr != nil {
 			debugErrorLog("Failed to read extracted file %s: %v", filename, readErr)
 			continue

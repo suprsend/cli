@@ -14,9 +14,10 @@ import (
 
 // fileRefConfig defines how a variant field is extracted to / reassembled from a separate file.
 type fileRefConfig struct {
-	Filename string
-	KeepRef  bool // true: replace with @filename, false: delete the key from parent
-	Inline   bool // true: accept literal values (not just @file refs) during reassembly
+	Filename    string
+	KeepRef     bool // true: replace with @filename, false: delete the key from parent
+	Inline      bool // true: accept literal values (not just @file refs) during reassembly
+	ForceCreate func(variant map[string]any) bool // if non-nil and returns true, always write the file even when the value is empty
 }
 
 // fileRefKeys defines which variant keys should be extracted into separate files.
@@ -127,12 +128,27 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 	for _, path := range sortedFileRefPaths(true) {
 		cfg := fileRefKeys[path]
 		parent, lastKey, val, ok := getNestedValue(variantCopy, path)
+
+		forced := cfg.ForceCreate != nil && cfg.ForceCreate(variantCopy)
+
 		if !ok || val == nil {
+			if forced {
+				extractedFiles[cfg.Filename] = ""
+				setNestedValue(variantCopy, path, "@"+cfg.Filename)
+			}
 			continue
 		}
 
 		content, hasContent := valueToFileContent(val)
 		if !hasContent {
+			if forced {
+				extractedFiles[cfg.Filename] = ""
+				if cfg.KeepRef {
+					parent[lastKey] = "@" + cfg.Filename
+				} else {
+					delete(parent, lastKey)
+				}
+			}
 			continue
 		}
 

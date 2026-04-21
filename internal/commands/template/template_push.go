@@ -31,79 +31,6 @@ func readTemplateJSON(templateDir string) (map[string]any, error) {
 	return templateData, nil
 }
 
-// readVariantOrder walks a template directory for variants_order.json files and
-// reconstructs the API payload structure.
-func readVariantOrder(templateDir string) (*mgmnt.VariantOrderResponse, error) {
-	channelMap := map[string]*mgmnt.VariantOrderChannel{}
-
-	err := filepath.WalkDir(templateDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || d.Name() != "variants_order.json" {
-			return nil
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("failed to read %s: %w", path, err)
-		}
-
-		var orderData struct {
-			IDs []string `json:"ids"`
-		}
-		if err := json.Unmarshal(data, &orderData); err != nil {
-			return fmt.Errorf("failed to parse %s: %w", path, err)
-		}
-
-		// Determine channel and tenant from the path relative to templateDir
-		rel, _ := filepath.Rel(templateDir, filepath.Dir(path))
-		parts := strings.Split(rel, string(filepath.Separator))
-
-		// Validate path structure: only accept known layouts
-		// Valid: <channel>/variants_order.json (len == 1)
-		// Valid: <channel>/__tenant_overrides__/<tenant>/variants_order.json (len == 3)
-		if len(parts) == 1 {
-			// ok: channel-level
-		} else if len(parts) == 3 && parts[1] == "__tenant_overrides__" {
-			// ok: tenant override
-		} else {
-			return fmt.Errorf("unexpected variants_order.json at %s: expected <channel>/variants_order.json or <channel>/__tenant_overrides__/<tenant>/variants_order.json", rel)
-		}
-
-		channel := parts[0]
-		var tenantID *string
-		if len(parts) >= 3 && parts[1] == "__tenant_overrides__" {
-			tid := parts[2]
-			tenantID = &tid
-		}
-
-		ch, exists := channelMap[channel]
-		if !exists {
-			ch = &mgmnt.VariantOrderChannel{Channel: channel}
-			channelMap[channel] = ch
-		}
-		ch.Tenants = append(ch.Tenants, mgmnt.VariantOrderTenant{
-			TenantID: tenantID,
-			Variants: orderData.IDs,
-		})
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(channelMap) == 0 {
-		return nil, nil
-	}
-
-	resp := &mgmnt.VariantOrderResponse{}
-	for _, ch := range channelMap {
-		resp.Channels = append(resp.Channels, *ch)
-	}
-	return resp, nil
-}
 
 func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
 	templateData, err := readTemplateJSON(templateDir)
@@ -169,16 +96,23 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		}
 	}
 
-	// Push variant order if variants_order.json files exist
-	variantOrder, err := readVariantOrder(templateDir)
-	if err != nil {
-		log.WithError(err).Errorf("Failed to read variant order for template %s", slug)
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read variant order for template %s: %v", slug, err))
-		stats.Failed++
-		return
-	}
-	if variantOrder != nil {
-		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", variantOrder); err != nil {
+	// Push variant order if present in template.json
+	if variantOrderRaw, ok := templateData["variant_order"]; ok && variantOrderRaw != nil {
+		orderBytes, err := json.Marshal(variantOrderRaw)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to marshal variant_order for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal variant_order for template %s: %v", slug, err))
+			stats.Failed++
+			return
+		}
+		var variantOrder mgmnt.VariantOrderResponse
+		if err := json.Unmarshal(orderBytes, &variantOrder); err != nil {
+			log.WithError(err).Errorf("Failed to parse variant_order for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse variant_order for template %s: %v", slug, err))
+			stats.Failed++
+			return
+		}
+		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", &variantOrder); err != nil {
 			log.WithError(err).Errorf("Failed to push variant order for template %s", slug)
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant order for template %s: %v", slug, err))
 			stats.Failed++

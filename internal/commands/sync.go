@@ -264,16 +264,16 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 
 func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
 	if dirPath == "" {
-		dirPath = filepath.Join(".", "suprsend", "category")
+		dirPath = filepath.Join(".", "suprsend", "preference_categories")
 	} else {
-		dirPath = filepath.Join(dirPath, "category")
+		dirPath = filepath.Join(dirPath, "preference_categories")
 	}
 	categoriesResp, err := mgmntClient.ListCategories(fromWorkspace, mode)
 	if err != nil {
 		return fmt.Errorf("error getting categories: %w", err)
 	}
 	log.Infof("Pulling categories from %s ...", fromWorkspace)
-	filePath := filepath.Join(dirPath, "categories_preferences.json")
+	filePath := filepath.Join(dirPath, "categories.json")
 	err = category.WriteToFile(categoriesResp, filePath)
 	if err != nil {
 		return fmt.Errorf("error writing categories to files: %w", err)
@@ -297,6 +297,10 @@ func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspac
 }
 
 func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string) error {
+	dirPath = filepath.Join(dirPath, "translations")
+	if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create translations directory: %w", err)
+	}
 	log.Infof("Pulling category translations from %s ...", fromWorkspace)
 	locales, err := mgmntClient.ListPreferenceTranslations(fromWorkspace)
 	if err != nil {

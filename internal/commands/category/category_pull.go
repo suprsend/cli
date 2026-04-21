@@ -23,7 +23,7 @@ var categoryPullCmd = &cobra.Command{
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 		if outputDir == "" {
-			outputDir = filepath.Join(".", "suprsend", "category")
+			outputDir = filepath.Join(".", defaultCategoryDir)
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
@@ -56,17 +56,17 @@ var categoryPullCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't fetch categories")
 			return err
 		}
-		filePath := filepath.Join(outputDir, "categories_preferences.json")
+		filePath := filepath.Join(outputDir, "categories.json")
 		if p != nil {
 			p.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
 		}
-		err = WriteToFileWithPath(categories, filePath)
+		err = writeCategoriesFile(categories, filePath)
 		if err != nil {
 			log.WithError(err).Error("Couldn't write categories to file")
 			return err
 		}
 
-		translationDir := filepath.Join(outputDir, "translation")
+		translationDir := filepath.Join(outputDir, "translations")
 		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ var categoryPullCmd = &cobra.Command{
 
 func init() {
 	categoryPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	categoryPullCmd.Flags().StringP("dir", "d", "", "Directory to save category files to (default: ./suprsend/category)")
+	categoryPullCmd.Flags().StringP("dir", "d", "", "Directory to save category files to (default: ./"+defaultCategoryDir+")")
 	categoryPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
 	CategoryCmd.AddCommand(categoryPullCmd)
 }

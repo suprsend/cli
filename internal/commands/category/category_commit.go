@@ -24,11 +24,10 @@ var categoryCommitCmd = &cobra.Command{
 		// Determine the category directory
 		categoryDir := dir
 		if categoryDir == "" {
-			categoryDir = filepath.Join(".", "suprsend", "category")
+			categoryDir = filepath.Join(".", defaultCategoryDir)
 		}
 
-		// Append "translation" to the category directory
-		translationDir := filepath.Join(categoryDir, "translation")
+		translationDir := filepath.Join(categoryDir, "translations")
 
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -56,7 +55,7 @@ var categoryCommitCmd = &cobra.Command{
 }
 
 func init() {
-	categoryCommitCmd.Flags().StringP("dir", "d", "", "Directory containing category and translation files (default: ./suprsend/category)")
+	categoryCommitCmd.Flags().StringP("dir", "d", "", "Directory containing category and translation files (default: ./"+defaultCategoryDir+")")
 	categoryCommitCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	CategoryCmd.AddCommand(categoryCommitCmd)
 }

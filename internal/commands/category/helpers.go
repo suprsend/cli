@@ -7,11 +7,39 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/suprsend/cli/mgmnt"
 )
+
+const defaultCategoryDir = "suprsend/preference_categories"
+
+// categoriesOnDisk is the on-disk format for categories.json.
+// Only editable fields are stored; server-side readonly fields (hash, version_no, status, etc.) are excluded.
+// $schema is preserved from the API response.
+type categoriesOnDisk struct {
+	Schema         string               `json:"$schema,omitempty"`
+	RootCategories []mgmnt.RootCategory `json:"root_categories"`
+}
+
+func writeCategoriesFile(resp *mgmnt.PreferenceCategoryResponse, filePath string) error {
+	data := categoriesOnDisk{
+		Schema:         resp.Schema,
+		RootCategories: resp.RootCategories,
+	}
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal categories: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+		return fmt.Errorf("failed to ensure directory %s: %w", filepath.Dir(filePath), err)
+	}
+	fmt.Fprintf(os.Stdout, "Successfully wrote categories to %s\n", filePath)
+	return os.WriteFile(filePath, jsonData, 0644)
+}
 
 func promptForOutputDirectory() string {
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := filepath.Join(".", "suprsend", "category")
+	defaultDir := filepath.Join(".", defaultCategoryDir)
 	fmt.Fprintf(os.Stdout, "Where would you like to save the categories?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")

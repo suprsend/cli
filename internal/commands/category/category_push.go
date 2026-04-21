@@ -88,14 +88,14 @@ Examples:
 
 		translationDir := path
 		if translationDir == "" {
-			translationDir = filepath.Join(".", "suprsend", "category")
+			translationDir = filepath.Join(".", defaultCategoryDir)
 		}
-		translationDir = filepath.Join(translationDir, "translation")
+		translationDir = filepath.Join(translationDir, "translations")
 
 		if path == "" {
-			path = filepath.Join(".", "suprsend", "category", "categories_preferences.json")
+			path = filepath.Join(".", defaultCategoryDir, "categories.json")
 		} else {
-			path = filepath.Join(path, "categories_preferences.json")
+			path = filepath.Join(path, "categories.json")
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -137,7 +137,7 @@ Examples:
 }
 
 func init() {
-	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./suprsend/category/)")
+	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./"+defaultCategoryDir+")")
 	categoryPushCmd.PersistentFlags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
 	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)

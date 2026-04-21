@@ -70,8 +70,8 @@ func PushTranslations(workspace, locale, dir string) error {
 			if locale != "" && fileLocale != locale {
 				continue
 			}
-			// Skip categories_preferences.json file
-			if fileLocale == "categories_preferences" {
+			// Skip categories.json
+			if fileLocale == "categories" {
 				continue
 			}
 			localeFiles = append(localeFiles, name)

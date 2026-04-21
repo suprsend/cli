@@ -11,6 +11,7 @@ import (
 )
 
 type PreferenceCategoryResponse struct {
+	Schema         string         `json:"$schema,omitempty"`
 	RootCategories []RootCategory `json:"root_categories"`
 	Hash           string         `json:"hash"`
 	VersionNo      *int           `json:"version_no"`

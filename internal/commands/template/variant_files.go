@@ -15,20 +15,38 @@ import (
 // fileRefConfig defines how a variant field is extracted to / reassembled from a separate file.
 type fileRefConfig struct {
 	Filename    string
-	KeepRef     bool // true: replace with @filename, false: delete the key from parent
-	Inline      bool // true: accept literal values (not just @file refs) during reassembly
+	KeepRef     bool                              // true: replace with @filename, false: delete the key from parent
+	Inline      bool                              // true: accept literal values (not just @file refs) during reassembly
 	ForceCreate func(variant map[string]any) bool // if non-nil and returns true, always write the file even when the value is empty
 }
+
+// variantIs returns true when the variant matches the given channel and content.body.type.
+func variantIs(variant map[string]any, channel, bodyType string) bool {
+	if ch, _ := variant["channel"].(string); ch != channel {
+		return false
+	}
+	_, _, bt, ok := getNestedValue(variant, "content.body.type")
+	if !ok {
+		return false
+	}
+	t, _ := bt.(string)
+	return t == bodyType
+}
+
+func forceCreateRaw(variant map[string]any) bool       { return variantIs(variant, "email", "raw") }
+func forceCreateDesigner(variant map[string]any) bool  { return variantIs(variant, "email", "designer") }
+func forceCreatePlainText(variant map[string]any) bool { return variantIs(variant, "email", "plain_text") }
 
 // fileRefKeys defines which variant keys should be extracted into separate files.
 // Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
 var fileRefKeys = map[string]fileRefConfig{
-	"content.body.designer.design_json": {Filename: "design_json.json", KeepRef: true, Inline: true},
-	"content.body.designer.html":        {Filename: "designer.html", KeepRef: true, Inline: true},
-	"content.body.designer.text":        {Filename: "designer.txt", KeepRef: true, Inline: true},
-	"content.body.raw.html":             {Filename: "raw.html", KeepRef: true, Inline: true},
-	"content.body.raw.text":             {Filename: "raw.txt", KeepRef: true, Inline: true},
+	"content.body.designer.design_json": {Filename: "design_json.json", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
+	"content.body.designer.html":        {Filename: "designer.html", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
+	"content.body.designer.text":        {Filename: "designer.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
+	"content.body.raw.html":             {Filename: "raw.html", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
+	"content.body.raw.text":             {Filename: "raw.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
+	"content.body.plain_text.text":      {Filename: "plain_text.txt", KeepRef: true, Inline: true, ForceCreate: forceCreatePlainText},
 	"content.body_text":                 {Filename: "body_text.txt", KeepRef: true, Inline: true},
 }
 

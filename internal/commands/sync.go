@@ -361,9 +361,9 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 
 func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
 	if dirPath == "" {
-		dirPath = filepath.Join(".", "suprsend", "translation")
+		dirPath = filepath.Join(".", "suprsend", "translations")
 	} else {
-		dirPath = filepath.Join(dirPath, "translation")
+		dirPath = filepath.Join(dirPath, "translations")
 	}
 
 	log.Infof("Pulling translations from %s ...", fromWorkspace)

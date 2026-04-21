@@ -79,7 +79,7 @@ var translationPushCmd = &cobra.Command{
 			}
 		} else {
 			if outputDir == "" {
-				outputDir = filepath.Join(".", "suprsend", "translation")
+				outputDir = filepath.Join(".", "suprsend", "translations")
 			}
 
 			files, err := os.ReadDir(outputDir)
@@ -193,7 +193,7 @@ var translationPushCmd = &cobra.Command{
 func init() {
 	translationPushCmd.Flags().StringP("commit", "c", "false", "Promote changes from draft to live after pushing (true/false)")
 	translationPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
-	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: ./suprsend/translation)")
+	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: ./suprsend/translations)")
 	translationPushCmd.Flags().StringP("json", "j", "", `Translations as a JSON object mapping locale codes (without .json extension) to their translation content objects, e.g. '{"en":{"key":"value"},"fr":{"key":"valeur"}}'`)
 	TranslationCmd.AddCommand(translationPushCmd)
 }

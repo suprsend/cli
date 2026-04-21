@@ -23,7 +23,7 @@ var workflowPullCmd = &cobra.Command{
 		slug, _ := cmd.Flags().GetString("slug")
 		force, _ := cmd.Flags().GetBool("force")
 		if outputDir == "" {
-			outputDir = filepath.Join(".", "suprsend", "workflow")
+			outputDir = filepath.Join(".", "suprsend", "workflows")
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
@@ -56,12 +56,20 @@ var workflowPullCmd = &cobra.Command{
 				fmt.Fprintf(os.Stdout, "Error: Failed to get workflow detail: %v\n", err)
 				return err
 			}
+			if workflowResp != nil {
+				(*workflowResp)["$schema"] = "https://schema.suprsend.com/workflow/v1/schema.json"
+			}
 			workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow: %v\n", err)
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(outputDir, fmt.Sprintf("%s.json", slug)), workflowJson, 0644); err != nil {
+			slugDir := filepath.Join(outputDir, slug)
+			if err := os.MkdirAll(slugDir, 0o755); err != nil {
+				fmt.Fprintf(os.Stdout, "Error: Failed to create workflow directory: %v\n", err)
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
 				fmt.Fprintf(os.Stdout, "Error: Failed to write workflow file: %v\n", err)
 				return err
 			}
@@ -103,7 +111,7 @@ var workflowPullCmd = &cobra.Command{
 
 func init() {
 	workflowPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	workflowPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save workflow files to (default: ./suprsend/workflow)")
+	workflowPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save workflow files to (default: ./suprsend/workflows)")
 	workflowPullCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to pull (omit to pull all)")
 	workflowPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
 	WorkflowCmd.AddCommand(workflowPullCmd)

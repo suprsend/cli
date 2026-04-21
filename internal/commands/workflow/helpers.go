@@ -33,7 +33,7 @@ func isDebugMode() bool {
 
 func promptForOutputDirectory() string {
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := filepath.Join(".", "suprsend", "workflow")
+	defaultDir := filepath.Join(".", "suprsend", "workflows")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the workflows?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
@@ -80,13 +80,13 @@ func validateInputDirectory(dirPath string) error {
 	return nil
 }
 
-func debugLog(format string, args ...interface{}) {
+func debugLog(format string, args ...any) {
 	if isDebugMode() {
 		log.Infof(format, args...)
 	}
 }
 
-func debugErrorLog(format string, args ...interface{}) {
+func debugErrorLog(format string, args ...any) {
 	if isDebugMode() {
 		log.Errorf(format, args...)
 	}
@@ -120,9 +120,15 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 		}
 
 		slug, _ := obj["slug"].(string)
-		filename := filepath.Join(outputDir, fmt.Sprintf("%s.json", slug))
+		slugDir := filepath.Join(outputDir, slug)
+		if err := os.MkdirAll(slugDir, 0o755); err != nil {
+			stats.Failed++
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create directory for '%s': %v", slug, err))
+			continue
+		}
 
-		fileData, err := json.MarshalIndent(wf, "", "  ")
+		obj["$schema"] = "https://schema.suprsend.com/workflow/v1/schema.json"
+		fileData, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			debugErrorLog("Error: %s", err)
 			fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow '%s': %v\n", slug, err)
@@ -131,7 +137,8 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 			continue
 		}
 
-		if err := os.WriteFile(filename, fileData, 0o644); err != nil {
+		filename := filepath.Join(slugDir, "workflow.json")
+		if err := os.WriteFile(filename, append(fileData, '\n'), 0o644); err != nil {
 			debugErrorLog("Error: %s", err)
 			fmt.Fprintf(os.Stdout, "Error: Failed to write file '%s': %v\n", filename, err)
 			stats.Failed++

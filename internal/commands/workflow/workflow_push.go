@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -50,7 +49,7 @@ var workflowPushCmd = &cobra.Command{
 				}
 			} else {
 				if path == "" {
-					path = filepath.Join(".", "suprsend", "workflow")
+					path = filepath.Join(".", "suprsend", "workflows")
 				}
 				if _, err := os.Stat(path); os.IsNotExist(err) {
 					log.Errorf("Directory %s does not exist", path)
@@ -61,8 +60,7 @@ var workflowPushCmd = &cobra.Command{
 					return err
 				}
 
-				fileName := fmt.Sprintf("%s.json", slug)
-				filePath := filepath.Join(path, fileName)
+				filePath := filepath.Join(path, slug, "workflow.json")
 				if _, err := os.Stat(filePath); err != nil {
 					log.WithError(err).Errorf("Failed to find workflow file %s", filePath)
 					stats.Failed++
@@ -77,6 +75,10 @@ var workflowPushCmd = &cobra.Command{
 						log.WithError(err).Errorf("Failed to parse JSON for %s", filePath)
 						stats.Failed++
 						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", filePath, err))
+					} else {
+						// path wins: --slug flag value is authoritative
+						workflow["slug"] = slug
+						delete(workflow, "$schema")
 					}
 				}
 			}
@@ -125,7 +127,7 @@ var workflowPushCmd = &cobra.Command{
 		}
 
 		if path == "" {
-			path = filepath.Join(".", "suprsend", "workflow")
+			path = filepath.Join(".", "suprsend", "workflows")
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -145,17 +147,17 @@ var workflowPushCmd = &cobra.Command{
 		}
 
 		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+			if file.IsDir() {
 				stats.Total++
 			}
 		}
 
 		for _, file := range files {
-			if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			if !file.IsDir() {
 				continue
 			}
 
-			slug := strings.TrimSuffix(file.Name(), ".json")
+			slug := file.Name()
 			if !hasError && !utils.IsOutputPiped() {
 				p = pin.New(fmt.Sprintf("Pushing %s...", slug),
 					pin.WithSpinnerColor(pin.ColorCyan),
@@ -163,7 +165,7 @@ var workflowPushCmd = &cobra.Command{
 				)
 				cancel = p.Start(context.Background())
 			}
-			filePath := filepath.Join(path, file.Name())
+			filePath := filepath.Join(path, slug, "workflow.json")
 			data, err := os.ReadFile(filePath)
 			if err != nil {
 				if p != nil && cancel != nil {
@@ -193,6 +195,13 @@ var workflowPushCmd = &cobra.Command{
 				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", file.Name(), err))
 				continue
 			}
+
+			// path wins: directory name is authoritative; warn on mismatch
+			if jsonSlug, _ := workflow["slug"].(string); jsonSlug != slug {
+				fmt.Fprintf(os.Stdout, "Warning: workflows/%s: workflow.json#slug is %q but directory is %q — using directory value\n", slug, jsonSlug, slug)
+				workflow["slug"] = slug
+			}
+			delete(workflow, "$schema")
 
 			err = mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
 			if err != nil {
@@ -238,7 +247,7 @@ var workflowPushCmd = &cobra.Command{
 }
 
 func init() {
-	workflowPushCmd.PersistentFlags().StringP("dir", "d", "", "Directory containing workflow JSON files (default: ./suprsend/workflow)")
+	workflowPushCmd.PersistentFlags().StringP("dir", "d", "", "Directory containing workflow subdirectories (default: ./suprsend/workflows)")
 	workflowPushCmd.PersistentFlags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
 	workflowPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to push (omit to push all)")

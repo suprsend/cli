@@ -124,9 +124,9 @@ func init() {
 
 func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string) error {
 	if dirPath == "" {
-		dirPath = filepath.Join(".", "suprsend", "workflow")
+		dirPath = filepath.Join(".", "suprsend", "workflows")
 	} else {
-		dirPath = filepath.Join(dirPath, "workflow")
+		dirPath = filepath.Join(dirPath, "workflows")
 	}
 
 	workflows_resp, err := mgmntClient.GetWorkflows(fromWorkspace, mode)
@@ -140,30 +140,33 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		return fmt.Errorf("error writing workflows to files: %w", err)
 	}
 
-	files, err := os.ReadDir(dirPath)
+	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return fmt.Errorf("error reading local workflows directory: %w", err)
 	}
 
 	var errors []string
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+	for _, entry := range entries {
+		if !entry.IsDir() {
 			continue
 		}
 
-		slug := strings.TrimSuffix(file.Name(), ".json")
-		path := filepath.Join(dirPath, file.Name())
+		slug := entry.Name()
+		path := filepath.Join(dirPath, slug, "workflow.json")
 		data, err := os.ReadFile(path)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("error reading file %s: %v", file.Name(), err))
+			errors = append(errors, fmt.Sprintf("error reading file %s: %v", path, err))
 			continue
 		}
 
 		var wf map[string]any
 		if err := json.Unmarshal(data, &wf); err != nil {
-			errors = append(errors, fmt.Sprintf("error unmarshalling JSON for %s: %v", file.Name(), err))
+			errors = append(errors, fmt.Sprintf("error unmarshalling JSON for %s: %v", path, err))
 			continue
 		}
+
+		wf["slug"] = slug
+		delete(wf, "$schema")
 
 		err = mgmntClient.PushWorkflow(toWorkspace, slug, wf, "true", "")
 		if err != nil {

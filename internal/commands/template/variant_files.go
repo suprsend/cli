@@ -23,7 +23,6 @@ type fileRefConfig struct {
 // Map key: dot-notation path, value: config with file extension and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
 var fileRefKeys = map[string]fileRefConfig{
-	"content":                           {Ext: ".json", KeepRef: false},
 	"content.body.designer.design_json": {Ext: ".json", KeepRef: true, Inline: true},
 	"content.body.designer.html":        {Ext: ".html", KeepRef: true, Inline: true},
 	"content.body.designer.text":        {Ext: ".txt", KeepRef: true, Inline: true},

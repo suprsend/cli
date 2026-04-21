@@ -127,7 +127,6 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 			continue
 		}
 
-		obj["$schema"] = "https://schema.suprsend.com/workflow/v1/schema.json"
 		fileData, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			debugErrorLog("Error: %s", err)

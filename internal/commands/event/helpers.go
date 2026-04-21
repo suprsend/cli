@@ -134,7 +134,6 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 			continue
 		}
 
-		obj["$schema"] = "https://schema.suprsend.com/event/v1/schema.json"
 		fileData, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			stats.Failed++

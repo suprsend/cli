@@ -33,10 +33,18 @@ func variantIs(variant map[string]any, channel, bodyTypePath, bodyType string) b
 	return t == bodyType
 }
 
-func forceCreateRaw(variant map[string]any) bool       { return variantIs(variant, "email", "content.body.type", "raw") }
-func forceCreateDesigner(variant map[string]any) bool  { return variantIs(variant, "email", "content.body.type", "designer") }
-func forceCreatePlainText(variant map[string]any) bool { return variantIs(variant, "email", "content.body.type", "plain_text") }
-func forceCreateSlackBlock(variant map[string]any) bool { return variantIs(variant, "slack", "content.body_type", "block") }
+func forceCreateRaw(variant map[string]any) bool {
+	return variantIs(variant, "email", "content.body.type", "raw")
+}
+func forceCreateDesigner(variant map[string]any) bool {
+	return variantIs(variant, "email", "content.body.type", "designer")
+}
+func forceCreatePlainText(variant map[string]any) bool {
+	return variantIs(variant, "email", "content.body.type", "plain_text")
+}
+func forceCreateSlackBlock(variant map[string]any) bool {
+	return variantIs(variant, "slack", "content.body_type", "block")
+}
 
 // fileRefKeys defines which variant keys should be extracted into separate files.
 // Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
@@ -48,8 +56,8 @@ var fileRefKeys = map[string]fileRefConfig{
 	"content.body.raw.html":             {Filename: "raw.html", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
 	"content.body.raw.text":             {Filename: "raw.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
 	"content.body.plain_text.text":      {Filename: "plain_text.txt", KeepRef: true, Inline: true, ForceCreate: forceCreatePlainText},
-	"content.body_text":                 {Filename: "body_text.txt", KeepRef: true, Inline: true},
 	"content.body_block":                {Filename: "body.block.json", KeepRef: true, Inline: true, ForceCreate: forceCreateSlackBlock},
+	// "content.body_text":                 {Filename: "body_text.txt", KeepRef: true, Inline: true},
 }
 
 // sortedFileRefPaths returns fileRefKeys paths sorted by depth.

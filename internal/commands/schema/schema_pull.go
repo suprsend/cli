@@ -2,7 +2,6 @@ package schema
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,7 +22,7 @@ var schemaPullCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		if outputDir == "" {
-			outputDir = filepath.Join(".", "suprsend", "schema")
+			outputDir = filepath.Join(".", "suprsend", "schemas")
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
@@ -62,17 +61,18 @@ var schemaPullCmd = &cobra.Command{
 				fmt.Fprintf(os.Stdout, "Error: Failed to get schema: %v\n", err)
 				return err
 			}
-			schemaData, err := json.MarshalIndent(schema, "", "  ")
-			if err != nil {
-				fmt.Fprintf(os.Stdout, "Error: Failed to marshal schema: %v\n", err)
-				return err
-			}
 			if p != nil {
 				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			}
-			if err := os.WriteFile(filepath.Join(outputDir, slug+".json"), schemaData, 0644); err != nil {
-				return fmt.Errorf("failed to write schema file: %w", err)
+			obj := *schema
+			slugDir := filepath.Join(outputDir, slug)
+			if err := os.MkdirAll(slugDir, 0o755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", slugDir, err)
 			}
+			if err := writeSchemaFiles(slugDir, slug, obj); err != nil {
+				return fmt.Errorf("failed to write schema files: %w", err)
+			}
+			fmt.Fprintf(os.Stdout, "Wrote schema to %s\n", filepath.Join(slugDir, "schema.json"))
 			return nil
 		}
 		schemas, err := mgmntClient.GetSchemas(workspace, mode)
@@ -105,7 +105,7 @@ var schemaPullCmd = &cobra.Command{
 }
 
 func init() {
-	schemaPullCmd.Flags().StringP("dir", "d", "", "Directory to save schema files to (default: ./suprsend/schema)")
+	schemaPullCmd.Flags().StringP("dir", "d", "", "Directory to save schema files to (default: ./suprsend/schemas)")
 	schemaPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	schemaPullCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to pull (omit to pull all)")
 	schemaPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")

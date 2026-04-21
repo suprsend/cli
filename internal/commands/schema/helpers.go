@@ -54,7 +54,7 @@ func debugErrorLog(format string, args ...interface{}) {
 
 func promptForOutputDirectory() string {
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := filepath.Join(".", "suprsend", "schema")
+	defaultDir := filepath.Join(".", "suprsend", "schemas")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the schema?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
@@ -141,31 +141,103 @@ func WriteSchemasToFiles(schemasResp *mgmnt.SchemasResponse, dirPath string) (*S
 		}
 
 		slug, _ := obj["slug"].(string)
-		filename := filepath.Join(dirPath, fmt.Sprintf("%s.json", slug))
-
-		fileData, err := json.MarshalIndent(schema, "", "  ")
-		if err != nil {
-			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to marshal schema '%s': %v\n", slug, err)
+		slugDir := filepath.Join(dirPath, slug)
+		if err := os.MkdirAll(slugDir, 0o755); err != nil {
 			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal schema '%s': %v", slug, err))
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create directory for '%s': %v", slug, err))
 			continue
 		}
 
-		if err := os.WriteFile(filename, fileData, 0o644); err != nil {
+		if err := writeSchemaFiles(slugDir, slug, obj); err != nil {
 			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to write file '%s': %v\n", filename, err)
+			fmt.Fprintf(os.Stdout, "Error: Failed to write schema '%s': %v\n", slug, err)
 			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write file '%s': %v", filename, err))
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write schema '%s': %v", slug, err))
 			continue
 		}
 
-		debugLog("Wrote: %s", filename)
-		fmt.Fprintf(os.Stdout, "Wrote schema: %s to %s\n", slug, filename)
+		debugLog("Wrote: %s", slugDir)
+		fmt.Fprintf(os.Stdout, "Wrote schema to %s\n", filepath.Join(slugDir, "schema.json"))
 		stats.Success++
 	}
 
 	return stats, nil
+}
+
+// writeSchemaFiles splits a raw schema API response into schema.json (metadata)
+// and payload_schema.json (extracted json_schema), writing both to slugDir.
+func writeSchemaFiles(slugDir, slug string, obj map[string]any) error {
+	schemaMeta := map[string]any{
+		"$schema":     "https://schema.suprsend.com/schemas/v1/schema.json",
+		"slug":        slug,
+		"name":        obj["name"],
+		"description": obj["description"],
+	}
+	metaData, err := json.MarshalIndent(schemaMeta, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal schema.json: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(slugDir, "schema.json"), append(metaData, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write schema.json: %w", err)
+	}
+
+	jsonSchema, hasSchema := obj["json_schema"]
+	if hasSchema && jsonSchema != nil {
+		payloadMap, ok := jsonSchema.(map[string]any)
+		if !ok {
+			payloadMap = map[string]any{}
+		}
+		if _, hasRef := payloadMap["$schema"]; !hasRef {
+			payloadMap["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+		}
+		payloadData, err := json.MarshalIndent(payloadMap, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshal payload_schema.json: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(slugDir, "payload_schema.json"), append(payloadData, '\n'), 0o644); err != nil {
+			return fmt.Errorf("write payload_schema.json: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// ReadAndMergeSchemaFiles reads schema.json + payload_schema.json from slugDir,
+// strips $schema keys, and returns the merged payload ready for the API.
+func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
+	schemaPath := filepath.Join(slugDir, "schema.json")
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("schemas/%s: failed to read schema.json: %w", slug, err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("schemas/%s: failed to parse schema.json: %w", slug, err)
+	}
+	delete(payload, "$schema")
+
+	// path wins: ensure slug matches directory name
+	if s, _ := payload["slug"].(string); s != slug {
+		fmt.Fprintf(os.Stdout, "Warning: schemas/%s: schema.json#slug is %q but directory is %q — using directory value\n", slug, s, slug)
+		payload["slug"] = slug
+	}
+
+	payloadSchemaPath := filepath.Join(slugDir, "payload_schema.json")
+	if _, err := os.Stat(payloadSchemaPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("schemas/%s: missing payload_schema.json", slug)
+	}
+	psData, err := os.ReadFile(payloadSchemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("schemas/%s: failed to read payload_schema.json: %w", slug, err)
+	}
+	var payloadSchema map[string]any
+	if err := json.Unmarshal(psData, &payloadSchema); err != nil {
+		return nil, fmt.Errorf("schemas/%s: failed to parse payload_schema.json: %w", slug, err)
+	}
+	delete(payloadSchema, "$schema")
+	payload["json_schema"] = payloadSchema
+
+	return payload, nil
 }
 
 type SchemasResponse struct {

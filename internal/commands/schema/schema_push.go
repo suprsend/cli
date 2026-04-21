@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -50,7 +49,7 @@ var schemaPushCmd = &cobra.Command{
 				}
 			} else {
 				if path == "" {
-					path = filepath.Join(".", "suprsend", "schema")
+					path = filepath.Join(".", "suprsend", "schemas")
 				}
 				if _, err := os.Stat(path); os.IsNotExist(err) {
 					log.Errorf("Directory %s does not exist", path)
@@ -61,24 +60,13 @@ var schemaPushCmd = &cobra.Command{
 					return err
 				}
 
-				fileName := fmt.Sprintf("%s.json", slug)
-				filePath := filepath.Join(path, fileName)
-
-				if _, err := os.Stat(filePath); err != nil {
-					log.WithError(err).Errorf("Failed to find schema file %s", filePath)
+				merged, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
+				if err != nil {
+					log.WithError(err).Errorf("Failed to read schema files for %s", slug)
 					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to find schema file %s: %v", filePath, err))
+					stats.Errors = append(stats.Errors, err.Error())
 				} else {
-					data, err := os.ReadFile(filePath)
-					if err != nil {
-						log.WithError(err).Errorf("Failed to read schema file %s", filePath)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read schema file %s: %v", filePath, err))
-					} else if err := json.Unmarshal(data, &schema); err != nil {
-						log.WithError(err).Errorf("Failed to parse JSON for %s", filePath)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", filePath, err))
-					}
+					schema = merged
 				}
 			}
 
@@ -126,7 +114,7 @@ var schemaPushCmd = &cobra.Command{
 		}
 
 		if path == "" {
-			path = filepath.Join(".", "suprsend", "schema")
+			path = filepath.Join(".", "suprsend", "schemas")
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -139,23 +127,23 @@ var schemaPushCmd = &cobra.Command{
 			return err
 		}
 
-		files, err := os.ReadDir(path)
+		entries, err := os.ReadDir(path)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to read local schema directory")
 			return err
 		}
 
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+		for _, entry := range entries {
+			if entry.IsDir() {
 				stats.Total++
 			}
 		}
 
-		for _, file := range files {
-			if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+		for _, entry := range entries {
+			if !entry.IsDir() {
 				continue
 			}
-			slug := strings.TrimSuffix(file.Name(), ".json")
+			slug := entry.Name()
 			if !hasError && !utils.IsOutputPiped() {
 				p = pin.New(fmt.Sprintf("Pushing %s...", slug),
 					pin.WithSpinnerColor(pin.ColorCyan),
@@ -163,8 +151,8 @@ var schemaPushCmd = &cobra.Command{
 				)
 				cancel = p.Start(context.Background())
 			}
-			path := filepath.Join(path, file.Name())
-			data, err := os.ReadFile(path)
+
+			schema, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
 			if err != nil {
 				if p != nil && cancel != nil {
 					p.Stop("")
@@ -173,24 +161,9 @@ var schemaPushCmd = &cobra.Command{
 					cancel = nil
 				}
 				hasError = true
-				log.WithError(err).Errorf("Failed to read file %s", file.Name())
+				log.WithError(err).Errorf("Failed to read schema files for %s", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read file %s: %v", file.Name(), err))
-				continue
-			}
-
-			var schema map[string]any
-			if err := json.Unmarshal(data, &schema); err != nil {
-				if p != nil && cancel != nil {
-					p.Stop("")
-					cancel()
-					p = nil
-					cancel = nil
-				}
-				hasError = true
-				log.WithError(err).Errorf("Failed to parse JSON for %s", file.Name())
-				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", file.Name(), err))
+				stats.Errors = append(stats.Errors, err.Error())
 				continue
 			}
 
@@ -237,7 +210,7 @@ var schemaPushCmd = &cobra.Command{
 }
 
 func init() {
-	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory containing schema JSON files (default: ./suprsend/schema)")
+	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory containing schema files (default: ./suprsend/schemas)")
 	schemaPushCmd.Flags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
 	schemaPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")

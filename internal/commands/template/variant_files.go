@@ -50,12 +50,12 @@ func forceCreateSlackBlock(variant map[string]any) bool {
 // Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
 var fileRefKeys = map[string]fileRefConfig{
-	"content.body.designer.design_json": {Filename: "design_json.json", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
-	"content.body.designer.html":        {Filename: "designer.html", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
-	"content.body.designer.text":        {Filename: "designer.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
-	"content.body.raw.html":             {Filename: "raw.html", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
-	"content.body.raw.text":             {Filename: "raw.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
-	"content.body.plain_text.text":      {Filename: "plain_text.txt", KeepRef: true, Inline: true, ForceCreate: forceCreatePlainText},
+	"content.body.designer.design_json": {Filename: "design.json", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
+	"content.body.designer.html":        {Filename: "body.designer.html", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
+	"content.body.designer.text":        {Filename: "body.designer.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
+	"content.body.raw.html":             {Filename: "body.raw.html", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
+	"content.body.raw.text":             {Filename: "body.raw.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
+	"content.body.plain_text.text":      {Filename: "body.plain_text.txt", KeepRef: true, Inline: true, ForceCreate: forceCreatePlainText},
 	"content.body_block":                {Filename: "body.block.json", KeepRef: true, Inline: true, ForceCreate: forceCreateSlackBlock},
 	// "content.body_text":                 {Filename: "body_text.txt", KeepRef: true, Inline: true},
 }

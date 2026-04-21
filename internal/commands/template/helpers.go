@@ -101,28 +101,28 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 			continue
 		}
 
-		// Write main.json with template-level metadata
-		mainData := map[string]any{
+		// Write template.json with template-level metadata
+		templateData := map[string]any{
 			"slug":             tmpl.Slug,
 			"name":             tmpl.Name,
 			"enabled_channels": tmpl.EnabledChannels,
 		}
-		mainJSON, err := json.MarshalIndent(mainData, "", "  ")
+		templateJSON, err := json.MarshalIndent(templateData, "", "  ")
 		if err != nil {
 			debugErrorLog("Error: %s", err)
 			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal main.json for '%s': %v", tmpl.Slug, err))
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal template.json for '%s': %v", tmpl.Slug, err))
 			continue
 		}
-		mainFile := filepath.Join(templateDir, "main.json")
-		if err := os.WriteFile(mainFile, mainJSON, 0o644); err != nil {
+		templateFile := filepath.Join(templateDir, "template.json")
+		if err := os.WriteFile(templateFile, templateJSON, 0o644); err != nil {
 			debugErrorLog("Error: %s", err)
 			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write main.json for '%s': %v", tmpl.Slug, err))
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write template.json for '%s': %v", tmpl.Slug, err))
 			continue
 		}
-		debugLog("Wrote: %s", mainFile)
-		fmt.Fprintf(os.Stdout, "Wrote template metadata to %s\n", mainFile)
+		debugLog("Wrote: %s", templateFile)
+		fmt.Fprintf(os.Stdout, "Wrote template metadata to %s\n", templateFile)
 
 		// Write mock_data.json if present
 		if tmpl.MockData != nil {

@@ -18,17 +18,17 @@ import (
 	"github.com/yarlson/pin"
 )
 
-func readMainJSON(templateDir string) (map[string]any, error) {
-	mainFile := filepath.Join(templateDir, "main.json")
-	data, err := os.ReadFile(mainFile)
+func readTemplateJSON(templateDir string) (map[string]any, error) {
+	templateFile := filepath.Join(templateDir, "template.json")
+	data, err := os.ReadFile(templateFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read main.json: %w", err)
+		return nil, fmt.Errorf("failed to read template.json: %w", err)
 	}
-	var mainData map[string]any
-	if err := json.Unmarshal(data, &mainData); err != nil {
-		return nil, fmt.Errorf("failed to parse main.json: %w", err)
+	var templateData map[string]any
+	if err := json.Unmarshal(data, &templateData); err != nil {
+		return nil, fmt.Errorf("failed to parse template.json: %w", err)
 	}
-	return mainData, nil
+	return templateData, nil
 }
 
 // readVariantOrder walks a template directory for variants_order.json files and
@@ -106,11 +106,11 @@ func readVariantOrder(templateDir string) (*mgmnt.VariantOrderResponse, error) {
 }
 
 func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
-	mainData, err := readMainJSON(templateDir)
+	templateData, err := readTemplateJSON(templateDir)
 	if err != nil {
-		log.WithError(err).Errorf("Failed to read main.json for template %s", slug)
+		log.WithError(err).Errorf("Failed to read template.json for template %s", slug)
 		stats.Failed++
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read main.json for template %s: %v", slug, err))
+		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template.json for template %s: %v", slug, err))
 		return
 	}
 
@@ -123,7 +123,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	}
 
 	var enabledChannels []string
-	if channels, ok := mainData["enabled_channels"].([]any); ok {
+	if channels, ok := templateData["enabled_channels"].([]any); ok {
 		for _, ch := range channels {
 			if s, ok := ch.(string); ok {
 				enabledChannels = append(enabledChannels, s)

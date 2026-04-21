@@ -98,19 +98,41 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 
 	// Push variant order if present in template.json
 	if variantOrderRaw, ok := templateData["variant_order"]; ok && variantOrderRaw != nil {
-		orderBytes, err := json.Marshal(variantOrderRaw)
-		if err != nil {
-			log.WithError(err).Errorf("Failed to marshal variant_order for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal variant_order for template %s: %v", slug, err))
+		flatOrder, ok := variantOrderRaw.(map[string]any)
+		if !ok {
+			log.Errorf("Invalid variant_order format for template %s", slug)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Invalid variant_order format for template %s", slug))
 			stats.Failed++
 			return
 		}
+		channelMap := map[string]*mgmnt.VariantOrderChannel{}
+		for key, variantsRaw := range flatOrder {
+			parts := strings.SplitN(key, "/", 2)
+			channel := parts[0]
+			var tenantIDPtr *string
+			if len(parts) == 2 {
+				t := parts[1]
+				tenantIDPtr = &t
+			}
+			var variants []string
+			if variantsList, ok := variantsRaw.([]any); ok {
+				for _, v := range variantsList {
+					if s, ok := v.(string); ok {
+						variants = append(variants, s)
+					}
+				}
+			}
+			if _, exists := channelMap[channel]; !exists {
+				channelMap[channel] = &mgmnt.VariantOrderChannel{Channel: channel}
+			}
+			channelMap[channel].Tenants = append(channelMap[channel].Tenants, mgmnt.VariantOrderTenant{
+				TenantID: tenantIDPtr,
+				Variants: variants,
+			})
+		}
 		var variantOrder mgmnt.VariantOrderResponse
-		if err := json.Unmarshal(orderBytes, &variantOrder); err != nil {
-			log.WithError(err).Errorf("Failed to parse variant_order for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse variant_order for template %s: %v", slug, err))
-			stats.Failed++
-			return
+		for _, ch := range channelMap {
+			variantOrder.Channels = append(variantOrder.Channels, *ch)
 		}
 		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", &variantOrder); err != nil {
 			log.WithError(err).Errorf("Failed to push variant order for template %s", slug)

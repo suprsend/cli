@@ -108,7 +108,17 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 			"enabled_channels": tmpl.EnabledChannels,
 		}
 		if tmpl.VariantOrder != nil {
-			templateData["variant_order"] = tmpl.VariantOrder
+			flatOrder := map[string][]string{}
+			for _, ch := range tmpl.VariantOrder.Channels {
+				for _, tenant := range ch.Tenants {
+					key := ch.Channel
+					if tenant.TenantID != nil {
+						key = ch.Channel + "/" + *tenant.TenantID
+					}
+					flatOrder[key] = tenant.Variants
+				}
+			}
+			templateData["variant_order"] = flatOrder
 		}
 		templateJSON, err := json.MarshalIndent(templateData, "", "  ")
 		if err != nil {

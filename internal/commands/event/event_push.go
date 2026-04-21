@@ -16,10 +16,10 @@ import (
 var eventPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push linked events",
-	Long:  "Push event-to-schema mappings from a local event_schema_mapping.json file to a workspace. Reads the mapping file from the specified directory.",
+	Long:  "Push event definitions from local per-event directories to a workspace. Reads from events/<name>/event.json files in the specified directory.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
-		path, _ := cmd.Flags().GetString("dir")
+		dir, _ := cmd.Flags().GetString("dir")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 
 		var p *pin.Pin
@@ -42,12 +42,17 @@ var eventPushCmd = &cobra.Command{
 			}
 			err = mgmntClient.PushEventsFromPayload(workspace, events)
 		} else {
-			if path == "" {
-				path = filepath.Join(".", "suprsend", "event", "event_schema_mapping.json")
-			} else {
-				path = filepath.Join(path, "event_schema_mapping.json")
+			if dir == "" {
+				dir = filepath.Join(".", "suprsend", "events")
 			}
-			err = mgmntClient.PushEvents(workspace, path)
+			if _, statErr := os.Stat(dir); os.IsNotExist(statErr) {
+				return fmt.Errorf("events directory not found: %s", dir)
+			}
+			events, readErr := ReadEventsFromDir(dir)
+			if readErr != nil {
+				return readErr
+			}
+			err = mgmntClient.PushEventsFromPayload(workspace, map[string]any{"events": events})
 		}
 
 		if err != nil {
@@ -67,7 +72,7 @@ var eventPushCmd = &cobra.Command{
 }
 
 func init() {
-	eventPushCmd.Flags().StringP("dir", "d", "", "Directory containing event files (default: ./suprsend/event)")
-	eventPushCmd.Flags().StringP("json", "j", "", `Events payload as a JSON object with an "events" array, matching the format produced by pull, e.g. '{"events":[{"name":"user_signed_up","description":"...","payload_schema":{...}}]}'`)
+	eventPushCmd.Flags().StringP("dir", "d", "", "Directory containing per-event subdirectories (default: ./suprsend/events)")
+	eventPushCmd.Flags().StringP("json", "j", "", `Events payload as a JSON object with an "events" array, e.g. '{"events":[{"name":"user_signed_up","description":"...","payload_schema":{...}}]}'`)
 	EventCmd.AddCommand(eventPushCmd)
 }

@@ -243,9 +243,9 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 
 func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string) error {
 	if dirPath == "" {
-		dirPath = filepath.Join(".", "suprsend", "event")
+		dirPath = filepath.Join(".", "suprsend", "events")
 	} else {
-		dirPath = filepath.Join(dirPath, "event")
+		dirPath = filepath.Join(dirPath, "events")
 	}
 
 	log.Infof("Pulling events from %s ...", fromWorkspace)
@@ -257,9 +257,12 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 	if err != nil {
 		return fmt.Errorf("error writing events to files: %w", err)
 	}
-	filePath := filepath.Join(dirPath, "event_schema_mapping.json")
+	events, err := event.ReadEventsFromDir(dirPath)
+	if err != nil {
+		return fmt.Errorf("error reading events from files: %w", err)
+	}
 	log.Infof("Pushing events to %s ...", toWorkspace)
-	err = mgmntClient.PushEvents(toWorkspace, filePath)
+	err = mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
 	if err != nil {
 		return fmt.Errorf("error pushing events: %w", err)
 	}

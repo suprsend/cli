@@ -335,15 +335,15 @@ func readTemplateVariants(templateDir string) ([]map[string]any, error) {
 
 		// Validate path structure: only accept known layouts
 		// Valid: <channel>/<variant_name>/variant.json (depth 2)
-		// Valid: <channel>/__tenant_overrides__/<tenant>/<variant_name>/variant.json (depth 4)
+		// Valid: <channel>/_tenants/<tenant>/<variant_name>/variant.json (depth 4)
 		rel, _ := filepath.Rel(templateDir, filepath.Dir(path))
 		parts := strings.Split(rel, string(filepath.Separator))
 		if len(parts) == 2 {
 			// ok: channel/variant_name
-		} else if len(parts) == 4 && parts[1] == "__tenant_overrides__" {
-			// ok: channel/__tenant_overrides__/tenant/variant_name
+		} else if len(parts) == 4 && parts[1] == "_tenants" {
+			// ok: channel/_tenants/tenant/variant_name
 		} else {
-			return fmt.Errorf("unexpected variant.json at %s: expected <channel>/<variant>/variant.json or <channel>/__tenant_overrides__/<tenant>/<variant>/variant.json", rel)
+			return fmt.Errorf("unexpected variant.json at %s: expected <channel>/<variant>/variant.json or <channel>/_tenants/<tenant>/<variant>/variant.json", rel)
 		}
 
 		variantDir := filepath.Dir(path)

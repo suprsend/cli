@@ -166,7 +166,7 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 			var variantDir string
 			tenantID, _ := variant["tenant_id"].(string)
 			if tenantID != "" {
-				variantDir = filepath.Join(templateDir, channel, "__tenant_overrides__", tenantID, variantName)
+				variantDir = filepath.Join(templateDir, channel, "_tenants", tenantID, variantName)
 			} else {
 				variantDir = filepath.Join(templateDir, channel, variantName)
 			}

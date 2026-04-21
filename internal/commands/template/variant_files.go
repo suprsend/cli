@@ -159,6 +159,13 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 
 		forced := cfg.ForceCreate != nil && cfg.ForceCreate(variantCopy)
 
+		if cfg.ForceCreate != nil && !forced {
+			filePath := filepath.Join(variantDir, cfg.Filename)
+			if _, statErr := os.Stat(filePath); statErr == nil {
+				fmt.Fprintf(os.Stdout, "  Warning: %s exists but is being ignored (variant type mismatch — file not applicable for this variant)\n", filePath)
+			}
+		}
+
 		if !ok || val == nil {
 			if forced {
 				extractedFiles[cfg.Filename] = ""

@@ -353,7 +353,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit, commitMessage string) error {
+func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", schemaSlug, "/")
@@ -365,7 +365,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
-	q.Add("commit", commit)
+	q.Add("commit", strconv.FormatBool(commit))
 	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()

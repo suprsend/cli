@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/suprsend/cli/internal/client"
@@ -96,7 +97,7 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	return result, nil
 }
 
-func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit, commitMessage string) error {
+func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
@@ -108,7 +109,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
-	q.Add("commit", commit)
+	q.Add("commit", strconv.FormatBool(commit))
 	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
@@ -129,7 +130,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		}
 		return fmt.Errorf("request failed with status: %s", resp.Status())
 	}
-	if commit == "true" {
+	if commit {
 		result := resp.Result().(*CategoryPushResponse)
 		if !result.ValidationResult.IsValid {
 			fmt.Fprintf(os.Stdout, "Warning: validation failed: %v\n", result.ValidationResult.Errors)

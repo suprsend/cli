@@ -273,7 +273,7 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[string]any, commit, commitMessage string) error {
+func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[string]any, commit bool, commitMessage string) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
@@ -290,7 +290,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
-	q.Add("commit", commit)
+	q.Add("commit", strconv.FormatBool(commit))
 	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
@@ -314,7 +314,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		}
 		return fmt.Errorf("request failed: %s", res.Status())
 	}
-	if commit == "true" {
+	if commit {
 		validationResult := res.Result().(*WorkflowPushResponse)
 		if !validationResult.ValidationResult.IsValid {
 			fmt.Fprintf(os.Stdout, "Warning: Workflow %s is not valid: %v\n", slug, validationResult.ValidationResult.Errors)

@@ -17,11 +17,11 @@ import (
 var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push translation files to a workspace",
-	Long:  "Upload local template translation JSON files to a workspace. Reads all .json files from the input directory and pushes them. Use --commit=true to also finalize the changes immediately.",
+	Long:  "Upload local template translation JSON files to a workspace. Reads all .json files from the input directory and pushes them. Use --commit to also finalize the changes immediately.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
-		commit, _ := cmd.Flags().GetString("commit")
+		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 
@@ -175,7 +175,7 @@ var translationPushCmd = &cobra.Command{
 			}
 		}
 
-		if commit == "true" {
+		if commit {
 			if err := mgmntClient.FinalizeTranslation(workspace, commitMessage); err != nil {
 				log.Errorf("Failed to commit translation: %v", err)
 				return err
@@ -191,7 +191,7 @@ var translationPushCmd = &cobra.Command{
 }
 
 func init() {
-	translationPushCmd.Flags().StringP("commit", "c", "false", "Promote changes from draft to live after pushing (true/false)")
+	translationPushCmd.Flags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
 	translationPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: ./suprsend/translations)")
 	translationPushCmd.Flags().StringP("json", "j", "", `Translations as a JSON object mapping locale codes (without .json extension) to their translation content objects, e.g. '{"en":{"key":"value"},"fr":{"key":"valeur"}}'`)

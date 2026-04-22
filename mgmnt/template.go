@@ -13,6 +13,7 @@ import (
 type Template struct {
 	Slug            string   `json:"slug"`
 	Name            string   `json:"name"`
+	Description     string   `json:"description"`
 	Status          string   `json:"status"`
 	Tags            []string `json:"tags"`
 	EnabledChannels []string `json:"enabled_channels"`

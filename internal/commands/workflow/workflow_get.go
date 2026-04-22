@@ -11,18 +11,15 @@ import (
 )
 
 var workflowGetCmd = &cobra.Command{
-	Use:   "get",
+	Use:   "get <slug>",
 	Short: "Get workflow details",
-	Long:  "Retrieve detailed information for a specific workflow by its slug. Requires --slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.",
+	Long:  "Retrieve detailed information for a specific workflow by its slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.",
+	Args:  cobra.ExactArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		slug, _ := cmd.Flags().GetString("slug")
-		if slug == "" {
-			log.Error("Workflow slug is required. Example: suprsend workflow get --slug <slug>")
-			return fmt.Errorf("workflow slug is required. Example: suprsend workflow get --slug <slug>")
-		}
+		slug := args[0]
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
@@ -58,7 +55,6 @@ var workflowGetCmd = &cobra.Command{
 }
 
 func init() {
-	workflowGetCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to retrieve (required)")
 	workflowGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
 	workflowGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	WorkflowCmd.AddCommand(workflowGetCmd)

@@ -11,18 +11,15 @@ import (
 )
 
 var schemaGetCmd = &cobra.Command{
-	Use:   "get",
+	Use:   "get <slug>",
 	Short: "Get schema details",
-	Long:  "Retrieve the full definition of a specific schema by its slug. Returns the JSON Schema object including type, properties, and validation rules. Requires --slug. Use --mode to switch between draft and live versions.",
+	Long:  "Retrieve the full definition of a specific schema by its slug. Returns the JSON Schema object including type, properties, and validation rules. Use --mode to switch between draft and live versions.",
+	Args:  cobra.ExactArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		slug, _ := cmd.Flags().GetString("slug")
-		if slug == "" {
-			log.Error("Schema slug is required. Example: suprsend schema get --slug <slug>")
-			return fmt.Errorf("schema slug is required. Example: suprsend schema get --slug <slug>")
-		}
+		slug := args[0]
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
@@ -58,7 +55,6 @@ var schemaGetCmd = &cobra.Command{
 }
 
 func init() {
-	schemaGetCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to retrieve (required)")
 	schemaGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
 	schemaGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	SchemaCmd.AddCommand(schemaGetCmd)

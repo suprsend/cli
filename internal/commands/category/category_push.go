@@ -44,6 +44,10 @@ Examples:
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 
+		if commit && commitMessage == "" {
+			return fmt.Errorf("--commit-message (-m) is required when --commit is set")
+		}
+
 		if jsonPayload != "" {
 			var input jsonCategoryInput
 			if err := json.Unmarshal([]byte(jsonPayload), &input); err != nil {

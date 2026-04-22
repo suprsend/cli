@@ -25,6 +25,10 @@ var translationPushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 
+		if commit && commitMessage == "" {
+			return fmt.Errorf("--commit-message (-m) is required when --commit is set")
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		hasError := false

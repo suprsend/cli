@@ -29,6 +29,10 @@ var schemaPushCmd = &cobra.Command{
 			return fmt.Errorf("--json requires --slug to be specified")
 		}
 
+		if commit && commitMessage == "" {
+			return fmt.Errorf("--commit-message (-m) is required when --commit is set")
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		stats := &SchemaPushStats{

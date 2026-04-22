@@ -29,6 +29,10 @@ var templateCommitCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		force, _ := cmd.Flags().GetBool("force")
 
+		if commitMessage == "" {
+			return fmt.Errorf("--commit-message (-m) is required")
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		var variants []map[string]any

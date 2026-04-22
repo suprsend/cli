@@ -21,6 +21,10 @@ var categoryCommitCmd = &cobra.Command{
 		commitMsg, _ := cmd.Flags().GetString("commit-message")
 		dir, _ := cmd.Flags().GetString("dir")
 
+		if commitMsg == "" {
+			return fmt.Errorf("--commit-message (-m) is required")
+		}
+
 		// Determine the category directory
 		categoryDir := dir
 		if categoryDir == "" {

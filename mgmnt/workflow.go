@@ -12,11 +12,13 @@ import (
 )
 
 type Workflow struct {
-	Slug      string   `json:"slug"`
-	IsEnabled bool     `json:"is_enabled"`
-	Status    string   `json:"status"`
-	Category  string   `json:"category"`
-	Tags      []string `json:"tags"`
+	Slug        string   `json:"slug"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	IsEnabled   bool     `json:"is_enabled"`
+	Status      string   `json:"status"`
+	Category    string   `json:"category"`
+	Tags        []string `json:"tags"`
 }
 
 type WorkflowPushResponse struct {

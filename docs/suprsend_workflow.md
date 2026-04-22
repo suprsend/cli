@@ -29,6 +29,7 @@ suprsend workflow [flags]
 ### SEE ALSO
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
+* [suprsend workflow commit](suprsend_workflow_commit.md)	 - Commit workflow from draft to live
 * [suprsend workflow disable](suprsend_workflow_disable.md)	 - Disable a workflow
 * [suprsend workflow enable](suprsend_workflow_enable.md)	 - Enables a workflow.
 * [suprsend workflow get](suprsend_workflow_get.md)	 - Get workflow details

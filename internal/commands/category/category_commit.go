@@ -60,6 +60,6 @@ var categoryCommitCmd = &cobra.Command{
 
 func init() {
 	categoryCommitCmd.Flags().StringP("dir", "d", "", "Directory containing category and translation files (default: ./"+defaultCategoryDir+")")
-	categoryCommitCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
+	categoryCommitCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
 	CategoryCmd.AddCommand(categoryCommitCmd)
 }

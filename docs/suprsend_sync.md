@@ -13,12 +13,14 @@ suprsend sync [flags]
 ### Options
 
 ```
-  -a, --assets string   Asset types to sync: all, workflow, schema, event, category, or translation (default "all")
-  -d, --dir string      Local directory for intermediate file storage during sync
-  -f, --from string     Source workspace to pull assets from (default "staging")
-  -h, --help            help for sync
-  -m, --mode string     Version mode: draft or live (default "live")
-  -t, --to string       Destination workspace to push assets to (default "production")
+  -a, --assets string          Asset types to sync: all, workflow, schema, event, category, or translation (default "all")
+  -c, --commit                 Promote changes from draft to live after syncing (applies to all resources)
+      --commit-message string  Commit message applied to every committed resource in this sync run (required when --commit is set)
+  -d, --dir string             Local directory for intermediate file storage during sync
+  -f, --from string            Source workspace to pull assets from (default "staging")
+  -h, --help                   help for sync
+  -m, --mode string            Version mode: draft or live (default "live")
+  -t, --to string              Destination workspace to push assets to (default "production")
 ```
 
 ### Options inherited from parent commands

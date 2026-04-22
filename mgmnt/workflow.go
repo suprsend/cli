@@ -323,6 +323,44 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	return nil
 }
 
+func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string) error {
+	if slug == "" {
+		return fmt.Errorf("slug cannot be empty")
+	}
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "commit", "/")
+	if err != nil {
+		return fmt.Errorf("failed constructing url: %w", err)
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed parsing url: %w", err)
+	}
+	q := u.Query()
+	q.Add("commit_message", commitMessage)
+	u.RawQuery = q.Encode()
+	urlStr = u.String()
+
+	res, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetHeader("Content-Type", "application/json").
+		Patch(urlStr)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	if res.IsError() {
+		var errorResp ErrorResponse
+		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
+			return fmt.Errorf("request failed with message: %s", errorResp.Message)
+		}
+		return fmt.Errorf("request failed: %s", res.Status())
+	}
+	return nil
+}
+
 func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bool) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")

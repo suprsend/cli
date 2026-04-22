@@ -14,10 +14,11 @@ import (
 
 // fileRefConfig defines how a variant field is extracted to / reassembled from a separate file.
 type fileRefConfig struct {
-	Filename    string
-	KeepRef     bool                              // true: replace with @filename, false: delete the key from parent
-	Inline      bool                              // true: accept literal values (not just @file refs) during reassembly
-	ForceCreate func(variant map[string]any) bool // if non-nil and returns true, always write the file even when the value is empty
+	Filename      string
+	KeepRef       bool                              // true: replace with @filename, false: delete the key from parent
+	Inline        bool                              // true: accept literal values (not just @file refs) during reassembly
+	StringifyJSON bool                              // true: re-serialize parsed JSON back to a string on reassembly (for API fields that expect a JSON string, not an object)
+	ForceCreate   func(variant map[string]any) bool // if non-nil and returns true, always write the file even when the value is empty
 }
 
 // variantIs returns true when the variant matches the given channel and the value at bodyTypePath equals bodyType.
@@ -55,8 +56,8 @@ var fileRefKeys = map[string]fileRefConfig{
 	"content.body.designer.text":        {Filename: "body.designer.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateDesigner},
 	"content.body.raw.html":             {Filename: "body.raw.html", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
 	"content.body.raw.text":             {Filename: "body.raw.txt", KeepRef: true, Inline: true, ForceCreate: forceCreateRaw},
-	"content.body.plain_text.text":      {Filename: "body.plain_text.txt", KeepRef: true, Inline: true, ForceCreate: forceCreatePlainText},
-	"content.body_block":                {Filename: "body.block.json", KeepRef: true, Inline: true, ForceCreate: forceCreateSlackBlock},
+	"content.body.plain_text.text":      {Filename: "body.plain_text.jsonnet", KeepRef: true, Inline: true, ForceCreate: forceCreatePlainText},
+	"content.body_block":                {Filename: "body.block.json", KeepRef: true, Inline: true, StringifyJSON: true, ForceCreate: forceCreateSlackBlock},
 	// "content.body_text":                 {Filename: "body_text.txt", KeepRef: true, Inline: true},
 }
 
@@ -289,6 +290,18 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 			continue
 		}
 
+		if cfg.StringifyJSON {
+			switch content.(type) {
+			case map[string]any, []any:
+				b, err := json.Marshal(content)
+				if err != nil {
+					debugErrorLog("Failed to stringify JSON at %s: %v", path, err)
+					continue
+				}
+				content = string(b)
+			}
+		}
+
 		parent[lastKey] = content
 	}
 
@@ -296,7 +309,7 @@ func readAndAssembleVariant(variantDir string) (map[string]any, error) {
 }
 
 // fileRefPattern matches valid extracted file references: word chars, dots, hyphens, with a known extension.
-var fileRefPattern = regexp.MustCompile(`^[\w][\w.\-]*\.(json|html|txt)$`)
+var fileRefPattern = regexp.MustCompile(`^[\w][\w.\-]*\.(json|html|txt|jsonnet)$`)
 
 // isFileRef checks whether a string value is a valid @file reference.
 // It verifies the @-prefix, the filename matches the expected pattern, and the file exists on disk.

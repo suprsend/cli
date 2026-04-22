@@ -135,7 +135,6 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 			continue
 		}
 		debugLog("Wrote: %s", templateFile)
-		fmt.Fprintf(os.Stdout, "Wrote template metadata to %s\n", templateFile)
 
 		// Write mock_data.json if present
 		if tmpl.MockData != nil {
@@ -148,7 +147,6 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 					debugErrorLog("Error writing mock_data.json for '%s': %s", tmpl.Slug, err)
 				} else {
 					debugLog("Wrote: %s", mockFile)
-					fmt.Fprintf(os.Stdout, "Wrote mock data to %s\n", mockFile)
 				}
 			}
 		}
@@ -181,6 +179,7 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 		}
 
 		stats.Success++
+		fmt.Fprintf(os.Stdout, "Pulled template: %s\n", tmpl.Slug)
 	}
 
 	return stats, nil

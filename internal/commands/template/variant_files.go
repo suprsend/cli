@@ -163,7 +163,7 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 		if cfg.ForceCreate != nil && !forced {
 			filePath := filepath.Join(variantDir, cfg.Filename)
 			if _, statErr := os.Stat(filePath); statErr == nil {
-				fmt.Fprintf(os.Stdout, "  Warning: %s exists but is being ignored (variant type mismatch — file not applicable for this variant)\n", filePath)
+				debugLog("Warning: %s exists but is being ignored (variant type mismatch — file not applicable for this variant)", filePath)
 			}
 		}
 
@@ -206,7 +206,6 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 			return err
 		}
 		debugLog("Wrote: %s", filePath)
-		fmt.Fprintf(os.Stdout, "  Wrote %s\n", filePath)
 	}
 
 	// Marshal variant JSON
@@ -224,7 +223,6 @@ func writeVariantFiles(variantDir string, variant map[string]any, channel, varia
 		return err
 	}
 	debugLog("Wrote: %s", variantFile)
-	fmt.Fprintf(os.Stdout, "  Wrote variant to %s\n", variantFile)
 	return nil
 }
 

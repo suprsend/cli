@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write # Required to create releases and upload artifacts
-  id-token: write # Required for OIDC authentication to AWS
+  id-token: write # Required for OIDC: AWS (cosign signing) + npm (trusted publishing)
 
 jobs:
   release:
@@ -80,10 +80,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Node 24 + setup-node@v6 is what npm documents for trusted publishing.
+      # Older combos (Node 20 + setup-node@v4 ship npm 10.x) sign the provenance
+      # but don't perform the OIDC token exchange, so publishes 404 against the
+      # setup-node placeholder _authToken. See
+      # https://docs.npmjs.com/trusted-publishers#supported-cicd-providers
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm

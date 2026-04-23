@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -20,7 +19,6 @@ type Variant = map[string]any
 type fileRefConfig struct {
 	ShouldExtract func(variant Variant) bool // if non-nil and returns false, skip extraction for this variant
 	Filename      func(variant Variant) string
-	Inline        bool // true: accept literal values (not just @file refs) during reassembly
 	StringifyJSON bool // true: re-serialize parsed JSON back to a string on reassembly (for API fields that expect a JSON string, not an object)
 }
 
@@ -59,15 +57,15 @@ func shouldExtractInbox(variant Variant) bool {
 // Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
 var fileRefKeys = map[string]fileRefConfig{
-	"content.body.designer.design_json": {Filename: func(_ Variant) string { return "body.designer.json" }, Inline: true, ShouldExtract: shouldExtractDesigner},
-	"content.body.designer.html":        {Filename: func(_ Variant) string { return "body.designer.html" }, Inline: true, ShouldExtract: shouldExtractDesigner},
-	"content.body.designer.text":        {Filename: func(_ Variant) string { return "body.designer.txt" }, Inline: true, ShouldExtract: shouldExtractDesigner},
-	"content.body.raw.html":             {Filename: func(_ Variant) string { return "body.raw.html" }, Inline: true, ShouldExtract: shouldExtractRaw},
-	"content.body.raw.text":             {Filename: func(_ Variant) string { return "body.raw.txt" }, Inline: true, ShouldExtract: shouldExtractRaw},
-	"content.body.plain_text.text":      {Filename: func(_ Variant) string { return "body.plain_text.txt" }, Inline: true, ShouldExtract: shouldExtractPlainText},
-	"content.body_block":                {Filename: func(_ Variant) string { return "body.block.jsonnet" }, Inline: true, StringifyJSON: true, ShouldExtract: shouldExtractSlackBlock},
-	"content.body":                      {Filename: func(_ Variant) string { return "body.md" }, Inline: true, ShouldExtract: shouldExtractInbox},
-	// "content.body_text":                 {Filename: func(_ Variant) string { return "body_text.txt" }, Inline: true},
+	"content.body.designer.design_json": {Filename: func(_ Variant) string { return "body.designer.json" }, ShouldExtract: shouldExtractDesigner},
+	"content.body.designer.html":        {Filename: func(_ Variant) string { return "body.designer.html" }, ShouldExtract: shouldExtractDesigner},
+	"content.body.designer.text":        {Filename: func(_ Variant) string { return "body.designer.txt" }, ShouldExtract: shouldExtractDesigner},
+	"content.body.raw.html":             {Filename: func(_ Variant) string { return "body.raw.html" }, ShouldExtract: shouldExtractRaw},
+	"content.body.raw.text":             {Filename: func(_ Variant) string { return "body.raw.txt" }, ShouldExtract: shouldExtractRaw},
+	"content.body.plain_text.text":      {Filename: func(_ Variant) string { return "body.plain_text.txt" }, ShouldExtract: shouldExtractPlainText},
+	"content.body_block":                {Filename: func(_ Variant) string { return "body.block.jsonnet" }, StringifyJSON: true, ShouldExtract: shouldExtractSlackBlock},
+	"content.body":                      {Filename: func(_ Variant) string { return "body.md" }, ShouldExtract: shouldExtractInbox},
+	// "content.body_text":                 {Filename: func(_ Variant) string { return "body_text.txt" }},
 }
 
 // sortedFileRefPaths returns fileRefKeys paths sorted by depth.
@@ -205,8 +203,8 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 		// Check if the value is a @file reference
 		strVal, isStr := val.(string)
 		if !isStr {
-			// Non-string value: if inline is enabled and ext is JSON, accept structured data as-is
-			if cfg.Inline && filepath.Ext(cfg.Filename(variant)) == ".json" {
+			// Non-string value: for JSON-backed fields, accept structured data as-is
+			if filepath.Ext(cfg.Filename(variant)) == ".json" {
 				switch val.(type) {
 				case map[string]any, []any:
 					// valid JSON structure, keep it
@@ -217,31 +215,18 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 			continue
 		}
 
-		if !isFileRef(variantDir, strVal) {
-			// Not a valid file ref: if inline is enabled, accept the literal value
-			if cfg.Inline {
-				if filepath.Ext(cfg.Filename(variant)) == ".json" {
-					var jsonVal any
-					if err := json.Unmarshal([]byte(strVal), &jsonVal); err != nil {
-						debugErrorLog("Inline JSON value at %s is not valid JSON: %v", path, err)
-						continue
-					}
-					parent[lastKey] = jsonVal
-				}
-				// For .html/.txt, the string value is already correct
-			}
+		filename := cfg.Filename(variant)
+		if !isFileRef(strVal, filename) {
 			continue
 		}
 
-		filename := strings.TrimPrefix(strVal, "@")
+		if _, statErr := os.Stat(filepath.Join(variantDir, filename)); statErr != nil {
+			debugErrorLog("Referenced file %s not found at %s: %v", filename, path, statErr)
+			continue
+		}
 		content, readErr := readExtractedFile(variantDir, filename, filepath.Ext(filename))
 		if readErr != nil {
 			debugErrorLog("Failed to read extracted file %s: %v", filename, readErr)
-			continue
-		}
-
-		if s, ok := content.(string); ok && s == "" {
-			parent[lastKey] = nil
 			continue
 		}
 
@@ -263,21 +248,10 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 	return variant, nil
 }
 
-// fileRefPattern matches valid extracted file references: word chars, dots, hyphens, with a known extension.
-var fileRefPattern = regexp.MustCompile(`^[\w][\w.\-]*\.(json|html|txt|jsonnet|md)$`)
-
-// isFileRef checks whether a string value is a valid @file reference.
-// It verifies the @-prefix, the filename matches the expected pattern, and the file exists on disk.
-func isFileRef(variantDir, val string) bool {
-	if !strings.HasPrefix(val, "@") {
-		return false
-	}
-	filename := strings.TrimPrefix(val, "@")
-	if !fileRefPattern.MatchString(filename) {
-		return false
-	}
-	_, err := os.Stat(filepath.Join(variantDir, filename))
-	return err == nil
+// isFileRef checks whether a string value is an @file reference
+// pointing at the filename this field is configured to extract to.
+func isFileRef(val, expectedFilename string) bool {
+	return val == "@"+expectedFilename
 }
 
 // readExtractedFile reads an extracted file and returns the appropriate typed value.

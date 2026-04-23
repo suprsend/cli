@@ -1,0 +1,40 @@
+{
+  "name": "suprsend",
+  "version": "0.0.0",
+  "description": "SuprSend CLI — manage notification infrastructure from your terminal.",
+  "bin": {
+    "suprsend": "bin/suprsend.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "suprsend",
+    "notifications",
+    "cli",
+    "workflow",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suprsend/cli.git"
+  },
+  "homepage": "https://github.com/suprsend/cli",
+  "bugs": {
+    "url": "https://github.com/suprsend/cli/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@suprsend/cli-darwin-x64": "0.0.0",
+    "@suprsend/cli-darwin-arm64": "0.0.0",
+    "@suprsend/cli-linux-x64": "0.0.0",
+    "@suprsend/cli-linux-arm64": "0.0.0",
+    "@suprsend/cli-win32-x64": "0.0.0",
+    "@suprsend/cli-win32-arm64": "0.0.0"
+  }
+}

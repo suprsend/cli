@@ -86,6 +86,13 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      # Node 20's bundled npm (10.x) doesn't support OIDC trusted-publishing
+      # token exchange — it signs the provenance attestation but still tries
+      # to publish with the setup-node placeholder _authToken, resulting in
+      # 404 from the registry. npm 11.5+ performs the exchange automatically.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
       - name: Publish to npm
         run: scripts/publish-npm.sh "${GITHUB_REF_NAME#v}"
 

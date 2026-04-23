@@ -4,6 +4,23 @@ SuprSend CLI is a command-line interface tool for interacting with the SuprSend 
 
 ## Installation
 
+### npm / npx
+
+Run without installing:
+
+```bash
+npx suprsend --help
+```
+
+Or install globally:
+
+```bash
+npm i -g suprsend
+suprsend --help
+```
+
+Works on macOS, Linux, and Windows (x64 and arm64). Requires Node.js ≥ 18 (for `npx`).
+
 ### Homebrew
 
 You can install SuprSend CLI using Homebrew:

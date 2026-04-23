@@ -24,9 +24,6 @@ var workflowCommitCmd = &cobra.Command{
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
-		if commitMessage == "" {
-			return fmt.Errorf("--commit-message (-m) is required")
-		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin

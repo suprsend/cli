@@ -32,11 +32,6 @@ var syncCmd = &cobra.Command{
 		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 
-		if commit && commitMessage == "" {
-			log.Error("--commit-message is required when --commit is set")
-			return
-		}
-
 		if fromWorkspace == toWorkspace {
 			log.Error("Cannot sync within the same workspace. Source and destination workspaces must be different.")
 			return

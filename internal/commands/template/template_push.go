@@ -205,11 +205,6 @@ var templatePushCmd = &cobra.Command{
 			path = filepath.Join(".", "suprsend", "templates")
 		}
 
-		if commit && commitMessage == "" {
-			log.Error("--commit-message (-m) is required when --commit is set")
-			return
-		}
-
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
 			return

@@ -14,15 +14,27 @@ import (
 )
 
 var templateGetCmd = &cobra.Command{
-	Use:   "get <slug>",
+	Use:   "get [<slug>]",
 	Short: "Get template details including variants",
 	Long:  "Retrieve a specific template by slug, including all its channel variants and mock data. Use --mode to switch between draft and live versions.",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o json` outputs the full template with variants.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		slug := args[0]
+		slugFlag, _ := cmd.Flags().GetString("slug")
+		if len(args) > 0 && slugFlag != "" {
+			return fmt.Errorf("slug provided both as positional argument and --slug flag; use only one")
+		}
+		var slug string
+		if len(args) > 0 {
+			slug = args[0]
+		} else {
+			slug = slugFlag
+		}
+		if slug == "" {
+			return fmt.Errorf("slug is required: provide it as a positional argument or via --slug")
+		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
@@ -82,6 +94,7 @@ var templateGetCmd = &cobra.Command{
 }
 
 func init() {
+	templateGetCmd.PersistentFlags().String("slug", "", "Template slug")
 	templateGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	templateGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json, yaml, or pretty")
 	TemplateCmd.AddCommand(templateGetCmd)

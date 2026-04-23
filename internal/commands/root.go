@@ -78,7 +78,7 @@ func init() {
 			return nil
 		}
 
-		if cmd.Name() == "version" {
+		if cmd.Name() == "version" || cmd.Name() == "help" {
 			return nil
 		}
 		if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {

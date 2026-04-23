@@ -67,11 +67,17 @@ for entry in "${PLATFORMS[@]}"; do
   cp "$ROOT/LICENSE"                              "$PKG_STAGE/LICENSE"
 
   # goreleaser output dir has a go-version suffix (_v1, _v8.0, ...). Match with a glob.
-  BIN_SRC_DIR=$(ls -d "$DIST/suprsend_${GO_OS}_${GO_ARCH}"_*/ 2>/dev/null | head -n1)
-  if [[ -z "$BIN_SRC_DIR" ]]; then
+  # Shell glob array rather than `ls | head` so a missing match surfaces the
+  # error message below instead of being swallowed by set -euo pipefail.
+  BIN_DIRS=("$DIST/suprsend_${GO_OS}_${GO_ARCH}"_*/)
+  if [[ ! -d "${BIN_DIRS[0]}" ]]; then
     echo "error: no goreleaser output for ${GO_OS}_${GO_ARCH} under $DIST" >&2
     exit 1
   fi
+  if [[ ${#BIN_DIRS[@]} -gt 1 ]]; then
+    echo "warning: multiple goreleaser output dirs for ${GO_OS}_${GO_ARCH}; using ${BIN_DIRS[0]}" >&2
+  fi
+  BIN_SRC_DIR="${BIN_DIRS[0]}"
   cp "${BIN_SRC_DIR%/}/$BIN_NAME" "$PKG_STAGE/bin/$BIN_NAME"
   if [[ "$BIN_NAME" != *.exe ]]; then
     chmod 0755 "$PKG_STAGE/bin/$BIN_NAME"
@@ -110,7 +116,20 @@ echo "==> Publishing suprsend@$VERSION"
 if [[ "${DRY_RUN:-}" == "1" ]]; then
   (cd "$ROOT_STAGE" && npm publish --access public --dry-run)
 else
-  (cd "$ROOT_STAGE" && npm publish --access public)
+  if ! (cd "$ROOT_STAGE" && npm publish --access public); then
+    # If the exact version is already on the registry, this is a harmless retry
+    # (e.g. CI re-run after a successful publish); proceed as success.
+    if npm view "suprsend@$VERSION" version >/dev/null 2>&1; then
+      echo "    suprsend@$VERSION already published, nothing to do."
+    else
+      echo "    failed to publish suprsend@$VERSION" >&2
+      exit 1
+    fi
+  fi
 fi
 
-echo "Done. Published suprsend + 6 platform packages at $VERSION."
+if [[ "${DRY_RUN:-}" == "1" ]]; then
+  echo "Done. Dry-run complete (nothing published) at $VERSION."
+else
+  echo "Done. Published suprsend + 6 platform packages at $VERSION."
+fi

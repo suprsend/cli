@@ -4,6 +4,9 @@
   "description": "SuprSend CLI binary for win32-arm64. Installed automatically by the `suprsend` package.",
   "os": ["win32"],
   "cpu": ["arm64"],
+  "exports": {
+    "./bin/suprsend.exe": "./bin/suprsend.exe"
+  },
   "files": [
     "bin",
     "README.md",

@@ -27,5 +27,7 @@ if (result.error) {
 }
 if (result.signal) {
   process.kill(process.pid, result.signal);
+  const signalNumber = require('node:os').constants.signals[result.signal] ?? 0;
+  process.exit(128 + signalNumber);
 }
 process.exit(result.status ?? 1);

@@ -80,18 +80,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Node 24 + setup-node@v6 is what npm documents for trusted publishing.
+      # Older combos (Node 20 + setup-node@v4 ship npm 10.x) sign the provenance
+      # but don't perform the OIDC token exchange, so publishes 404 against the
+      # setup-node placeholder _authToken. See
+      # https://docs.npmjs.com/trusted-publishers#supported-cicd-providers
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
-      # Node 20's bundled npm (10.x) doesn't support OIDC trusted-publishing
-      # token exchange — it signs the provenance attestation but still tries
-      # to publish with the setup-node placeholder _authToken, resulting in
-      # 404 from the registry. npm 11.5+ performs the exchange automatically.
-      - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
 
       - name: Publish to npm
         run: scripts/publish-npm.sh "${GITHUB_REF_NAME#v}"

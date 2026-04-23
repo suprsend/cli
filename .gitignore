@@ -22,6 +22,8 @@ __debug_bin*
 .vscode/
 dist/
 bin/
+!npm/**/bin/
+!npm/**/bin/**
 .DS_Store
 TODO.md
 .air.toml

@@ -18,7 +18,7 @@ type Variant = map[string]any
 
 // fileRefConfig defines how a variant field is extracted to / reassembled from a separate file.
 type fileRefConfig struct {
-	ShouldExtract func(variant Variant) bool // if non-nil and returns true, always write the file even when the value is empty
+	ShouldExtract func(variant Variant) bool // if non-nil and returns false, skip extraction for this variant
 	Filename      func(variant Variant) string
 	Inline        bool // true: accept literal values (not just @file refs) during reassembly
 	StringifyJSON bool // true: re-serialize parsed JSON back to a string on reassembly (for API fields that expect a JSON string, not an object)
@@ -134,7 +134,7 @@ func valueToFileContent(v any) (string, bool) {
 
 func writeVariantFiles(variantDir string, variant Variant, channel, variantName, slug string, stats *TemplateWriteStats) error {
 	variantCopy := utils.DeepCopyMap(variant)
-	extractedFiles := map[string]string{} // filename -> content
+	filesToWrite := map[string]string{} // filename -> content
 
 	for _, path := range sortedFileRefPaths(true) {
 		cfg := fileRefKeys[path]
@@ -148,14 +148,25 @@ func writeVariantFiles(variantDir string, variant Variant, channel, variantName,
 			continue
 		}
 
-		content, _ := valueToFileContent(val)
+		content, ok := valueToFileContent(val)
+		if !ok {
+			continue
+		}
 		filename := cfg.Filename(variantCopy)
-		extractedFiles[filename] = content
+		filesToWrite[filename] = content
 		parent[lastKey] = "@" + filename
 	}
 
-	// Write extracted content files
-	for filename, content := range extractedFiles {
+	// Marshal variant JSON and include it alongside the extracted content files
+	variantJSON, err := json.MarshalIndent(variantCopy, "", "  ")
+	if err != nil {
+		debugErrorLog("Error: %s", err)
+		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal variant '%s/%s' for '%s': %v", channel, variantName, slug, err))
+		return err
+	}
+	filesToWrite["variant.json"] = string(variantJSON)
+
+	for filename, content := range filesToWrite {
 		filePath := filepath.Join(variantDir, filename)
 		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 			debugErrorLog("Error: %s", err)
@@ -164,22 +175,6 @@ func writeVariantFiles(variantDir string, variant Variant, channel, variantName,
 		}
 		debugLog("Wrote: %s", filePath)
 	}
-
-	// Marshal variant JSON
-	variantJSON, err := json.MarshalIndent(variantCopy, "", "  ")
-	if err != nil {
-		debugErrorLog("Error: %s", err)
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal variant '%s/%s' for '%s': %v", channel, variantName, slug, err))
-		return err
-	}
-
-	variantFile := filepath.Join(variantDir, "variant.json")
-	if err := os.WriteFile(variantFile, variantJSON, 0o644); err != nil {
-		debugErrorLog("Error: %s", err)
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write variant file '%s': %v", variantFile, err))
-		return err
-	}
-	debugLog("Wrote: %s", variantFile)
 	return nil
 }
 

@@ -89,7 +89,7 @@ for entry in "${PLATFORMS[@]}"; do
   if [[ "${DRY_RUN:-}" == "1" ]]; then
     (cd "$PKG_STAGE" && npm publish --access public --dry-run)
   else
-    if ! (cd "$PKG_STAGE" && npm publish --access public); then
+    if ! (cd "$PKG_STAGE" && npm publish --access public --provenance); then
       # Retry-friendly: if this exact version already exists, continue.
       if npm view "$NPM_PKG@$VERSION" version >/dev/null 2>&1; then
         echo "    $NPM_PKG@$VERSION already published, continuing."
@@ -116,7 +116,7 @@ echo "==> Publishing suprsend@$VERSION"
 if [[ "${DRY_RUN:-}" == "1" ]]; then
   (cd "$ROOT_STAGE" && npm publish --access public --dry-run)
 else
-  if ! (cd "$ROOT_STAGE" && npm publish --access public); then
+  if ! (cd "$ROOT_STAGE" && npm publish --access public --provenance); then
     # If the exact version is already on the registry, this is a harmless retry
     # (e.g. CI re-run after a successful publish); proceed as success.
     if npm view "suprsend@$VERSION" version >/dev/null 2>&1; then

@@ -51,6 +51,10 @@ func shouldExtractPlainText(variant Variant) bool {
 func shouldExtractSlackBlock(variant Variant) bool {
 	return variantIs(variant, []string{"slack", "ms_teams"}, "content.body_type", "block")
 }
+func shouldExtractInbox(variant Variant) bool {
+	ch, _ := variant["channel"].(string)
+	return ch == "inbox"
+}
 
 // fileRefKeys defines which variant keys should be extracted into separate files.
 // Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
@@ -63,6 +67,7 @@ var fileRefKeys = map[string]fileRefConfig{
 	"content.body.raw.text":             {Filename: func(_ Variant) string { return "body.raw.txt" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractRaw},
 	"content.body.plain_text.text":      {Filename: func(_ Variant) string { return "body.plain_text.txt" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractPlainText},
 	"content.body_block":                {Filename: func(_ Variant) string { return "body.block.jsonnet" }, KeepRef: true, Inline: true, StringifyJSON: true, ShouldExtract: shouldExtractSlackBlock},
+	"content.body":                      {Filename: func(_ Variant) string { return "body.md" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractInbox},
 	// "content.body_text":                 {Filename: func(_ Variant) string { return "body_text.txt" }, KeepRef: true, Inline: true},
 }
 
@@ -269,7 +274,7 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 }
 
 // fileRefPattern matches valid extracted file references: word chars, dots, hyphens, with a known extension.
-var fileRefPattern = regexp.MustCompile(`^[\w][\w.\-]*\.(json|html|txt|jsonnet)$`)
+var fileRefPattern = regexp.MustCompile(`^[\w][\w.\-]*\.(json|html|txt|jsonnet|md)$`)
 
 // isFileRef checks whether a string value is a valid @file reference.
 // It verifies the @-prefix, the filename matches the expected pattern, and the file exists on disk.

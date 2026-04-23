@@ -20,7 +20,6 @@ type Variant = map[string]any
 type fileRefConfig struct {
 	ShouldExtract func(variant Variant) bool // if non-nil and returns true, always write the file even when the value is empty
 	Filename      func(variant Variant) string
-	KeepRef       bool // true: replace with @filename, false: delete the key from parent
 	Inline        bool // true: accept literal values (not just @file refs) during reassembly
 	StringifyJSON bool // true: re-serialize parsed JSON back to a string on reassembly (for API fields that expect a JSON string, not an object)
 }
@@ -60,15 +59,15 @@ func shouldExtractInbox(variant Variant) bool {
 // Map key: dot-notation path, value: config with filename and whether to keep a @ref or delete the key.
 // Add new entries here to extract more fields.
 var fileRefKeys = map[string]fileRefConfig{
-	"content.body.designer.design_json": {Filename: func(_ Variant) string { return "body.designer.json" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractDesigner},
-	"content.body.designer.html":        {Filename: func(_ Variant) string { return "body.designer.html" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractDesigner},
-	"content.body.designer.text":        {Filename: func(_ Variant) string { return "body.designer.txt" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractDesigner},
-	"content.body.raw.html":             {Filename: func(_ Variant) string { return "body.raw.html" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractRaw},
-	"content.body.raw.text":             {Filename: func(_ Variant) string { return "body.raw.txt" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractRaw},
-	"content.body.plain_text.text":      {Filename: func(_ Variant) string { return "body.plain_text.txt" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractPlainText},
-	"content.body_block":                {Filename: func(_ Variant) string { return "body.block.jsonnet" }, KeepRef: true, Inline: true, StringifyJSON: true, ShouldExtract: shouldExtractSlackBlock},
-	"content.body":                      {Filename: func(_ Variant) string { return "body.md" }, KeepRef: true, Inline: true, ShouldExtract: shouldExtractInbox},
-	// "content.body_text":                 {Filename: func(_ Variant) string { return "body_text.txt" }, KeepRef: true, Inline: true},
+	"content.body.designer.design_json": {Filename: func(_ Variant) string { return "body.designer.json" }, Inline: true, ShouldExtract: shouldExtractDesigner},
+	"content.body.designer.html":        {Filename: func(_ Variant) string { return "body.designer.html" }, Inline: true, ShouldExtract: shouldExtractDesigner},
+	"content.body.designer.text":        {Filename: func(_ Variant) string { return "body.designer.txt" }, Inline: true, ShouldExtract: shouldExtractDesigner},
+	"content.body.raw.html":             {Filename: func(_ Variant) string { return "body.raw.html" }, Inline: true, ShouldExtract: shouldExtractRaw},
+	"content.body.raw.text":             {Filename: func(_ Variant) string { return "body.raw.txt" }, Inline: true, ShouldExtract: shouldExtractRaw},
+	"content.body.plain_text.text":      {Filename: func(_ Variant) string { return "body.plain_text.txt" }, Inline: true, ShouldExtract: shouldExtractPlainText},
+	"content.body_block":                {Filename: func(_ Variant) string { return "body.block.jsonnet" }, Inline: true, StringifyJSON: true, ShouldExtract: shouldExtractSlackBlock},
+	"content.body":                      {Filename: func(_ Variant) string { return "body.md" }, Inline: true, ShouldExtract: shouldExtractInbox},
+	// "content.body_text":                 {Filename: func(_ Variant) string { return "body_text.txt" }, Inline: true},
 }
 
 // sortedFileRefPaths returns fileRefKeys paths sorted by depth.
@@ -152,11 +151,7 @@ func writeVariantFiles(variantDir string, variant Variant, channel, variantName,
 		content, _ := valueToFileContent(val)
 		filename := cfg.Filename(variantCopy)
 		extractedFiles[filename] = content
-		if cfg.KeepRef {
-			parent[lastKey] = "@" + filename
-		} else {
-			delete(parent, lastKey)
-		}
+		parent[lastKey] = "@" + filename
 	}
 
 	// Write extracted content files

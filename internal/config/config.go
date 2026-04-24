@@ -18,6 +18,7 @@ type Config struct {
 	ServiceToken  string
 	NoColorOutput bool
 	Workspace     string
+	Quiet         bool
 }
 
 // cfg is the global configuration instance.
@@ -72,6 +73,11 @@ func SetUpLogs() error {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 
+	if Cfg.Quiet {
+		log.SetOutput(os.Stderr)
+		log.SetLevel(log.FatalLevel)
+		return nil
+	}
 	if viper.GetBool("debug") {
 		Cfg.Verbosity = "debug"
 	}

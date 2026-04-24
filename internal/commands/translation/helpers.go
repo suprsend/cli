@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/mgmnt"
 )
 
@@ -70,25 +71,25 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 		filename := filepath.Join(outputDir, obj["filename"].(string))
 		content, ok := obj["content"]
 		if !ok || content == nil {
-			fmt.Fprintf(os.Stdout, "Warning: No content found for translation '%s', skipping\n", slug)
+			log.Warnf("No content found for translation '%s', skipping", slug)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("No content found for translation '%s'", slug))
 			continue
 		}
 		fileData, err := json.MarshalIndent(content, "", "  ")
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to marshal translation '%s': %v\n", slug, err)
+			log.WithError(err).Errorf("Failed to marshal translation '%s'", slug)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal translation '%s': %v", slug, err))
 			continue
 		}
 		if err := os.WriteFile(filename, fileData, 0644); err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to write file '%s': %v\n", filename, err)
+			log.WithError(err).Errorf("Failed to write file '%s'", filename)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write file '%s': %v", filename, err))
 			continue
 		}
-		fmt.Fprintf(os.Stdout, "Wrote translation to %s\n", filename)
+		log.Infof("Wrote translation to %s", filename)
 		stats.Success++
 	}
 	return stats, nil

@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 type TemplateWriteStats struct {
@@ -42,18 +43,26 @@ func debugErrorLog(format string, args ...any) {
 	}
 }
 
-func promptForOutputDirectory() string {
+func promptForOutputDirectory() (string, bool) {
+	if utils.IsOutputPiped() {
+		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
+		return "", false
+	}
 	reader := bufio.NewReader(os.Stdin)
 	defaultDir := filepath.Join(".", "suprsend", "templates")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the templates?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
-	input, _ := reader.ReadString('\n')
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading input: %v. Using default directory: %s\n", err, defaultDir)
+		return defaultDir, true
+	}
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultDir
+		return defaultDir, true
 	}
-	return input
+	return input, true
 }
 
 func ensureOutputDirectory(dirPath string) error {
@@ -191,4 +200,3 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 
 	return stats, nil
 }
-

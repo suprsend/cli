@@ -112,7 +112,11 @@ var templatePullCmd = &cobra.Command{
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
 				} else {
-					outputDir = promptForOutputDirectory()
+					od, success := promptForOutputDirectory()
+					if !success {
+						return
+					}
+					outputDir = od
 				}
 			}
 			if outputDir == "" {

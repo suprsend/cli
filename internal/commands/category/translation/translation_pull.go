@@ -37,7 +37,11 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 			if force {
 				fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
 			} else {
-				outputDir = promptForOutputDirectory()
+				od, success := promptForOutputDirectory()
+				if !success {
+					return nil
+				}
+				outputDir = od
 			}
 		}
 		if outputDir == "" {

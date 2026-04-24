@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
 
@@ -26,7 +27,11 @@ type TranslationPushStats struct {
 	Errors  []string
 }
 
-func promptForOutputDirectory() string {
+func promptForOutputDirectory() (string, bool) {
+	if utils.IsOutputPiped() {
+		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
+		return "", false
+	}
 	reader := bufio.NewReader(os.Stdin)
 	defaultDir := filepath.Join(".", "suprsend", "translations")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the translations?\n")
@@ -35,9 +40,9 @@ func promptForOutputDirectory() string {
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultDir
+		return defaultDir, true
 	}
-	return input
+	return input, false
 }
 
 func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (*TranslationWriteStats, error) {

@@ -25,7 +25,11 @@ var eventPullCmd = &cobra.Command{
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", dirPath)
 				} else {
-					dirPath = promptForOutputDirectory()
+					od, success := promptForOutputDirectory()
+					if !success {
+						return nil
+					}
+					dirPath = od
 				}
 			}
 			if dirPath == "" {

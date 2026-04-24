@@ -28,7 +28,12 @@ var categoryPullCmd = &cobra.Command{
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
 				} else {
-					outputDir = promptForOutputDirectory()
+					od, success := promptForOutputDirectory()
+					if !success {
+						fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+						return nil
+					}
+					outputDir = od
 				}
 			}
 			if outputDir == "" {

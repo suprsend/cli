@@ -28,7 +28,11 @@ var schemaPullCmd = &cobra.Command{
 				if force {
 					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
 				} else {
-					outputDir = promptForOutputDirectory()
+					od, success := promptForOutputDirectory()
+					if !success {
+						return fmt.Errorf("no output directory specified")
+					}
+					outputDir = od
 				}
 			}
 			if outputDir == "" {

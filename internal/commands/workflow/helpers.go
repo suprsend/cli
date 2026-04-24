@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
 
@@ -31,7 +32,11 @@ func isDebugMode() bool {
 	return viper.GetBool("debug")
 }
 
-func promptForOutputDirectory() string {
+func promptForOutputDirectory() (string, bool) {
+	if utils.IsOutputPiped() {
+		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
+		return "", false
+	}
 	reader := bufio.NewReader(os.Stdin)
 	defaultDir := filepath.Join(".", "suprsend", "workflows")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the workflows?\n")
@@ -40,9 +45,9 @@ func promptForOutputDirectory() string {
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultDir
+		return defaultDir, true
 	}
-	return input
+	return input, false
 }
 
 func ensureOutputDirectory(dirPath string) error {

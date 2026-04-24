@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -34,7 +35,7 @@ func writeCategoriesFile(resp *mgmnt.PreferenceCategoryResponse, filePath string
 	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 		return fmt.Errorf("failed to ensure directory %s: %w", filepath.Dir(filePath), err)
 	}
-	fmt.Fprintf(os.Stdout, "Successfully wrote categories to %s\n", filePath)
+	log.Infof("Successfully wrote categories to %s", filePath)
 	return os.WriteFile(filePath, jsonData, 0644)
 }
 
@@ -68,7 +69,7 @@ func WriteToFileWithPath(data interface{}, filePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "Successfully wrote categories to %s\n", filePath)
+	log.Infof("Successfully wrote categories to %s", filePath)
 	return os.WriteFile(filePath, jsonData, 0644)
 }
 

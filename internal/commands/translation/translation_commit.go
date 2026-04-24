@@ -3,7 +3,6 @@ package translation
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -21,7 +20,7 @@ var translationCommitCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Fprintf(os.Stdout, "DRY RUN: would commit translations in %s\n", workspace)
+			log.Infof("DRY RUN: would commit translations in %s", workspace)
 			return nil
 		}
 
@@ -30,7 +29,7 @@ var translationCommitCmd = &cobra.Command{
 			msg := fmt.Sprintf("This will promote translations to live in workspace \"%s\". Continue?", workspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
-				fmt.Fprintln(os.Stdout, "Aborted.")
+				log.Info("Aborted.")
 				return nil
 			}
 		}
@@ -53,7 +52,7 @@ var translationCommitCmd = &cobra.Command{
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully committed translation '%s'\n", commitMessage)
+			log.Infof("Successfully committed translation '%s'", commitMessage)
 		}
 		return nil
 	},

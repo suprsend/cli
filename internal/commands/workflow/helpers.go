@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -28,9 +27,6 @@ type WorkflowPushStats struct {
 	Errors  []string
 }
 
-func isDebugMode() bool {
-	return viper.GetBool("debug")
-}
 
 func promptForOutputDirectory() (string, bool) {
 	if utils.IsOutputPiped() {
@@ -54,7 +50,7 @@ func ensureOutputDirectory(dirPath string) error {
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(os.Stdout, "Creating directory: %s\n", dirPath)
+			log.Infof("Creating directory: %s", dirPath)
 			return os.MkdirAll(dirPath, 0o755)
 		}
 		return fmt.Errorf("error checking directory: %w", err)
@@ -85,17 +81,6 @@ func validateInputDirectory(dirPath string) error {
 	return nil
 }
 
-func debugLog(format string, args ...any) {
-	if isDebugMode() {
-		log.Infof(format, args...)
-	}
-}
-
-func debugErrorLog(format string, args ...any) {
-	if isDebugMode() {
-		log.Errorf(format, args...)
-	}
-}
 
 func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*WorkflowWriteStats, error) {
 	stats := &WorkflowWriteStats{
@@ -134,8 +119,7 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 
 		fileData, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
-			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow '%s': %v\n", slug, err)
+			log.Errorf("Failed to marshal workflow '%s': %v", slug, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal workflow '%s': %v", slug, err))
 			continue
@@ -143,15 +127,13 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 
 		filename := filepath.Join(slugDir, "workflow.json")
 		if err := os.WriteFile(filename, append(fileData, '\n'), 0o644); err != nil {
-			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to write file '%s': %v\n", filename, err)
+			log.Errorf("Failed to write file '%s': %v", filename, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write file '%s': %v", filename, err))
 			continue
 		}
 
-		debugLog("Wrote: %s", filename)
-		fmt.Fprintf(os.Stdout, "Wrote workflow to %s\n", filename)
+		log.Infof("Wrote workflow to %s", filename)
 		stats.Success++
 	}
 

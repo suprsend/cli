@@ -12,7 +12,6 @@ import (
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -37,21 +36,6 @@ type FilteredSchema struct {
 	Description string `json:"description"`
 }
 
-func isDebugMode() bool {
-	return viper.GetBool("debug")
-}
-
-func debugLog(format string, args ...interface{}) {
-	if isDebugMode() {
-		log.Infof(format, args...)
-	}
-}
-
-func debugErrorLog(format string, args ...interface{}) {
-	if isDebugMode() {
-		log.Errorf(format, args...)
-	}
-}
 
 func promptForOutputDirectory() (string, bool) {
 	if utils.IsOutputPiped() {
@@ -79,7 +63,7 @@ func ensureOutputDirectory(dirPath string) error {
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(os.Stdout, "Creating directory: %s\n", dirPath)
+			log.Infof("Creating directory: %s", dirPath)
 			return os.MkdirAll(dirPath, 0o755)
 		}
 		return fmt.Errorf("error checking directory: %w", err)
@@ -158,15 +142,13 @@ func WriteSchemasToFiles(schemasResp *mgmnt.SchemasResponse, dirPath string) (*S
 		}
 
 		if err := writeSchemaFiles(slugDir, slug, obj); err != nil {
-			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to write schema '%s': %v\n", slug, err)
+			log.Errorf("Failed to write schema '%s': %v", slug, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write schema '%s': %v", slug, err))
 			continue
 		}
 
-		debugLog("Wrote: %s", slugDir)
-		fmt.Fprintf(os.Stdout, "Wrote schema to %s\n", filepath.Join(slugDir, "schema.json"))
+		log.Infof("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
 		stats.Success++
 	}
 
@@ -227,7 +209,7 @@ func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
 
 	// path wins: ensure slug matches directory name
 	if s, _ := payload["slug"].(string); s != slug {
-		fmt.Fprintf(os.Stdout, "Warning: schemas/%s: schema.json#slug is %q but directory is %q — using directory value\n", slug, s, slug)
+		log.Warnf("schemas/%s: schema.json#slug is %q but directory is %q — using directory value", slug, s, slug)
 		payload["slug"] = slug
 	}
 

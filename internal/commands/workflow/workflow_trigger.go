@@ -65,7 +65,7 @@ var workflowTrigger = &cobra.Command{
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully triggered workflow '%s'", slug))
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully triggered workflow '%s'", slug)
+			log.Infof("Successfully triggered workflow '%s'", slug)
 		}
 		return nil
 	},

@@ -65,7 +65,7 @@ var eventPushCmd = &cobra.Command{
 		if p != nil {
 			p.Stop("Successfully pushed events")
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully pushed events\n")
+			log.Info("Successfully pushed events")
 		}
 		return nil
 	},

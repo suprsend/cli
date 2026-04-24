@@ -147,11 +147,10 @@ func PushTranslations(workspace, locale, dir string) error {
 		p.Stop(msg)
 	}
 
-	// Print errors if any
 	if len(errors) > 0 {
-		fmt.Fprintf(os.Stdout, "\nErrors:\n")
+		log.Info("Errors:")
 		for _, errMsg := range errors {
-			fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
+			log.Infof("  - %s", errMsg)
 		}
 		return fmt.Errorf("%d locale(s) failed to push", failedCount)
 	}

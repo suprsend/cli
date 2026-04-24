@@ -110,7 +110,7 @@ var templatePullCmd = &cobra.Command{
 			outputDir = filepath.Join(".", "suprsend", "templates")
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+					log.Infof("Using default directory: %s", outputDir)
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
@@ -120,13 +120,13 @@ var templatePullCmd = &cobra.Command{
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+				log.Info("No output directory specified. Exiting.")
 				return
 			}
 		}
 
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
+			log.Errorf("Error with output directory: %v", err)
 			return
 		}
 
@@ -163,15 +163,15 @@ var templatePullCmd = &cobra.Command{
 
 		stats, err := WriteTemplatesToFiles(results, outputDir)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to save templates: %v\n", err)
+			log.Errorf("Failed to save templates: %v", err)
 			return
 		}
 
-		fmt.Fprintf(os.Stdout, "\nPull Summary: %d total, %d success, %d failed\n", stats.Total, stats.Success, stats.Failed)
+		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
 		if len(stats.Errors) > 0 {
-			fmt.Fprintf(os.Stdout, "Errors:\n")
+			log.Info("Errors:")
 			for _, e := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", e)
+				log.Infof("  - %s", e)
 			}
 		}
 	},

@@ -35,7 +35,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		outputDir = defaultDir
 		if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 			if force {
-				fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+				log.Infof("Using default directory: %s", outputDir)
 			} else {
 				od, success := promptForOutputDirectory()
 				if !success {
@@ -45,7 +45,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 			}
 		}
 		if outputDir == "" {
-			fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+			log.Info("No output directory specified. Exiting.")
 			return nil
 		}
 	}
@@ -105,14 +105,14 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		p.Stop(fmt.Sprintf("Pulled translations from %s", workspace))
 	}
 
-	fmt.Fprintf(os.Stdout, "\n=== Translation Pull Summary ===\n")
-	fmt.Fprintf(os.Stdout, "Total locales processed: %d\n", len(locales.Results))
-	fmt.Fprintf(os.Stdout, "Successfully written: %d\n", successCount)
+	log.Info("=== Translation Pull Summary ===")
+	log.Infof("Total locales processed: %d", len(locales.Results))
+	log.Infof("Successfully written: %d", successCount)
 	if failedCount > 0 {
-		fmt.Fprintf(os.Stdout, "Failed to write: %d\n", failedCount)
-		fmt.Fprintf(os.Stdout, "\nFailed translations:\n")
+		log.Infof("Failed to write: %d", failedCount)
+		log.Info("Failed translations:")
 		for _, errMsg := range errors {
-			fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
+			log.Infof("  - %s", errMsg)
 		}
 	}
 	return nil

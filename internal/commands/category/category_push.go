@@ -70,7 +70,7 @@ Examples:
 				if p != nil {
 					p.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
 				} else {
-					fmt.Fprintf(os.Stdout, "DRY RUN: would push categories to %s\n", workspace)
+					log.Infof("DRY RUN: would push categories to %s", workspace)
 				}
 				return nil
 			}
@@ -133,7 +133,7 @@ Examples:
 			if p != nil {
 				p.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
 			} else {
-				fmt.Fprintf(os.Stdout, "DRY RUN: would push categories to %s\n", workspace)
+				log.Infof("DRY RUN: would push categories to %s", workspace)
 			}
 			return nil
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/suprsend/cli/internal/utils"
 )
 
+
 var workflowDisableCmd = &cobra.Command{
 	Use:   "disable [<slug>]",
 	Short: "Disable a workflow",
@@ -24,7 +25,7 @@ var workflowDisableCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Printf("DRY RUN: would disable workflow '%s' in %s\n", slug, workspace)
+			log.Infof("DRY RUN: would disable workflow '%s' in %s", slug, workspace)
 			return nil
 		}
 
@@ -33,7 +34,7 @@ var workflowDisableCmd = &cobra.Command{
 			msg := fmt.Sprintf("This will disable workflow '%s' in workspace \"%s\". Live traffic for this workflow will stop. Continue?", slug, workspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
-				fmt.Println("Aborted.")
+				log.Info("Aborted.")
 				return nil
 			}
 		}
@@ -46,7 +47,7 @@ var workflowDisableCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Disabled workflow: %s\n", slug)
+		log.Infof("Disabled workflow: %s", slug)
 		return nil
 	},
 }

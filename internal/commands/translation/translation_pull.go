@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
@@ -24,7 +25,7 @@ var translationPullCmd = &cobra.Command{
 			outputDir = filepath.Join(".", "suprsend", "translations")
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+					log.Infof("Using default directory: %s", outputDir)
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
@@ -34,7 +35,7 @@ var translationPullCmd = &cobra.Command{
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting \n")
+				log.Info("No output directory specified. Exiting.")
 				return
 			}
 		}
@@ -52,7 +53,7 @@ var translationPullCmd = &cobra.Command{
 		mgmnt_client := utils.GetSuprSendMgmntClient()
 		translationResp, err := mgmnt_client.GetTranslations(workspace, mode)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get translations: %v\n", err)
+			log.Errorf("Failed to get translations: %v", err)
 			return
 		}
 		if p != nil {
@@ -61,19 +62,19 @@ var translationPullCmd = &cobra.Command{
 
 		stats, err := WriteTranslationToFiles(*translationResp, outputDir)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to save translations: %v\n", err)
+			log.Errorf("Failed to save translations: %v", err)
 			return
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Translation Pull Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total translations processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully written: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to write: %d", stats.Failed)
+		log.Info("=== Translation Pull Summary ===")
+		log.Infof("Total translations processed: %d", stats.Total)
+		log.Infof("Successfully written: %d", stats.Success)
+		log.Infof("Failed to write: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed translations:\n")
+			log.Info("Failed translations:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, " - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 		}
 	},

@@ -26,23 +26,23 @@ var categoryPullCmd = &cobra.Command{
 			outputDir = filepath.Join(".", defaultCategoryDir)
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+					log.Infof("Using default directory: %s", outputDir)
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
-						fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+						log.Info("No output directory specified. Exiting.")
 						return nil
 					}
 					outputDir = od
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+				log.Info("No output directory specified. Exiting.")
 				return nil
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
+			log.Errorf("Error with output directory: %v", err)
 			return err
 		}
 		var p *pin.Pin

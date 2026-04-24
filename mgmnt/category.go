@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
 )
 
@@ -133,7 +133,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 	if commit {
 		result := resp.Result().(*CategoryPushResponse)
 		if !result.ValidationResult.IsValid {
-			fmt.Fprintf(os.Stdout, "Warning: validation failed: %v\n", result.ValidationResult.Errors)
+			log.Warnf("validation failed: %v", result.ValidationResult.Errors)
 		}
 	}
 	return nil

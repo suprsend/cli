@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -27,21 +26,6 @@ type TemplatePushStats struct {
 	Errors  []string
 }
 
-func isDebugMode() bool {
-	return viper.GetBool("debug")
-}
-
-func debugLog(format string, args ...any) {
-	if isDebugMode() {
-		log.Infof(format, args...)
-	}
-}
-
-func debugErrorLog(format string, args ...any) {
-	if isDebugMode() {
-		log.Errorf(format, args...)
-	}
-}
 
 func promptForOutputDirectory() (string, bool) {
 	if utils.IsOutputPiped() {
@@ -69,7 +53,7 @@ func ensureOutputDirectory(dirPath string) error {
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(os.Stdout, "Creating directory: %s\n", dirPath)
+			log.Infof("Creating directory: %s", dirPath)
 			return os.MkdirAll(dirPath, 0o755)
 		}
 		return fmt.Errorf("error checking directory: %w", err)
@@ -138,31 +122,31 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 		}
 		templateJSON, err := json.MarshalIndent(templateData, "", "  ")
 		if err != nil {
-			debugErrorLog("Error: %s", err)
+			log.Errorf("Failed to marshal template.json for '%s': %v", tmpl.Slug, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal template.json for '%s': %v", tmpl.Slug, err))
 			continue
 		}
 		templateFile := filepath.Join(templateDir, "template.json")
 		if err := os.WriteFile(templateFile, templateJSON, 0o644); err != nil {
-			debugErrorLog("Error: %s", err)
+			log.Errorf("Failed to write template.json for '%s': %v", tmpl.Slug, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write template.json for '%s': %v", tmpl.Slug, err))
 			continue
 		}
-		debugLog("Wrote: %s", templateFile)
+		log.Debugf("Wrote: %s", templateFile)
 
 		// Write mock_data.json if present
 		if tmpl.MockData != nil {
 			mockJSON, err := json.MarshalIndent(tmpl.MockData, "", "  ")
 			if err != nil {
-				debugErrorLog("Error marshaling mock_data.json for '%s': %s", tmpl.Slug, err)
+				log.Errorf("Error marshaling mock_data.json for '%s': %s", tmpl.Slug, err)
 			} else {
 				mockFile := filepath.Join(templateDir, "mock_data.json")
 				if err := os.WriteFile(mockFile, mockJSON, 0o644); err != nil {
-					debugErrorLog("Error writing mock_data.json for '%s': %s", tmpl.Slug, err)
+					log.Errorf("Error writing mock_data.json for '%s': %s", tmpl.Slug, err)
 				} else {
-					debugLog("Wrote: %s", mockFile)
+					log.Debugf("Wrote: %s", mockFile)
 				}
 			}
 		}
@@ -173,7 +157,7 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 			variantName, _ := variant["id"].(string)
 
 			if channel == "" || variantName == "" {
-				debugErrorLog("Skipping variant with missing channel or id for template '%s'", tmpl.Slug)
+				log.Errorf("Skipping variant with missing channel or id for template '%s'", tmpl.Slug)
 				continue
 			}
 
@@ -195,7 +179,7 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 		}
 
 		stats.Success++
-		fmt.Fprintf(os.Stdout, "Pulled template: %s\n", tmpl.Slug)
+		log.Infof("Pulled template: %s", tmpl.Slug)
 	}
 
 	return stats, nil

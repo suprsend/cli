@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -85,7 +84,7 @@ func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationRe
 			SetResult(&TranslationResponse{}).
 			Get(c.mgmnt_base_URL + "v1/" + workspace + "/translation/?include_content=true&include_version_info=true" + "&limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get translations: %v\n", err)
+			log.Errorf("Failed to get translations: %v", err)
 			return nil, err
 		}
 

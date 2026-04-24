@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -171,7 +172,7 @@ func writeVariantFiles(variantDir string, variant Variant, channel, variantName,
 	// Marshal variant JSON and include it alongside the extracted content files
 	variantJSON, err := json.MarshalIndent(variantCopy, "", "  ")
 	if err != nil {
-		debugErrorLog("Error: %s", err)
+		log.Errorf("Failed to marshal variant '%s/%s' for '%s': %v", channel, variantName, slug, err)
 		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal variant '%s/%s' for '%s': %v", channel, variantName, slug, err))
 		return err
 	}
@@ -180,11 +181,11 @@ func writeVariantFiles(variantDir string, variant Variant, channel, variantName,
 	for filename, content := range filesToWrite {
 		filePath := filepath.Join(variantDir, filename)
 		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
-			debugErrorLog("Error: %s", err)
+			log.Errorf("Failed to write '%s': %v", filePath, err)
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write '%s': %v", filePath, err))
 			return err
 		}
-		debugLog("Wrote: %s", filePath)
+		log.Debugf("Wrote: %s", filePath)
 	}
 	return nil
 }
@@ -222,7 +223,7 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 				case map[string]any, []any:
 					// valid JSON structure, keep it
 				default:
-					debugErrorLog("Inline value at %s has unsupported type %T", path, val)
+					log.Warnf("Inline value at %s has unsupported type %T", path, val)
 				}
 			}
 			continue
@@ -234,12 +235,12 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 		}
 
 		if _, statErr := os.Stat(filepath.Join(variantDir, filename)); statErr != nil {
-			debugErrorLog("Referenced file %s not found at %s: %v", filename, path, statErr)
+			log.Warnf("Referenced file %s not found at %s: %v", filename, path, statErr)
 			continue
 		}
 		content, readErr := readExtractedFile(variantDir, filename, filepath.Ext(filename))
 		if readErr != nil {
-			debugErrorLog("Failed to read extracted file %s: %v", filename, readErr)
+			log.Warnf("Failed to read extracted file %s: %v", filename, readErr)
 			continue
 		}
 
@@ -248,7 +249,7 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 			case map[string]any, []any:
 				b, err := json.Marshal(content)
 				if err != nil {
-					debugErrorLog("Failed to stringify JSON at %s: %v", path, err)
+					log.Warnf("Failed to stringify JSON at %s: %v", path, err)
 					continue
 				}
 				content = string(b)

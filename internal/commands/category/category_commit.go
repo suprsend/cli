@@ -3,7 +3,6 @@ package category
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
@@ -32,7 +31,7 @@ var categoryCommitCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Fprintf(os.Stdout, "DRY RUN: would commit categories to %s\n", workspace)
+			log.Infof("DRY RUN: would commit categories to %s", workspace)
 			return nil
 		}
 
@@ -41,7 +40,7 @@ var categoryCommitCmd = &cobra.Command{
 			msg := fmt.Sprintf("This will promote categories to live in workspace \"%s\". Continue?", workspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
-				fmt.Fprintln(os.Stdout, "Aborted.")
+				log.Info("Aborted.")
 				return nil
 			}
 		}

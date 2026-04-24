@@ -263,7 +263,7 @@ var templatePushCmd = &cobra.Command{
 					}
 					cancel()
 				} else if stats.Success > 0 && !dryRun {
-					fmt.Fprintf(os.Stdout, "Pushed template: %s\n", slug)
+					log.Infof("Pushed template: %s", slug)
 				}
 			}
 		} else {
@@ -323,7 +323,7 @@ var templatePushCmd = &cobra.Command{
 					p = nil
 					cancel = nil
 				} else if !dryRun {
-					fmt.Fprintf(os.Stdout, "Pushed template: %s\n", templateSlug)
+					log.Infof("Pushed template: %s", templateSlug)
 				}
 				hasError = false
 			}
@@ -334,22 +334,22 @@ var templatePushCmd = &cobra.Command{
 			if commit {
 				action = "push and commit"
 			}
-			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d template(s) to %s\n", action, len(dryRunSlugs), workspace)
+			log.Infof("DRY RUN: would %s %d template(s) to %s", action, len(dryRunSlugs), workspace)
 			for _, s := range dryRunSlugs {
-				fmt.Fprintf(os.Stdout, "  - %s\n", s)
+				log.Infof("  - %s", s)
 			}
 			return
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Template Push Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total templates processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+		log.Info("=== Template Push Summary ===")
+		log.Infof("Total templates processed: %d", stats.Total)
+		log.Infof("Successfully pushed: %d", stats.Success)
+		log.Infof("Failed to push: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed templates:\n")
+			log.Info("Failed templates:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 		}
 	},

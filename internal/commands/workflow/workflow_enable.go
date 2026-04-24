@@ -23,7 +23,7 @@ var worklowEnableCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Printf("DRY RUN: would enable workflow '%s' in %s\n", slug, workspace)
+			log.Infof("DRY RUN: would enable workflow '%s' in %s", slug, workspace)
 			return nil
 		}
 
@@ -34,7 +34,7 @@ var worklowEnableCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Enabled workflow: %s\n", slug)
+		log.Infof("Enabled workflow: %s", slug)
 		return nil
 	},
 }

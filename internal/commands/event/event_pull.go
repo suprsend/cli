@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
@@ -23,7 +24,7 @@ var eventPullCmd = &cobra.Command{
 			dirPath = filepath.Join(".", "suprsend", "events")
 			if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", dirPath)
+					log.Infof("Using default directory: %s", dirPath)
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
@@ -33,7 +34,7 @@ var eventPullCmd = &cobra.Command{
 				}
 			}
 			if dirPath == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting \n")
+				log.Info("No output directory specified. Exiting.")
 				return nil
 			}
 		}
@@ -50,7 +51,7 @@ var eventPullCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		eventsResp, err := mgmntClient.GetEvents(workspace)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get events: %v\n", err)
+			log.Errorf("Failed to get events: %v", err)
 			return err
 		}
 		if p != nil {
@@ -59,7 +60,7 @@ var eventPullCmd = &cobra.Command{
 
 		_, err = WriteEventsToFiles(eventsResp, dirPath)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to save events: %v\n", err)
+			log.Errorf("Failed to save events: %v", err)
 			return err
 		}
 		return nil

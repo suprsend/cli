@@ -120,7 +120,7 @@ var generateTypesJavaCmd = &cobra.Command{
 			if p != nil {
 				p.Stop("No valid schemas found")
 			}
-			fmt.Println("No valid schemas found with meaningful JSON schema content")
+			log.Warn("No valid schemas found with meaningful JSON schema content")
 			return
 		}
 
@@ -301,7 +301,7 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 			if p != nil {
 				p.Stop("No valid schemas found")
 			}
-			fmt.Println("No valid schemas found with meaningful JSON schema content")
+			log.Warn("No valid schemas found with meaningful JSON schema content")
 			return
 		}
 

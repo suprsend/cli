@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
 	"resty.dev/v3"
 )
@@ -247,7 +247,7 @@ func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchema
 			SetResult(&LinkedSchemasResponse{}).
 			Get(c.mgmnt_base_URL + "v1/" + workspace + "/schema/all/linked/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
+			log.Errorf("Failed to get schemas: %v", err)
 			return nil, err
 		}
 		if res.IsError() {
@@ -317,7 +317,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 			SetResult(&SchemasResponse{}).
 			Get(urlStr)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
+			log.Errorf("Failed to get schemas: %v", err)
 			return nil, err
 		}
 		if res.IsError() {

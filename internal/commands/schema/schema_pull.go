@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
@@ -26,7 +27,7 @@ var schemaPullCmd = &cobra.Command{
 			outputDir = filepath.Join(".", "suprsend", "schemas")
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+					log.Infof("Using default directory: %s", outputDir)
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
@@ -40,13 +41,13 @@ var schemaPullCmd = &cobra.Command{
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
+			log.Errorf("Error with output directory: %v", err)
 			return err
 		}
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to create directory: %v\n", err)
+			log.Errorf("Failed to create directory: %v", err)
 			return err
 		}
 		var p *pin.Pin
@@ -63,7 +64,7 @@ var schemaPullCmd = &cobra.Command{
 		if slug != "" {
 			schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
 			if err != nil {
-				fmt.Fprintf(os.Stdout, "Error: Failed to get schema: %v\n", err)
+				log.Errorf("Failed to get schema: %v", err)
 				return err
 			}
 			if p != nil {
@@ -77,12 +78,12 @@ var schemaPullCmd = &cobra.Command{
 			if err := writeSchemaFiles(slugDir, slug, obj); err != nil {
 				return fmt.Errorf("failed to write schema files: %w", err)
 			}
-			fmt.Fprintf(os.Stdout, "Wrote schema to %s\n", filepath.Join(slugDir, "schema.json"))
+			log.Infof("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
 			return nil
 		}
 		schemas, err := mgmntClient.GetSchemas(workspace, mode)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
+			log.Errorf("Failed to get schemas: %v", err)
 			return err
 		}
 		if p != nil {
@@ -90,19 +91,19 @@ var schemaPullCmd = &cobra.Command{
 		}
 		stats, err := WriteSchemasToFiles(schemas, outputDir)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to save schemas: %v\n", err)
+			log.Errorf("Failed to save schemas: %v", err)
 			return err
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Schema Pull Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total schemas processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully updated: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to pull: %d\n", stats.Failed)
+		log.Info("=== Schema Pull Summary ===")
+		log.Infof("Total schemas processed: %d", stats.Total)
+		log.Infof("Successfully updated: %d", stats.Success)
+		log.Infof("Failed to pull: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed schemas:\n")
+			log.Info("Failed schemas:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 		}
 		return nil

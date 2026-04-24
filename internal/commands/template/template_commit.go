@@ -6,7 +6,6 @@ package template
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -32,7 +31,7 @@ var templateCommitCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Fprintf(os.Stdout, "DRY RUN: would commit template '%s' to live\n", slug)
+			log.Infof("DRY RUN: would commit template '%s' to live", slug)
 			return nil
 		}
 
@@ -40,7 +39,7 @@ var templateCommitCmd = &cobra.Command{
 			msg := fmt.Sprintf("This will promote template '%s' to live in workspace \"%s\". Continue?", slug, workspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
-				fmt.Fprintln(os.Stdout, "Aborted.")
+				log.Info("Aborted.")
 				return nil
 			}
 		}
@@ -105,7 +104,7 @@ var templateCommitCmd = &cobra.Command{
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully committed template '%s' to live", slug))
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully committed template '%s' to live\n", slug)
+			log.Infof("Successfully committed template '%s' to live", slug)
 		}
 		return nil
 	},

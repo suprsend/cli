@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 
 	"github.com/fatih/color"
@@ -9,6 +11,35 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+type cliFormatter struct {
+	noColor bool
+}
+
+func (f *cliFormatter) Format(entry *log.Entry) ([]byte, error) {
+	var buf bytes.Buffer
+	if entry.Level == log.InfoLevel {
+		fmt.Fprintf(&buf, "%s\n", entry.Message)
+		return buf.Bytes(), nil
+	}
+	var levelLabel string
+	if f.noColor {
+		levelLabel = fmt.Sprintf("%-5s", entry.Level.String())
+	} else {
+		switch entry.Level {
+		case log.WarnLevel:
+			levelLabel = color.YellowString("%-5s", entry.Level.String())
+		case log.ErrorLevel:
+			levelLabel = color.RedString("%-5s", entry.Level.String())
+		case log.DebugLevel:
+			levelLabel = color.CyanString("%-5s", entry.Level.String())
+		default:
+			levelLabel = fmt.Sprintf("%-5s", entry.Level.String())
+		}
+	}
+	fmt.Fprintf(&buf, "%s %s\n", levelLabel, entry.Message)
+	return buf.Bytes(), nil
+}
 
 // Config holds the application's configuration.
 type Config struct {
@@ -64,11 +95,7 @@ func InitConfig(cfgFile string) {
 
 // setUpLogs set the log output ans the log level
 func SetUpLogs() error {
-	log.SetFormatter(&log.TextFormatter{
-		DisableColors: viper.GetBool("NO_COLOR"),
-		FullTimestamp: true,
-		PadLevelText:  true,
-	})
+	log.SetFormatter(&cliFormatter{noColor: viper.GetBool("NO_COLOR")})
 	if Cfg.OutputType == "json" {
 		log.SetFormatter(&log.JSONFormatter{})
 	}

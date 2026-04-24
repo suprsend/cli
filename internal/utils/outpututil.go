@@ -163,7 +163,7 @@ func outputTable(data any) {
 	// Handle slice of structs
 	if val.Kind() == reflect.Slice {
 		if val.Len() == 0 {
-			fmt.Println("No data to display")
+			log.Info("No data to display")
 			return
 		}
 		elemType := val.Index(0).Type()
@@ -184,7 +184,7 @@ func outputTable(data any) {
 
 func printStructAsTable(values []reflect.Value) {
 	if len(values) == 0 {
-		fmt.Println("No data to display")
+		log.Info("No data to display")
 		return
 	}
 

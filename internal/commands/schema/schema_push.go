@@ -79,7 +79,7 @@ var schemaPushCmd = &cobra.Command{
 					if commit {
 						action = "push and commit"
 					}
-					fmt.Fprintf(os.Stdout, "DRY RUN: would %s schema '%s' to %s\n", action, slug, workspace)
+					log.Infof("DRY RUN: would %s schema '%s' to %s", action, slug, workspace)
 					stats.Success++
 				} else {
 					if !utils.IsOutputPiped() {
@@ -98,7 +98,7 @@ var schemaPushCmd = &cobra.Command{
 						}
 						cancel()
 					} else if err == nil {
-						fmt.Fprintf(os.Stdout, "Pushed schema: %s\n", slug)
+						log.Infof("Pushed schema: %s", slug)
 					}
 					if err != nil {
 						log.WithError(err).Errorf("Failed to push schema %s", slug)
@@ -110,15 +110,15 @@ var schemaPushCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Fprintf(os.Stdout, "\n=== Schema Push Summary ===\n")
-			fmt.Fprintf(os.Stdout, "Total schemas processed: %d\n", stats.Total)
-			fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-			fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+			log.Info("=== Schema Push Summary ===")
+			log.Infof("Total schemas processed: %d", stats.Total)
+			log.Infof("Successfully pushed: %d", stats.Success)
+			log.Infof("Failed to push: %d", stats.Failed)
 
 			if stats.Failed > 0 {
-				fmt.Fprintf(os.Stdout, "\nFailed schemas:\n")
+				log.Info("Failed schemas:")
 				for _, errorMsg := range stats.Errors {
-					fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+					log.Infof("  - %s", errorMsg)
 				}
 				return fmt.Errorf("%d schema(s) failed to push", stats.Failed)
 			}
@@ -214,7 +214,7 @@ var schemaPushCmd = &cobra.Command{
 				p = nil
 				cancel = nil
 			} else {
-				fmt.Fprintf(os.Stdout, "Pushed schema: %s\n", slug)
+				log.Infof("Pushed schema: %s", slug)
 			}
 			hasError = false
 		}
@@ -224,22 +224,22 @@ var schemaPushCmd = &cobra.Command{
 			if commit {
 				action = "push and commit"
 			}
-			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d schema(s) to %s\n", action, len(dryRunSlugs), workspace)
+			log.Infof("DRY RUN: would %s %d schema(s) to %s", action, len(dryRunSlugs), workspace)
 			for _, s := range dryRunSlugs {
-				fmt.Fprintf(os.Stdout, "  - %s\n", s)
+				log.Infof("  - %s", s)
 			}
 			return nil
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Schema Push Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total schemas processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+		log.Info("=== Schema Push Summary ===")
+		log.Infof("Total schemas processed: %d", stats.Total)
+		log.Infof("Successfully pushed: %d", stats.Success)
+		log.Infof("Failed to push: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed schemas:\n")
+			log.Info("Failed schemas:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 		}
 		return nil

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -238,7 +237,7 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 			SetResult(&WorkflowsResponse{}).
 			Get(urlStr)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get workflows: %v\n", err)
+			log.Errorf("Failed to get workflows: %v", err)
 			return nil, err
 		}
 
@@ -319,7 +318,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	if commit {
 		validationResult := res.Result().(*WorkflowPushResponse)
 		if !validationResult.ValidationResult.IsValid {
-			fmt.Fprintf(os.Stdout, "Warning: Workflow %s is not valid: %v\n", slug, validationResult.ValidationResult.Errors)
+			log.Warnf("Workflow %s is not valid: %v", slug, validationResult.ValidationResult.Errors)
 		}
 	}
 	return nil
@@ -379,8 +378,7 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	urlStr = u.String()
-	fmt.Println(urlStr)
-	fmt.Println(urlStr)
+	log.Debugf("workflow status URL: %s", urlStr)
 	body := map[string]interface{}{
 		"is_enabled": enabled,
 	}

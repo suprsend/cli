@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/yarlson/pin"
@@ -27,7 +28,7 @@ var workflowPullCmd = &cobra.Command{
 			outputDir = filepath.Join(".", "suprsend", "workflows")
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+					log.Infof("Using default directory: %s", outputDir)
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
@@ -41,7 +42,7 @@ var workflowPullCmd = &cobra.Command{
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
+			log.Errorf("Error with output directory: %v", err)
 			return err
 		}
 		var p *pin.Pin
@@ -58,7 +59,7 @@ var workflowPullCmd = &cobra.Command{
 		if slug != "" {
 			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
 			if err != nil {
-				fmt.Fprintf(os.Stdout, "Error: Failed to get workflow detail: %v\n", err)
+				log.Errorf("Failed to get workflow detail: %v", err)
 				return err
 			}
 			if workflowResp != nil {
@@ -66,16 +67,16 @@ var workflowPullCmd = &cobra.Command{
 			}
 			workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
 			if err != nil {
-				fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow: %v\n", err)
+				log.Errorf("Failed to marshal workflow: %v", err)
 				return err
 			}
 			slugDir := filepath.Join(outputDir, slug)
 			if err := os.MkdirAll(slugDir, 0o755); err != nil {
-				fmt.Fprintf(os.Stdout, "Error: Failed to create workflow directory: %v\n", err)
+				log.Errorf("Failed to create workflow directory: %v", err)
 				return err
 			}
 			if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
-				fmt.Fprintf(os.Stdout, "Error: Failed to write workflow file: %v\n", err)
+				log.Errorf("Failed to write workflow file: %v", err)
 				return err
 			}
 			if p != nil {
@@ -86,7 +87,7 @@ var workflowPullCmd = &cobra.Command{
 
 		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get workflows: %v\n", err)
+			log.Errorf("Failed to get workflows: %v", err)
 			return err
 		}
 		if p != nil {
@@ -95,19 +96,19 @@ var workflowPullCmd = &cobra.Command{
 
 		stats, err := WriteWorkflowsToFiles(*workflows_resp, outputDir)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to save workflows: %v\n", err)
+			log.Errorf("Failed to save workflows: %v", err)
 			return err
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Workflow Pull Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total workflows processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully updated: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to pull: %d\n", stats.Failed)
+		log.Info("=== Workflow Pull Summary ===")
+		log.Infof("Total workflows processed: %d", stats.Total)
+		log.Infof("Successfully updated: %d", stats.Success)
+		log.Infof("Failed to pull: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed workflows:\n")
+			log.Info("Failed workflows:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 		}
 		return nil

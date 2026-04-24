@@ -92,7 +92,7 @@ var workflowPushCmd = &cobra.Command{
 					if commit {
 						action = "push and commit"
 					}
-					fmt.Fprintf(os.Stdout, "DRY RUN: would %s workflow '%s' to %s\n", action, slug, workspace)
+					log.Infof("DRY RUN: would %s workflow '%s' to %s", action, slug, workspace)
 					stats.Success++
 				} else {
 					if !utils.IsOutputPiped() {
@@ -111,7 +111,7 @@ var workflowPushCmd = &cobra.Command{
 						}
 						cancel()
 					} else if err == nil {
-						fmt.Fprintf(os.Stdout, "Pushed workflow: %s\n", slug)
+						log.Infof("Pushed workflow: %s", slug)
 					}
 					if err != nil {
 						log.WithError(err).Errorf("Failed to push workflow %s", slug)
@@ -123,15 +123,15 @@ var workflowPushCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Fprintf(os.Stdout, "\n=== Workflow Push Summary ===\n")
-			fmt.Fprintf(os.Stdout, "Total workflows processed: %d\n", stats.Total)
-			fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-			fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+			log.Info("=== Workflow Push Summary ===")
+			log.Infof("Total workflows processed: %d", stats.Total)
+			log.Infof("Successfully pushed: %d", stats.Success)
+			log.Infof("Failed to push: %d", stats.Failed)
 
 			if stats.Failed > 0 {
-				fmt.Fprintf(os.Stdout, "\nFailed workflows:\n")
+				log.Info("Failed workflows:")
 				for _, errorMsg := range stats.Errors {
-					fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+					log.Infof("  - %s", errorMsg)
 				}
 				return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
 			}
@@ -210,7 +210,7 @@ var workflowPushCmd = &cobra.Command{
 
 			// path wins: directory name is authoritative; warn on mismatch
 			if jsonSlug, _ := workflow["slug"].(string); jsonSlug != slug {
-				fmt.Fprintf(os.Stdout, "Warning: workflows/%s: workflow.json#slug is %q but directory is %q — using directory value\n", slug, jsonSlug, slug)
+				log.Warnf("workflows/%s: workflow.json#slug is %q but directory is %q — using directory value", slug, jsonSlug, slug)
 				workflow["slug"] = slug
 			}
 			delete(workflow, "$schema")
@@ -250,7 +250,7 @@ var workflowPushCmd = &cobra.Command{
 				p = nil
 				cancel = nil
 			} else {
-				fmt.Fprintf(os.Stdout, "Pushed workflow: %s\n", slug)
+				log.Infof("Pushed workflow: %s", slug)
 			}
 			hasError = false
 		}
@@ -260,22 +260,22 @@ var workflowPushCmd = &cobra.Command{
 			if commit {
 				action = "push and commit"
 			}
-			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d workflow(s) to %s\n", action, len(dryRunSlugs), workspace)
+			log.Infof("DRY RUN: would %s %d workflow(s) to %s", action, len(dryRunSlugs), workspace)
 			for _, s := range dryRunSlugs {
-				fmt.Fprintf(os.Stdout, "  - %s\n", s)
+				log.Infof("  - %s", s)
 			}
 			return nil
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Workflow Push Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total workflows processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+		log.Info("=== Workflow Push Summary ===")
+		log.Infof("Total workflows processed: %d", stats.Total)
+		log.Infof("Successfully pushed: %d", stats.Success)
+		log.Infof("Failed to push: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed workflows:\n")
+			log.Info("Failed workflows:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 			return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
 		}

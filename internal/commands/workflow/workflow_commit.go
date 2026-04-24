@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,7 +27,7 @@ var workflowCommitCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Fprintf(os.Stdout, "DRY RUN: would commit workflow '%s' to live\n", slug)
+			log.Infof("DRY RUN: would commit workflow '%s' to live", slug)
 			return nil
 		}
 
@@ -37,7 +36,7 @@ var workflowCommitCmd = &cobra.Command{
 			msg := fmt.Sprintf("This will promote workflow '%s' to live in workspace \"%s\". Continue?", slug, workspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
-				fmt.Fprintln(os.Stdout, "Aborted.")
+				log.Info("Aborted.")
 				return nil
 			}
 		}
@@ -62,7 +61,7 @@ var workflowCommitCmd = &cobra.Command{
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully committed workflow '%s' to live mode", slug))
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully committed workflow '%s' to live mode\n", slug)
+			log.Infof("Successfully committed workflow '%s' to live mode", slug)
 		}
 		return nil
 	},

@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -27,7 +26,7 @@ var schemaCommitCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
-			fmt.Fprintf(os.Stdout, "DRY RUN: would commit schema '%s' to live\n", slug)
+			log.Infof("DRY RUN: would commit schema '%s' to live", slug)
 			return nil
 		}
 
@@ -36,7 +35,7 @@ var schemaCommitCmd = &cobra.Command{
 			msg := fmt.Sprintf("This will promote schema '%s' to live in workspace \"%s\". Continue?", slug, workspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
-				fmt.Fprintln(os.Stdout, "Aborted.")
+				log.Info("Aborted.")
 				return nil
 			}
 		}
@@ -61,7 +60,7 @@ var schemaCommitCmd = &cobra.Command{
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully committed schema '%s' to live mode", slug))
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully committed schema '%s' to live mode\n", slug)
+			log.Infof("Successfully committed schema '%s' to live mode", slug)
 		}
 		return nil
 	},

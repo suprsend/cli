@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -26,21 +25,6 @@ var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 var leadingNonAlphanumRe = regexp.MustCompile(`^[^a-zA-Z0-9]+`)
 var trailingNonAlphanumRe = regexp.MustCompile(`[^a-zA-Z0-9]+$`)
 
-func isDebugMode() bool {
-	return viper.GetBool("debug")
-}
-
-func debugLog(format string, args ...any) {
-	if isDebugMode() {
-		log.Infof(format, args...)
-	}
-}
-
-func debugErrorLog(format string, args ...any) {
-	if isDebugMode() {
-		log.Errorf(format, args...)
-	}
-}
 
 func promptForOutputDirectory() (string, bool) {
 	if utils.IsOutputPiped() {
@@ -124,7 +108,7 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 		if err != nil {
 			stats.Failed++
 			stats.Errors = append(stats.Errors, err.Error())
-			fmt.Fprintf(os.Stderr, "events: skip %q: %v\n", name, err)
+			log.Warnf("events: skip %q: %v", name, err)
 			continue
 		}
 
@@ -147,7 +131,7 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 		if err != nil {
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("failed to marshal event %q: %v", name, err))
-			debugErrorLog("Failed to marshal event %q: %v", name, err)
+			log.Errorf("Failed to marshal event %q: %v", name, err)
 			continue
 		}
 
@@ -155,12 +139,11 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 		if err := os.WriteFile(filename, append(fileData, '\n'), 0o644); err != nil {
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("failed to write %s: %v", filename, err))
-			debugErrorLog("Failed to write %s: %v", filename, err)
+			log.Errorf("Failed to write %s: %v", filename, err)
 			continue
 		}
 
-		debugLog("Wrote: %s", filename)
-		fmt.Fprintf(os.Stdout, "Wrote event to %s\n", filename)
+		log.Infof("Wrote event to %s", filename)
 		stats.Success++
 	}
 

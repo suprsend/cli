@@ -88,7 +88,7 @@ var translationPushCmd = &cobra.Command{
 					p = nil
 					cancel = nil
 				} else {
-					fmt.Fprintf(os.Stdout, "Pushed translation: %s.json\n", filename)
+					log.Infof("Pushed translation: %s.json", filename)
 				}
 				hasError = false
 			}
@@ -103,7 +103,7 @@ var translationPushCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Printf("Pushing translations to %s\n", workspace)
+			log.Infof("Pushing translations to %s", workspace)
 
 			for _, file := range files {
 				if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
@@ -185,7 +185,7 @@ var translationPushCmd = &cobra.Command{
 					p = nil
 					cancel = nil
 				} else {
-					fmt.Fprintf(os.Stdout, "Pushed translation: %s\n", file.Name())
+					log.Infof("Pushed translation: %s", file.Name())
 				}
 				hasError = false
 			}
@@ -196,22 +196,22 @@ var translationPushCmd = &cobra.Command{
 			if commit {
 				action = "push and commit"
 			}
-			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d translation(s) to %s\n", action, len(dryRunNames), workspace)
+			log.Infof("DRY RUN: would %s %d translation(s) to %s", action, len(dryRunNames), workspace)
 			for _, n := range dryRunNames {
-				fmt.Fprintf(os.Stdout, "  - %s\n", n)
+				log.Infof("  - %s", n)
 			}
 			return nil
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Translation Push Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total translations processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+		log.Info("=== Translation Push Summary ===")
+		log.Infof("Total translations processed: %d", stats.Total)
+		log.Infof("Successfully pushed: %d", stats.Success)
+		log.Infof("Failed to push: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed translations:\n")
+			log.Info("Failed translations:")
 			for _, errMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
+				log.Infof("  - %s", errMsg)
 			}
 		}
 
@@ -220,7 +220,7 @@ var translationPushCmd = &cobra.Command{
 				log.Errorf("Failed to commit translation: %v", err)
 				return err
 			}
-			fmt.Fprintf(os.Stdout, "Committed translation: %s\n", commitMessage)
+			log.Infof("Committed translation: %s", commitMessage)
 		}
 
 		if stats.Failed > 0 {

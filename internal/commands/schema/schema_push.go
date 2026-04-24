@@ -14,12 +14,13 @@ import (
 )
 
 var schemaPushCmd = &cobra.Command{
-	Use:   "push",
+	Use:   "push [<slug>]",
 	Short: "Push schemas",
-	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Use --slug to push a single schema.",
+	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema.",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
-		slug, _ := cmd.Flags().GetString("slug")
+		slug := utils.ResolveSlug(cmd, args)
 		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		path, _ := cmd.Flags().GetString("dir")

@@ -15,15 +15,16 @@ import (
 )
 
 var templateCommitCmd = &cobra.Command{
-	Use:   "commit <slug>",
+	Use:   "commit [<slug>]",
 	Short: "Commit a template from draft to live",
-	Long:  `Commit a template from draft to live in a workspace. Example: suprsend template commit <slug>`,
+	Long:  `Commit a template from draft to live in a workspace. Pass the template slug as a positional argument or via --slug. Example: suprsend template commit <slug>`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("Template slug argument is required. Example: suprsend template commit <slug>")
-			return fmt.Errorf("template slug argument is required. Example: suprsend template commit <slug>")
+		slug := utils.ResolveSlug(cmd, args)
+		if slug == "" {
+			log.Error("template slug is required: provide it as a positional argument or via --slug")
+			return fmt.Errorf("template slug is required: provide it as a positional argument or via --slug")
 		}
-		slug := args[0]
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
@@ -96,6 +97,7 @@ var templateCommitCmd = &cobra.Command{
 }
 
 func init() {
+	templateCommitCmd.Flags().StringP("slug", "g", "", "Template slug")
 	templateCommitCmd.Flags().String("commit-message", "", "Commit message describing the changes")
 	templateCommitCmd.Flags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
 	TemplateCmd.AddCommand(templateCommitCmd)

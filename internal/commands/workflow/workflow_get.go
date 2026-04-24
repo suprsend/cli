@@ -19,16 +19,7 @@ var workflowGetCmd = &cobra.Command{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		slugFlag, _ := cmd.Flags().GetString("slug")
-		if len(args) > 0 && slugFlag != "" {
-			return fmt.Errorf("slug provided both as positional argument and --slug flag; use only one")
-		}
-		var slug string
-		if len(args) > 0 {
-			slug = args[0]
-		} else {
-			slug = slugFlag
-		}
+		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
 			return fmt.Errorf("slug is required: provide it as a positional argument or via --slug")
 		}

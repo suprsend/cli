@@ -12,15 +12,16 @@ import (
 )
 
 var schemaCommitCmd = &cobra.Command{
-	Use:   "commit",
+	Use:   "commit [<slug>]",
 	Short: "Commit schema from draft to live",
-	Long:  `Promote a schema from draft to live mode. Requires a schema slug as a positional argument. Once committed, the schema changes become active immediately.`,
+	Long:  `Promote a schema from draft to live mode. Pass the schema slug as a positional argument or via --slug. Once committed, the schema changes become active immediately.`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("Schema slug argument is required. Example: suprsend schema commit <slug>")
-			return fmt.Errorf("Schema slug argument is required. Example: suprsend schema commit <slug>")
+		slug := utils.ResolveSlug(cmd, args)
+		if slug == "" {
+			log.Error("schema slug is required: provide it as a positional argument or via --slug")
+			return fmt.Errorf("schema slug is required: provide it as a positional argument or via --slug")
 		}
-		slug := args[0]
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
@@ -51,6 +52,7 @@ var schemaCommitCmd = &cobra.Command{
 }
 
 func init() {
+	schemaCommitCmd.Flags().StringP("slug", "g", "", "Schema slug")
 	schemaCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	SchemaCmd.AddCommand(schemaCommitCmd)
 }

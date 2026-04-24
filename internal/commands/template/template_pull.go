@@ -94,13 +94,14 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) 
 }
 
 var templatePullCmd = &cobra.Command{
-	Use:   "pull",
+	Use:   "pull [<slug>]",
 	Short: "Pull templates and their variants from SuprSend workspace",
-	Long:  `Pull templates and their variants from SuprSend workspace`,
+	Long:  `Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all.`,
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
-		slug, _ := cmd.Flags().GetString("slug")
+		slug := utils.ResolveSlug(cmd, args)
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 

@@ -12,13 +12,14 @@ import (
 )
 
 var schemaPullCmd = &cobra.Command{
-	Use:   "pull",
+	Use:   "pull [<slug>]",
 	Short: "Pull schemas",
-	Long:  `Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Use --slug to pull a single schema, or omit to pull all.`,
+	Long:  `Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir, _ := cmd.Flags().GetString("dir")
 		mode, _ := cmd.Flags().GetString("mode")
-		slug, _ := cmd.Flags().GetString("slug")
+		slug := utils.ResolveSlug(cmd, args)
 		force, _ := cmd.Flags().GetBool("force")
 
 		if outputDir == "" {

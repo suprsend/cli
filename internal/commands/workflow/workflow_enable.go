@@ -9,16 +9,17 @@ import (
 )
 
 var worklowEnableCmd = &cobra.Command{
-	Use:   "enable",
+	Use:   "enable [<slug>]",
 	Short: "Enables a workflow.",
-	Long:  "Enable a workflow to make it active and ready to receive triggers. Requires a workflow slug as a positional argument.",
+	Long:  "Enable a workflow to make it active and ready to receive triggers. Pass the workflow slug as a positional argument or via --slug.",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("workflow_slug is required.")
-			return fmt.Errorf("workflow_slug is required.")
-		}
 		workspace, _ := cmd.Flags().GetString("workspace")
-		slug := args[0]
+		slug := utils.ResolveSlug(cmd, args)
+		if slug == "" {
+			log.Error("workflow slug is required: provide it as a positional argument or via --slug")
+			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
+		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, true)
@@ -33,5 +34,6 @@ var worklowEnableCmd = &cobra.Command{
 }
 
 func init() {
+	worklowEnableCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	WorkflowCmd.AddCommand(worklowEnableCmd)
 }

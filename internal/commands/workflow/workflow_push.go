@@ -14,15 +14,16 @@ import (
 )
 
 var workflowPushCmd = &cobra.Command{
-	Use:   "push",
+	Use:   "push [<slug>]",
 	Short: "Push workflows from local to SuprSend workspace",
-	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Use --slug to push a single workflow, or omit to push all.`,
+	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single workflow, or omit to push all.`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
 		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
-		slug, _ := cmd.Flags().GetString("slug")
+		slug := utils.ResolveSlug(cmd, args)
 		jsonPayload, _ := cmd.Flags().GetString("json")
 
 		if jsonPayload != "" && slug == "" {

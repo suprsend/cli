@@ -14,15 +14,16 @@ import (
 )
 
 var workflowTrigger = &cobra.Command{
-	Use:   "trigger",
+	Use:   "trigger [<slug>]",
 	Short: "Trigger a specific workflow",
-	Long:  "Trigger a specific workflow by passing a slug",
+	Long:  "Trigger a specific workflow by passing a slug as a positional argument or via --slug.",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("Workflow slug argument is required. Example: suprsend workflow trigger <slug>")
-			return fmt.Errorf("Workflow slug argument is required. Example: suprsend workflow trigger <slug>")
+		slug := utils.ResolveSlug(cmd, args)
+		if slug == "" {
+			log.Error("workflow slug is required: provide it as a positional argument or via --slug")
+			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
 		}
-		slug := args[0]
 		workspace, _ := cmd.Flags().GetString("workspace")
 		tenantId, _ := cmd.Flags().GetString("tenant")
 		wsClient, err := utils.GetSuprSendWorkspaceClient(workspace)
@@ -71,6 +72,7 @@ var workflowTrigger = &cobra.Command{
 }
 
 func init() {
+	workflowTrigger.Flags().StringP("slug", "g", "", "Workflow slug")
 	workflowTrigger.PersistentFlags().String("path", "", "json body to trigger the wf")
 	workflowTrigger.MarkFlagRequired("path")
 	workflowTrigger.PersistentFlags().String("tenant", "", "tenant id to pass in body")

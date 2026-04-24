@@ -9,17 +9,18 @@ import (
 )
 
 var workflowDisableCmd = &cobra.Command{
-	Use:   "disable",
+	Use:   "disable [<slug>]",
 	Short: "Disable a workflow",
-	Long:  "Disable a workflow to stop it from processing triggers. Requires a workflow slug as a positional argument.",
+	Long:  "Disable a workflow to stop it from processing triggers. Pass the workflow slug as a positional argument or via --slug.",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("workflow_slug is required.")
-			return fmt.Errorf("workflow_slug is required.")
-		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 
-		slug := args[0]
+		slug := utils.ResolveSlug(cmd, args)
+		if slug == "" {
+			log.Error("workflow slug is required: provide it as a positional argument or via --slug")
+			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
+		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -35,5 +36,6 @@ var workflowDisableCmd = &cobra.Command{
 }
 
 func init() {
+	workflowDisableCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	WorkflowCmd.AddCommand(workflowDisableCmd)
 }

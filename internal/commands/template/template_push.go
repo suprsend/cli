@@ -190,15 +190,16 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 }
 
 var templatePushCmd = &cobra.Command{
-	Use:   "push",
+	Use:   "push [<slug>]",
 	Short: "Push templates and their variants from local to SuprSend workspace",
-	Long:  `Push templates and their variants from local to SuprSend workspace`,
+	Long:  `Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.`,
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
 		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
-		slug, _ := cmd.Flags().GetString("slug")
+		slug := utils.ResolveSlug(cmd, args)
 		force, _ := cmd.Flags().GetBool("force")
 
 		if path == "" {

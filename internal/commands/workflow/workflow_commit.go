@@ -12,15 +12,16 @@ import (
 )
 
 var workflowCommitCmd = &cobra.Command{
-	Use:   "commit",
+	Use:   "commit [<slug>]",
 	Short: "Commit workflow from draft to live",
-	Long:  `Promote a workflow from draft to live mode. Requires a workflow slug as a positional argument. Once committed, the workflow changes become active immediately.`,
+	Long:  `Promote a workflow from draft to live mode. Pass the workflow slug as a positional argument or via --slug. Once committed, the workflow changes become active immediately.`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			log.Error("Workflow slug argument is required. Example: suprsend workflow commit <slug>")
-			return fmt.Errorf("workflow slug argument is required. Example: suprsend workflow commit <slug>")
+		slug := utils.ResolveSlug(cmd, args)
+		if slug == "" {
+			log.Error("workflow slug is required: provide it as a positional argument or via --slug")
+			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
 		}
-		slug := args[0]
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
@@ -52,6 +53,7 @@ var workflowCommitCmd = &cobra.Command{
 }
 
 func init() {
+	workflowCommitCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	workflowCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	WorkflowCmd.AddCommand(workflowCommitCmd)
 }

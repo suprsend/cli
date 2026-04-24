@@ -15,9 +15,16 @@ var translationCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit translation",
 	Long:  "Promote template translation changes from draft to live mode. Finalizes all pending translation changes in the workspace.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Fprintf(os.Stdout, "DRY RUN: would commit translations in %s\n", workspace)
+			return nil
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -31,17 +38,19 @@ var translationCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
 		if err != nil {
 			log.Errorf("%s", err)
-			return
+			return err
 		}
 		if p != nil {
 			p.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
 		} else {
 			fmt.Fprintf(os.Stdout, "Successfully committed translation '%s'\n", commitMessage)
 		}
+		return nil
 	},
 }
 
 func init() {
 	translationCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
+	translationCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
 	TranslationCmd.AddCommand(translationCommitCmd)
 }

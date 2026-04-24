@@ -25,6 +25,8 @@ var schemaPushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		path, _ := cmd.Flags().GetString("dir")
 		jsonPayload, _ := cmd.Flags().GetString("json")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
 			return fmt.Errorf("--json requires --slug to be specified")
@@ -72,30 +74,39 @@ var schemaPushCmd = &cobra.Command{
 			}
 
 			if schema != nil {
-				if !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing %s...", slug),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
-				}
-				err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
-				if p != nil && cancel != nil {
-					if err == nil {
-						p.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-					} else {
-						p.Stop("")
+				if dryRun {
+					action := "push"
+					if commit {
+						action = "push and commit"
 					}
-					cancel()
-				} else if err == nil {
-					fmt.Fprintf(os.Stdout, "Pushed schema: %s\n", slug)
-				}
-				if err != nil {
-					log.WithError(err).Errorf("Failed to push schema %s", slug)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push schema %s: %v", slug, err))
-				} else {
+					fmt.Fprintf(os.Stdout, "DRY RUN: would %s schema '%s' to %s\n", action, slug, workspace)
 					stats.Success++
+				} else {
+					if !utils.IsOutputPiped() {
+						p = pin.New(fmt.Sprintf("Pushing %s...", slug),
+							pin.WithSpinnerColor(pin.ColorCyan),
+							pin.WithTextColor(pin.ColorYellow),
+						)
+						cancel = p.Start(context.Background())
+					}
+					err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+					if p != nil && cancel != nil {
+						if err == nil {
+							p.Stop(fmt.Sprintf("Pushed schema: %s", slug))
+						} else {
+							p.Stop("")
+						}
+						cancel()
+					} else if err == nil {
+						fmt.Fprintf(os.Stdout, "Pushed schema: %s\n", slug)
+					}
+					if err != nil {
+						log.WithError(err).Errorf("Failed to push schema %s", slug)
+						stats.Failed++
+						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push schema %s: %v", slug, err))
+					} else {
+						stats.Success++
+					}
 				}
 			}
 
@@ -168,6 +179,19 @@ var schemaPushCmd = &cobra.Command{
 				continue
 			}
 
+			if dryRun {
+				dryRunSlugs = append(dryRunSlugs, slug)
+				stats.Success++
+				if p != nil && cancel != nil {
+					p.Stop(fmt.Sprintf("(dry run) %s", slug))
+					cancel()
+					p = nil
+					cancel = nil
+				}
+				hasError = false
+				continue
+			}
+
 			err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
 			if err != nil {
 				if p != nil && cancel != nil {
@@ -195,6 +219,18 @@ var schemaPushCmd = &cobra.Command{
 			hasError = false
 		}
 
+		if dryRun {
+			action := "push"
+			if commit {
+				action = "push and commit"
+			}
+			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d schema(s) to %s\n", action, len(dryRunSlugs), workspace)
+			for _, s := range dryRunSlugs {
+				fmt.Fprintf(os.Stdout, "  - %s\n", s)
+			}
+			return nil
+		}
+
 		fmt.Fprintf(os.Stdout, "\n=== Schema Push Summary ===\n")
 		fmt.Fprintf(os.Stdout, "Total schemas processed: %d\n", stats.Total)
 		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
@@ -216,5 +252,6 @@ func init() {
 	schemaPushCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")
 	schemaPushCmd.PersistentFlags().StringP("json", "j", "", `Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'`)
+	schemaPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	SchemaCmd.AddCommand(schemaPushCmd)
 }

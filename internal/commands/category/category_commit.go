@@ -3,6 +3,7 @@ package category
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
@@ -28,6 +29,12 @@ var categoryCommitCmd = &cobra.Command{
 		}
 
 		translationDir := filepath.Join(categoryDir, "translations")
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Fprintf(os.Stdout, "DRY RUN: would commit categories to %s\n", workspace)
+			return nil
+		}
 
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -57,5 +64,6 @@ var categoryCommitCmd = &cobra.Command{
 func init() {
 	categoryCommitCmd.Flags().StringP("dir", "d", "", "Directory containing category and translation files (default: ./"+defaultCategoryDir+")")
 	categoryCommitCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
+	categoryCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
 	CategoryCmd.AddCommand(categoryCommitCmd)
 }

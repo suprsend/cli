@@ -26,6 +26,12 @@ var workflowCommitCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Fprintf(os.Stdout, "DRY RUN: would commit workflow '%s' to live\n", slug)
+			return nil
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -55,5 +61,6 @@ var workflowCommitCmd = &cobra.Command{
 func init() {
 	workflowCommitCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	workflowCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
+	workflowCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
 	WorkflowCmd.AddCommand(workflowCommitCmd)
 }

@@ -25,6 +25,12 @@ var schemaCommitCmd = &cobra.Command{
 
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Fprintf(os.Stdout, "DRY RUN: would commit schema '%s' to live\n", slug)
+			return nil
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -54,5 +60,6 @@ var schemaCommitCmd = &cobra.Command{
 func init() {
 	schemaCommitCmd.Flags().StringP("slug", "g", "", "Schema slug")
 	schemaCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
+	schemaCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
 	SchemaCmd.AddCommand(schemaCommitCmd)
 }

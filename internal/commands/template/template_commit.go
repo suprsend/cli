@@ -30,6 +30,12 @@ var templateCommitCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		force, _ := cmd.Flags().GetBool("force")
 
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Fprintf(os.Stdout, "DRY RUN: would commit template '%s' to live\n", slug)
+			return nil
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		var variants []map[string]any
@@ -100,5 +106,6 @@ func init() {
 	templateCommitCmd.Flags().StringP("slug", "g", "", "Template slug")
 	templateCommitCmd.Flags().String("commit-message", "", "Commit message describing the changes")
 	templateCommitCmd.Flags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
+	templateCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
 	TemplateCmd.AddCommand(templateCommitCmd)
 }

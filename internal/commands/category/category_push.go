@@ -43,6 +43,7 @@ Examples:
 		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		if jsonPayload != "" {
 			var input jsonCategoryInput
@@ -63,6 +64,15 @@ Examples:
 				)
 				cancel := p.Start(context.Background())
 				defer cancel()
+			}
+
+			if dryRun {
+				if p != nil {
+					p.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
+				} else {
+					fmt.Fprintf(os.Stdout, "DRY RUN: would push categories to %s\n", workspace)
+				}
+				return nil
 			}
 
 			if commit {
@@ -119,6 +129,15 @@ Examples:
 			defer cancel()
 		}
 
+		if dryRun {
+			if p != nil {
+				p.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
+			} else {
+				fmt.Fprintf(os.Stdout, "DRY RUN: would push categories to %s\n", workspace)
+			}
+			return nil
+		}
+
 		if commit {
 			translation.PushTranslations(workspace, "", translationDir)
 		}
@@ -141,5 +160,6 @@ func init() {
 	categoryPushCmd.PersistentFlags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
 	categoryPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
+	categoryPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

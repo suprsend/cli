@@ -32,7 +32,7 @@ func readTemplateJSON(templateDir string) (map[string]any, error) {
 }
 
 
-func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, stats *TemplatePushStats) {
+func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, dryRun bool, stats *TemplatePushStats) {
 	templateData, err := readTemplateJSON(templateDir)
 	if err != nil {
 		log.WithError(err).Errorf("Failed to read template.json for template %s", slug)
@@ -46,6 +46,11 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		log.WithError(err).Errorf("Failed to read template %s", slug)
 		stats.Failed++
 		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template %s: %v", slug, err))
+		return
+	}
+
+	if dryRun {
+		stats.Success++
 		return
 	}
 
@@ -201,6 +206,8 @@ var templatePushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		slug := utils.ResolveSlug(cmd, args)
 		force, _ := cmd.Flags().GetBool("force")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		var dryRunSlugs []string
 
 		if path == "" {
 			path = filepath.Join(".", "suprsend", "templates")
@@ -239,16 +246,23 @@ var templatePushCmd = &cobra.Command{
 					cancel = p.Start(context.Background())
 				}
 
-				PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, stats)
+				PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun, stats)
 
+				if dryRun && stats.Success > 0 {
+					dryRunSlugs = append(dryRunSlugs, slug)
+				}
 				if p != nil && cancel != nil {
 					if stats.Success > 0 {
-						p.Stop(fmt.Sprintf("Pushed template: %s", slug))
+						if dryRun {
+							p.Stop(fmt.Sprintf("(dry run) %s", slug))
+						} else {
+							p.Stop(fmt.Sprintf("Pushed template: %s", slug))
+						}
 					} else {
 						p.Stop("")
 					}
 					cancel()
-				} else if stats.Success > 0 {
+				} else if stats.Success > 0 && !dryRun {
 					fmt.Fprintf(os.Stdout, "Pushed template: %s\n", slug)
 				}
 			}
@@ -283,7 +297,7 @@ var templatePushCmd = &cobra.Command{
 				}
 
 				prevFailed := stats.Failed
-				PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, stats)
+				PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun, stats)
 
 				if stats.Failed > prevFailed {
 					if p != nil && cancel != nil {
@@ -296,16 +310,35 @@ var templatePushCmd = &cobra.Command{
 					continue
 				}
 
+				if dryRun {
+					dryRunSlugs = append(dryRunSlugs, templateSlug)
+				}
 				if p != nil && cancel != nil {
-					p.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
+					if dryRun {
+						p.Stop(fmt.Sprintf("(dry run) %s", templateSlug))
+					} else {
+						p.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
+					}
 					cancel()
 					p = nil
 					cancel = nil
-				} else {
+				} else if !dryRun {
 					fmt.Fprintf(os.Stdout, "Pushed template: %s\n", templateSlug)
 				}
 				hasError = false
 			}
+		}
+
+		if dryRun {
+			action := "push"
+			if commit {
+				action = "push and commit"
+			}
+			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d template(s) to %s\n", action, len(dryRunSlugs), workspace)
+			for _, s := range dryRunSlugs {
+				fmt.Fprintf(os.Stdout, "  - %s\n", s)
+			}
+			return
 		}
 
 		fmt.Fprintf(os.Stdout, "\n=== Template Push Summary ===\n")
@@ -370,5 +403,6 @@ func init() {
 	templatePushCmd.PersistentFlags().String("commit-message", "", "Commit message describing the changes")
 	templatePushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to push")
 	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
+	templatePushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

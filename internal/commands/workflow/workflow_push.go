@@ -25,6 +25,8 @@ var workflowPushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		slug := utils.ResolveSlug(cmd, args)
 		jsonPayload, _ := cmd.Flags().GetString("json")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
 			return fmt.Errorf("--json requires --slug to be specified")
@@ -85,30 +87,39 @@ var workflowPushCmd = &cobra.Command{
 			}
 
 			if workflow != nil {
-				if !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing %s...", slug),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
-				}
-				err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
-				if p != nil && cancel != nil {
-					if err == nil {
-						p.Stop(fmt.Sprintf("Pushed workflow: %s", slug))
-					} else {
-						p.Stop("")
+				if dryRun {
+					action := "push"
+					if commit {
+						action = "push and commit"
 					}
-					cancel()
-				} else if err == nil {
-					fmt.Fprintf(os.Stdout, "Pushed workflow: %s\n", slug)
-				}
-				if err != nil {
-					log.WithError(err).Errorf("Failed to push workflow %s", slug)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push workflow %s: %v", slug, err))
-				} else {
+					fmt.Fprintf(os.Stdout, "DRY RUN: would %s workflow '%s' to %s\n", action, slug, workspace)
 					stats.Success++
+				} else {
+					if !utils.IsOutputPiped() {
+						p = pin.New(fmt.Sprintf("Pushing %s...", slug),
+							pin.WithSpinnerColor(pin.ColorCyan),
+							pin.WithTextColor(pin.ColorYellow),
+						)
+						cancel = p.Start(context.Background())
+					}
+					err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+					if p != nil && cancel != nil {
+						if err == nil {
+							p.Stop(fmt.Sprintf("Pushed workflow: %s", slug))
+						} else {
+							p.Stop("")
+						}
+						cancel()
+					} else if err == nil {
+						fmt.Fprintf(os.Stdout, "Pushed workflow: %s\n", slug)
+					}
+					if err != nil {
+						log.WithError(err).Errorf("Failed to push workflow %s", slug)
+						stats.Failed++
+						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push workflow %s: %v", slug, err))
+					} else {
+						stats.Success++
+					}
 				}
 			}
 
@@ -204,6 +215,19 @@ var workflowPushCmd = &cobra.Command{
 			}
 			delete(workflow, "$schema")
 
+			if dryRun {
+				dryRunSlugs = append(dryRunSlugs, slug)
+				stats.Success++
+				if p != nil && cancel != nil {
+					p.Stop(fmt.Sprintf("(dry run) %s", slug))
+					cancel()
+					p = nil
+					cancel = nil
+				}
+				hasError = false
+				continue
+			}
+
 			err = mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
 			if err != nil {
 				if p != nil && cancel != nil {
@@ -231,6 +255,18 @@ var workflowPushCmd = &cobra.Command{
 			hasError = false
 		}
 
+		if dryRun {
+			action := "push"
+			if commit {
+				action = "push and commit"
+			}
+			fmt.Fprintf(os.Stdout, "\nDRY RUN: would %s %d workflow(s) to %s\n", action, len(dryRunSlugs), workspace)
+			for _, s := range dryRunSlugs {
+				fmt.Fprintf(os.Stdout, "  - %s\n", s)
+			}
+			return nil
+		}
+
 		fmt.Fprintf(os.Stdout, "\n=== Workflow Push Summary ===\n")
 		fmt.Fprintf(os.Stdout, "Total workflows processed: %d\n", stats.Total)
 		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
@@ -253,5 +289,6 @@ func init() {
 	workflowPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to push (omit to push all)")
 	workflowPushCmd.PersistentFlags().StringP("json", "j", "", `Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'`)
+	workflowPushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	WorkflowCmd.AddCommand(workflowPushCmd)
 }

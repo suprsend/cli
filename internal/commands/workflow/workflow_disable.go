@@ -22,6 +22,12 @@ var workflowDisableCmd = &cobra.Command{
 			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
 		}
 
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Printf("DRY RUN: would disable workflow '%s' in %s\n", slug, workspace)
+			return nil
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, false)
@@ -37,5 +43,6 @@ var workflowDisableCmd = &cobra.Command{
 
 func init() {
 	workflowDisableCmd.Flags().StringP("slug", "g", "", "Workflow slug")
+	workflowDisableCmd.Flags().BoolP("dry-run", "n", false, "Print what would be changed without making any changes")
 	WorkflowCmd.AddCommand(workflowDisableCmd)
 }

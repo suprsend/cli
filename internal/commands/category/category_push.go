@@ -1,7 +1,6 @@
 package category
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 )
 
 type jsonCategoryInput struct {
@@ -55,23 +53,10 @@ Examples:
 			}
 
 			mgmntClient := utils.GetSuprSendMgmntClient()
-
-			var p *pin.Pin
-			if !utils.IsOutputPiped() {
-				p = pin.New("Pushing categories...",
-					pin.WithSpinnerColor(pin.ColorCyan),
-					pin.WithTextColor(pin.ColorYellow),
-				)
-				cancel := p.Start(context.Background())
-				defer cancel()
-			}
+			spinner := utils.NewSpinner("Pushing categories...")
 
 			if dryRun {
-				if p != nil {
-					p.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
-				} else {
-					log.Infof("DRY RUN: would push categories to %s", workspace)
-				}
+				spinner.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
 				return nil
 			}
 
@@ -90,9 +75,7 @@ Examples:
 				log.WithError(err).Error("Couldn't push categories")
 				return err
 			}
-			if p != nil {
-				p.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
-			}
+			spinner.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
 			return nil
 		}
 
@@ -119,22 +102,10 @@ Examples:
 			return err
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Pushing categories...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner2 := utils.NewSpinner("Pushing categories...")
 
 		if dryRun {
-			if p != nil {
-				p.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
-			} else {
-				log.Infof("DRY RUN: would push categories to %s", workspace)
-			}
+			spinner2.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
 			return nil
 		}
 
@@ -148,9 +119,7 @@ Examples:
 			log.WithError(err).Error("Couldn't push categories")
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
-		}
+		spinner2.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
 		return nil
 	},
 }

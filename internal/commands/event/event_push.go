@@ -1,7 +1,6 @@
 package event
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var eventPushCmd = &cobra.Command{
@@ -22,15 +20,7 @@ var eventPushCmd = &cobra.Command{
 		dir, _ := cmd.Flags().GetString("dir")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Pushing events...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Pushing events...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -56,17 +46,11 @@ var eventPushCmd = &cobra.Command{
 		}
 
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-			}
+			spinner.Stop("")
 			log.WithError(err).Error("Failed to push events")
 			return err
 		}
-		if p != nil {
-			p.Stop("Successfully pushed events")
-		} else {
-			log.Info("Successfully pushed events")
-		}
+		spinner.Stop("Successfully pushed events")
 		return nil
 	},
 }

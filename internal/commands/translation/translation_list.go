@@ -1,13 +1,11 @@
 package translation
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationListCmd = &cobra.Command{
@@ -18,15 +16,7 @@ var translationListCmd = &cobra.Command{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 		mode, _ := cmd.Flags().GetString("mode")
 		workspace, _ := cmd.Flags().GetString("workspace")
 		includeContent, _ := cmd.Flags().GetString("include-content")
@@ -38,10 +28,7 @@ var translationListCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't fetch translations")
 			return
 		}
-		msg := fmt.Sprintf("Listed %d translation files from %s in %s mode", len(translations.Results), workspace, mode)
-		if p != nil {
-			p.Stop(msg)
-		}
+		spinner.Stop(fmt.Sprintf("Listed %d translation files from %s in %s mode", len(translations.Results), workspace, mode))
 		outputType, _ := cmd.Flags().GetString("output")
 		if len(translations.Results) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)

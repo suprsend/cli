@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -76,15 +74,7 @@ var generateTypesJavaCmd = &cobra.Command{
 			return
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Generating Java types...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Generating Java types...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
@@ -117,9 +107,7 @@ var generateTypesJavaCmd = &cobra.Command{
 		}
 
 		if len(schemasToBeGenerated) == 0 {
-			if p != nil {
-				p.Stop("No valid schemas found")
-			}
+			spinner.Stop("No valid schemas found")
 			log.Warn("No valid schemas found with meaningful JSON schema content")
 			return
 		}
@@ -169,9 +157,7 @@ var generateTypesJavaCmd = &cobra.Command{
 				generatedCount++
 			}
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Generated %d Java type files in %s", generatedCount, outputDir))
-		}
+		spinner.Stop(fmt.Sprintf("Generated %d Java type files in %s", generatedCount, outputDir))
 	},
 }
 
@@ -257,15 +243,7 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 			return
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New(fmt.Sprintf("Generating %s types...", cases.Title(language.English).String(targetLang)),
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner(fmt.Sprintf("Generating %s types...", cases.Title(language.English).String(targetLang)))
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
@@ -298,9 +276,7 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 		}
 
 		if len(schemasToBeGenerated) == 0 {
-			if p != nil {
-				p.Stop("No valid schemas found")
-			}
+			spinner.Stop("No valid schemas found")
 			log.Warn("No valid schemas found with meaningful JSON schema content")
 			return
 		}
@@ -338,9 +314,7 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 				generatedCount++
 			}
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Generated %d %s types in %s", generatedCount, targetLang, fileName))
-		}
+		spinner.Stop(fmt.Sprintf("Generated %d %s types in %s", generatedCount, targetLang, fileName))
 	}
 }
 

@@ -1,7 +1,6 @@
 package category
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var categoryCommitCmd = &cobra.Command{
@@ -45,15 +43,7 @@ var categoryCommitCmd = &cobra.Command{
 			}
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		translation.PushTranslations(workspace, "", translationDir)
 
@@ -63,9 +53,7 @@ var categoryCommitCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't commit categories")
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Committed categories to %s", workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Committed categories to %s", workspace))
 		return nil
 	},
 }

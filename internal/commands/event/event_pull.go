@@ -1,7 +1,6 @@
 package event
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var eventPullCmd = &cobra.Command{
@@ -38,15 +36,7 @@ var eventPullCmd = &cobra.Command{
 				return nil
 			}
 		}
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		eventsResp, err := mgmntClient.GetEvents(workspace)
@@ -54,9 +44,7 @@ var eventPullCmd = &cobra.Command{
 			log.Errorf("Failed to get events: %v", err)
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pulled %d events", len(eventsResp.Results)))
-		}
+		spinner.Stop(fmt.Sprintf("Pulled %d events", len(eventsResp.Results)))
 
 		_, err = WriteEventsToFiles(eventsResp, dirPath)
 		if err != nil {

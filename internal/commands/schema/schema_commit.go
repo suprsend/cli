@@ -1,13 +1,11 @@
 package schema
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var schemaCommitCmd = &cobra.Command{
@@ -41,15 +39,7 @@ var schemaCommitCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Committing schema...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Committing schema...")
 
 		err := mgmntClient.FinalizeSchema(workspace, slug, commitMessage)
 		if err != nil {
@@ -57,11 +47,7 @@ var schemaCommitCmd = &cobra.Command{
 			return err
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully committed schema '%s' to live mode", slug))
-		} else {
-			log.Infof("Successfully committed schema '%s' to live mode", slug)
-		}
+		spinner.Stop(fmt.Sprintf("Successfully committed schema '%s' to live mode", slug))
 		return nil
 	},
 }

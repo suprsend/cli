@@ -1,7 +1,6 @@
 package translation
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationPullCmd = &cobra.Command{
@@ -40,15 +38,7 @@ var translationPullCmd = &cobra.Command{
 			}
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()
 		translationResp, err := mgmnt_client.GetTranslations(workspace, mode)
@@ -56,9 +46,7 @@ var translationPullCmd = &cobra.Command{
 			log.Errorf("Failed to get translations: %v", err)
 			return
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pulled %d translations from %s", len(translationResp.Results), workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Pulled %d translations from %s", len(translationResp.Results), workspace))
 
 		stats, err := WriteTranslationToFiles(*translationResp, outputDir)
 		if err != nil {

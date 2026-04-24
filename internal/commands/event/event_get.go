@@ -1,13 +1,11 @@
 package event
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var eventGetCmd = &cobra.Command{
@@ -21,30 +19,16 @@ var eventGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		var cancel context.CancelFunc
-		if !utils.IsOutputPiped() {
-			p = pin.New("Getting events...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel = p.Start(context.Background())
-		}
+		spinner := utils.NewSpinner("Getting events...")
 
 		eventsResp, err := mgmntClient.GetEvents(workspace)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting events")
 			return err
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully got %d event(s)", len(eventsResp.Results)))
-			cancel()
-		}
+		spinner.Stop(fmt.Sprintf("Successfully got %d event(s)", len(eventsResp.Results)))
 
 		output := map[string]any{"events": eventsResp.Results}
 		utils.OutputData(output, outputType)

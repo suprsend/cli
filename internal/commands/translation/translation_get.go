@@ -1,14 +1,12 @@
 package translation
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationGetCmd = &cobra.Command{
@@ -23,22 +21,11 @@ var translationGetCmd = &cobra.Command{
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		var cancel context.CancelFunc
-		if !utils.IsOutputPiped() {
-			p = pin.New("Getting translations...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel = p.Start(context.Background())
-		}
+		spinner := utils.NewSpinner("Getting translations...")
 
 		translationsResp, err := mgmntClient.GetTranslations(workspace, mode)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting translations")
 			return err
 		}
@@ -54,10 +41,7 @@ var translationGetCmd = &cobra.Command{
 			output[locale] = obj["content"]
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully got %d translation(s)", len(output)))
-			cancel()
-		}
+		spinner.Stop(fmt.Sprintf("Successfully got %d translation(s)", len(output)))
 
 		utils.OutputData(output, outputType)
 		return nil

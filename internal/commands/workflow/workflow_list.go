@@ -4,13 +4,11 @@ Copyright © 2025 SuprSend
 package workflow
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var workflowListCmd = &cobra.Command{
@@ -21,15 +19,7 @@ var workflowListCmd = &cobra.Command{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -43,10 +33,7 @@ var workflowListCmd = &cobra.Command{
 			return err
 		}
 
-		msg := fmt.Sprintf("Listed %d workflows from %s with offset %d", len(workflows.Results), workspace, offset)
-		if p != nil {
-			p.Stop(msg)
-		}
+		spinner.Stop(fmt.Sprintf("Listed %d workflows from %s with offset %d", len(workflows.Results), workspace, offset))
 		outputType, _ := cmd.Flags().GetString("output")
 
 		if len(workflows.Results) == 0 && utils.IsOutputPiped() {

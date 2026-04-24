@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var workflowPullCmd = &cobra.Command{
@@ -45,15 +43,7 @@ var workflowPullCmd = &cobra.Command{
 			log.Errorf("Error with output directory: %v", err)
 			return err
 		}
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
@@ -79,9 +69,7 @@ var workflowPullCmd = &cobra.Command{
 				log.Errorf("Failed to write workflow file: %v", err)
 				return err
 			}
-			if p != nil {
-				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
-			}
+			spinner.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			return nil
 		}
 
@@ -90,9 +78,7 @@ var workflowPullCmd = &cobra.Command{
 			log.Errorf("Failed to get workflows: %v", err)
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pulled %d workflows from %s", len(workflows_resp.Results), workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Pulled %d workflows from %s", len(workflows_resp.Results), workspace))
 
 		stats, err := WriteWorkflowsToFiles(*workflows_resp, outputDir)
 		if err != nil {

@@ -5,6 +5,7 @@ package utils
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -18,7 +19,9 @@ import (
 	"github.com/olekukonko/tablewriter/tw"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/tidwall/pretty"
+	"github.com/yarlson/pin"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,6 +56,39 @@ func IsOutputPiped() bool {
 	// If ModeCharDevice is NOT set, it means the output is not a character device (terminal).
 	// This implies it's a pipe or redirection.
 	return (fi.Mode() & os.ModeCharDevice) == 0
+}
+
+// ShowSpinner returns true when a spinner should be displayed — i.e. output is not piped and quiet mode is off.
+func ShowSpinner() bool {
+	return !IsOutputPiped() && !config.Cfg.Quiet
+}
+
+// Spinner is a thin wrapper around pin.Pin that is nil-safe and no-ops when quiet/piped.
+type Spinner struct {
+	p      *pin.Pin
+	cancel context.CancelFunc
+}
+
+// NewSpinner creates and starts a spinner with the given text. Returns a no-op Spinner when output is piped or quiet mode is on.
+func NewSpinner(text string) *Spinner {
+	s := &Spinner{}
+	if ShowSpinner() {
+		s.p = pin.New(text,
+			pin.WithSpinnerColor(pin.ColorCyan),
+			pin.WithTextColor(pin.ColorYellow),
+		)
+		s.cancel = s.p.Start(context.Background())
+	}
+	return s
+}
+
+// Stop stops the spinner with the given message. Safe to call multiple times or on a no-op Spinner.
+func (s *Spinner) Stop(msg string) {
+	if s.p != nil {
+		s.p.Stop(msg)
+		s.cancel()
+		s.p = nil
+	}
 }
 
 func supportsColor() bool {

@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/suprsend-go"
-	"github.com/yarlson/pin"
 )
 
 var workflowTrigger = &cobra.Command{
@@ -32,15 +30,7 @@ var workflowTrigger = &cobra.Command{
 			log.WithError(err).Error("Error getting workspace client")
 			return err
 		}
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Triggering workflow...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Triggering workflow...")
 		wfRequestBody, err := os.ReadFile(path)
 		if err != nil {
 			log.WithError(err).Error("Error reading workflow file")
@@ -62,11 +52,7 @@ var workflowTrigger = &cobra.Command{
 			log.WithError(err).Error("Error triggering workflow")
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully triggered workflow '%s'", slug))
-		} else {
-			log.Infof("Successfully triggered workflow '%s'", slug)
-		}
+		spinner.Stop(fmt.Sprintf("Successfully triggered workflow '%s'", slug))
 		return nil
 	},
 }

@@ -1,13 +1,11 @@
 package event
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var eventListCmd = &cobra.Command{
@@ -18,15 +16,7 @@ var eventListCmd = &cobra.Command{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 		workspace, _ := cmd.Flags().GetString("workspace")
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
@@ -37,9 +27,7 @@ var eventListCmd = &cobra.Command{
 			return err
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Showing %d events out of %d from workspace %s\n", len(events.Results), events.Meta.Count, workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Showing %d events out of %d from workspace %s\n", len(events.Results), events.Meta.Count, workspace))
 		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(events.Results, outputType)
 		return nil

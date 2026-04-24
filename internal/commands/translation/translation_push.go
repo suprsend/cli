@@ -1,7 +1,6 @@
 package translation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationPushCmd = &cobra.Command{
@@ -30,8 +28,7 @@ var translationPushCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		hasError := false
-		var p *pin.Pin
-		var cancel context.CancelFunc
+		var spinner *utils.Spinner
 		stats := &TranslationPushStats{
 			Errors: []string{},
 		}
@@ -45,35 +42,21 @@ var translationPushCmd = &cobra.Command{
 
 			for filename, content := range translations {
 				stats.Total++
-				if !hasError && !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing %s.json...", filename),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
+				if !hasError {
+					spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s.json...", filename))
 				}
 
 				if dryRun {
 					dryRunNames = append(dryRunNames, filename+".json")
 					stats.Success++
-					if p != nil && cancel != nil {
-						p.Stop(fmt.Sprintf("(dry run) %s.json", filename))
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop(fmt.Sprintf("(dry run) %s.json", filename))
 					hasError = false
 					continue
 				}
 
 				err := mgmntClient.PushTranslation(workspace, filename+".json", map[string]any{"content": content})
 				if err != nil {
-					if p != nil && cancel != nil {
-						p.Stop("")
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop("")
 					hasError = true
 					log.Errorf("Failed to push translation %s: %v", filename, err)
 					stats.Failed++
@@ -82,14 +65,7 @@ var translationPushCmd = &cobra.Command{
 				}
 
 				stats.Success++
-				if p != nil && cancel != nil {
-					p.Stop(fmt.Sprintf("Pushed translation: %s.json", filename))
-					cancel()
-					p = nil
-					cancel = nil
-				} else {
-					log.Infof("Pushed translation: %s.json", filename)
-				}
+				spinner.Stop(fmt.Sprintf("Pushed translation: %s.json", filename))
 				hasError = false
 			}
 		} else {
@@ -110,24 +86,15 @@ var translationPushCmd = &cobra.Command{
 					continue
 				}
 
-				if !hasError && !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing %s...", file.Name()),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
+				if !hasError {
+					spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", file.Name()))
 				}
 
 				stats.Total++
 				path := filepath.Join(outputDir, file.Name())
 				data, err := os.ReadFile(path)
 				if err != nil {
-					if p != nil && cancel != nil {
-						p.Stop("")
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop("")
 					hasError = true
 					log.Errorf("Failed to read file %s: %v", file.Name(), err)
 					stats.Failed++
@@ -137,12 +104,7 @@ var translationPushCmd = &cobra.Command{
 
 				var content map[string]any
 				if err := json.Unmarshal(data, &content); err != nil {
-					if p != nil && cancel != nil {
-						p.Stop("")
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop("")
 					hasError = true
 					log.Errorf("Failed to parse JSON for %s: %v", file.Name(), err)
 					stats.Failed++
@@ -153,24 +115,14 @@ var translationPushCmd = &cobra.Command{
 				if dryRun {
 					dryRunNames = append(dryRunNames, file.Name())
 					stats.Success++
-					if p != nil && cancel != nil {
-						p.Stop(fmt.Sprintf("(dry run) %s", file.Name()))
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop(fmt.Sprintf("(dry run) %s", file.Name()))
 					hasError = false
 					continue
 				}
 
 				err = mgmntClient.PushTranslation(workspace, file.Name(), map[string]any{"content": content})
 				if err != nil {
-					if p != nil && cancel != nil {
-						p.Stop("")
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop("")
 					hasError = true
 					log.Errorf("Failed to push translation %s: %v", file.Name(), err)
 					stats.Failed++
@@ -179,14 +131,7 @@ var translationPushCmd = &cobra.Command{
 				}
 
 				stats.Success++
-				if p != nil && cancel != nil {
-					p.Stop(fmt.Sprintf("Pushed translation: %s", file.Name()))
-					cancel()
-					p = nil
-					cancel = nil
-				} else {
-					log.Infof("Pushed translation: %s", file.Name())
-				}
+				spinner.Stop(fmt.Sprintf("Pushed translation: %s", file.Name()))
 				hasError = false
 			}
 		}

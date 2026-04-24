@@ -4,13 +4,11 @@ Copyright © 2025 SuprSend
 package template
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var templateCommitCmd = &cobra.Command{
@@ -49,15 +47,7 @@ var templateCommitCmd = &cobra.Command{
 		var variants []map[string]any
 
 		if force {
-			var p *pin.Pin
-			if !utils.IsOutputPiped() {
-				p = pin.New(fmt.Sprintf("Validating template %s...", slug),
-					pin.WithSpinnerColor(pin.ColorCyan),
-					pin.WithTextColor(pin.ColorYellow),
-				)
-				cancel := p.Start(context.Background())
-				defer cancel()
-			}
+			validationSpinner := utils.NewSpinner(fmt.Sprintf("Validating template %s...", slug))
 
 			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
 			if err != nil {
@@ -65,9 +55,7 @@ var templateCommitCmd = &cobra.Command{
 				return err
 			}
 
-			if p != nil {
-				p.Stop("")
-			}
+			validationSpinner.Stop("")
 
 			for _, v := range validateResp.Variants {
 				if len(v.Errors) > 0 {
@@ -86,26 +74,14 @@ var templateCommitCmd = &cobra.Command{
 			}
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New(fmt.Sprintf("Committing template %s...", slug),
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner(fmt.Sprintf("Committing template %s...", slug))
 
 		if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, variants); err != nil {
 			log.WithError(err).Errorf("Failed to commit template %s", slug)
 			return err
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully committed template '%s' to live", slug))
-		} else {
-			log.Infof("Successfully committed template '%s' to live", slug)
-		}
+		spinner.Stop(fmt.Sprintf("Successfully committed template '%s' to live", slug))
 		return nil
 	},
 }

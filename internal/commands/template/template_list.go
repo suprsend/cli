@@ -4,13 +4,11 @@ Copyright © 2025 SuprSend
 package template
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var templateListCmd = &cobra.Command{
@@ -18,15 +16,7 @@ var templateListCmd = &cobra.Command{
 	Short: "List templates for a workspace",
 	Long:  `List templates for a workspace`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -40,10 +30,7 @@ var templateListCmd = &cobra.Command{
 			return
 		}
 
-		msg := fmt.Sprintf("Listed %d templates from %s with offset %d", len(templates.Results), workspace, offset)
-		if p != nil {
-			p.Stop(msg)
-		}
+		spinner.Stop(fmt.Sprintf("Listed %d templates from %s with offset %d", len(templates.Results), workspace, offset))
 		outputType, _ := cmd.Flags().GetString("output")
 
 		if len(templates.Results) == 0 && utils.IsOutputPiped() {

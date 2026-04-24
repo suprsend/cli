@@ -1,7 +1,6 @@
 package translation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 )
 
 var translationPushCmd = &cobra.Command{
@@ -82,15 +80,7 @@ func PushTranslations(workspace, locale, dir string) error {
 		return fmt.Errorf("no locale JSON files found in %s", translationsDir)
 	}
 
-	var p *pin.Pin
-	if !utils.IsOutputPiped() {
-		p = pin.New("Pushing translations...",
-			pin.WithSpinnerColor(pin.ColorCyan),
-			pin.WithTextColor(pin.ColorYellow),
-		)
-		cancel := p.Start(context.Background())
-		defer cancel()
-	}
+	spinner := utils.NewSpinner("Pushing translations...")
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -139,13 +129,11 @@ func PushTranslations(workspace, locale, dir string) error {
 		log.Infof("Successfully pushed translations for locale: %s", fileLocale)
 	}
 
-	if p != nil {
-		msg := fmt.Sprintf("Pushed %d translation file(s) to %s", successCount, workspace)
-		if failedCount > 0 {
-			msg += fmt.Sprintf(" (%d failed)", failedCount)
-		}
-		p.Stop(msg)
+	msg := fmt.Sprintf("Pushed %d translation file(s) to %s", successCount, workspace)
+	if failedCount > 0 {
+		msg += fmt.Sprintf(" (%d failed)", failedCount)
 	}
+	spinner.Stop(msg)
 
 	if len(errors) > 0 {
 		log.Info("Errors:")

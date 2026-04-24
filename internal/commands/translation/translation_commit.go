@@ -1,13 +1,11 @@
 package translation
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationCommitCmd = &cobra.Command{
@@ -35,25 +33,13 @@ var translationCommitCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Committing translation...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Committing translation...")
 		err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
 		if err != nil {
 			log.Errorf("%s", err)
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
-		} else {
-			log.Infof("Successfully committed translation '%s'", commitMessage)
-		}
+		spinner.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
 		return nil
 	},
 }

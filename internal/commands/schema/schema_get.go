@@ -1,13 +1,11 @@
 package schema
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var schemaGetCmd = &cobra.Command{
@@ -27,30 +25,16 @@ var schemaGetCmd = &cobra.Command{
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		var cancel context.CancelFunc
-		if !utils.IsOutputPiped() {
-			p = pin.New("Getting details...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel = p.Start(context.Background())
-		}
+		spinner := utils.NewSpinner("Getting details...")
 
 		schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting schema detail")
 			return err
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully got details for '%s'", slug))
-			cancel()
-		}
+		spinner.Stop(fmt.Sprintf("Successfully got details for '%s'", slug))
 
 		utils.OutputData(schema, outputType)
 		return nil

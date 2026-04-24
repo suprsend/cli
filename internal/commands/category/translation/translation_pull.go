@@ -1,7 +1,6 @@
 package translation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationPullCmd = &cobra.Command{
@@ -53,15 +51,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		return fmt.Errorf("error with output directory: %w", err)
 	}
 
-	var p *pin.Pin
-	if !utils.IsOutputPiped() {
-		p = pin.New("Loading...",
-			pin.WithSpinnerColor(pin.ColorCyan),
-			pin.WithTextColor(pin.ColorYellow),
-		)
-		cancel := p.Start(context.Background())
-		defer cancel()
-	}
+	spinner := utils.NewSpinner("Loading...")
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
 	locales, err := mgmntClient.ListPreferenceTranslations(workspace)
@@ -101,9 +91,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		successCount++
 	}
 
-	if p != nil {
-		p.Stop(fmt.Sprintf("Pulled translations from %s", workspace))
-	}
+	spinner.Stop(fmt.Sprintf("Pulled translations from %s", workspace))
 
 	log.Info("=== Translation Pull Summary ===")
 	log.Infof("Total locales processed: %d", len(locales.Results))

@@ -1,13 +1,11 @@
 package schema
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var schemaListCmd = &cobra.Command{
@@ -23,15 +21,7 @@ var schemaListCmd = &cobra.Command{
 		offset, _ := cmd.Flags().GetInt("offset")
 		mode, _ := cmd.Flags().GetString("mode")
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		schemas, err := mgmntClient.ListSchema(workspace, limit, offset, mode)
@@ -39,9 +29,7 @@ var schemaListCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't fetch schemas")
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Listed %d schemas from %s with offset %d", len(schemas.Results), workspace, offset))
-		}
+		spinner.Stop(fmt.Sprintf("Listed %d schemas from %s with offset %d", len(schemas.Results), workspace, offset))
 
 		outputType, _ := cmd.Flags().GetString("output")
 		if len(schemas.Results) == 0 && utils.IsOutputPiped() {

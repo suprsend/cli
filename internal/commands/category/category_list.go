@@ -1,14 +1,12 @@
 package category
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 type CategoryTableRow struct {
@@ -30,15 +28,7 @@ var categoryListCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		categories, err := mgmntClient.ListCategories(workspace, mode)
@@ -63,9 +53,7 @@ var categoryListCmd = &cobra.Command{
 				}
 			}
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Listed %d categories from %s", len(tableRows), workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Listed %d categories from %s", len(tableRows), workspace))
 
 		if len(tableRows) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)

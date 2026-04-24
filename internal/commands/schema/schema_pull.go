@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var schemaPullCmd = &cobra.Command{
@@ -50,15 +48,7 @@ var schemaPullCmd = &cobra.Command{
 			log.Errorf("Failed to create directory: %v", err)
 			return err
 		}
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
@@ -67,9 +57,7 @@ var schemaPullCmd = &cobra.Command{
 				log.Errorf("Failed to get schema: %v", err)
 				return err
 			}
-			if p != nil {
-				p.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
-			}
+			spinner.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			obj := *schema
 			slugDir := filepath.Join(outputDir, slug)
 			if err := os.MkdirAll(slugDir, 0o755); err != nil {
@@ -86,9 +74,7 @@ var schemaPullCmd = &cobra.Command{
 			log.Errorf("Failed to get schemas: %v", err)
 			return err
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pulled %d schemas from %s", len(schemas.Results), workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Pulled %d schemas from %s", len(schemas.Results), workspace))
 		stats, err := WriteSchemasToFiles(schemas, outputDir)
 		if err != nil {
 			log.Errorf("Failed to save schemas: %v", err)

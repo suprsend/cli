@@ -1,12 +1,10 @@
 package translation
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationListCmd = &cobra.Command{
@@ -31,25 +29,14 @@ func listTranslations(workspace, outputType string) error {
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
 
-	var p *pin.Pin
-	if !utils.IsOutputPiped() {
-		p = pin.New("Loading...",
-			pin.WithSpinnerColor(pin.ColorCyan),
-			pin.WithTextColor(pin.ColorYellow),
-		)
-		cancel := p.Start(context.Background())
-		defer cancel()
-	}
+	spinner := utils.NewSpinner("Loading...")
 
 	translations, err := mgmntClient.ListPreferenceTranslations(workspace)
 	if err != nil {
 		return fmt.Errorf("couldn't fetch translations: %w", err)
 	}
 
-	msg := fmt.Sprintf("Listed %d translation locales from %s", len(translations.Results), workspace)
-	if p != nil {
-		p.Stop(msg)
-	}
+	spinner.Stop(fmt.Sprintf("Listed %d translation locales from %s", len(translations.Results), workspace))
 
 	if len(translations.Results) == 0 && utils.IsOutputPiped() {
 		utils.OutputData([]interface{}{}, outputType)

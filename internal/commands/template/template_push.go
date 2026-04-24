@@ -4,7 +4,6 @@ Copyright © 2025 SuprSend
 package template
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 )
 
 func readTemplateJSON(templateDir string) (map[string]any, error) {
@@ -225,8 +223,7 @@ var templatePushCmd = &cobra.Command{
 		}
 
 		hasError := false
-		var p *pin.Pin
-		var cancel context.CancelFunc
+		var spinner *utils.Spinner
 
 		if slug != "" {
 			// Push a single template by slug
@@ -238,32 +235,21 @@ var templatePushCmd = &cobra.Command{
 				stats.Failed++
 				stats.Errors = append(stats.Errors, fmt.Sprintf("Template directory %s does not exist", templateDir))
 			} else {
-				if !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing template %s...", slug),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
-				}
+				spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
 
 				PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun, stats)
 
 				if dryRun && stats.Success > 0 {
 					dryRunSlugs = append(dryRunSlugs, slug)
 				}
-				if p != nil && cancel != nil {
-					if stats.Success > 0 {
-						if dryRun {
-							p.Stop(fmt.Sprintf("(dry run) %s", slug))
-						} else {
-							p.Stop(fmt.Sprintf("Pushed template: %s", slug))
-						}
+				if stats.Success > 0 {
+					if dryRun {
+						spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
 					} else {
-						p.Stop("")
+						spinner.Stop(fmt.Sprintf("Pushed template: %s", slug))
 					}
-					cancel()
-				} else if stats.Success > 0 && !dryRun {
-					log.Infof("Pushed template: %s", slug)
+				} else {
+					spinner.Stop("")
 				}
 			}
 		} else {
@@ -288,42 +274,24 @@ var templatePushCmd = &cobra.Command{
 				templateSlug := entry.Name()
 				templateDir := filepath.Join(path, templateSlug)
 
-				if !hasError && !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing template %s...", templateSlug),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
+				if !hasError {
+					spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
 				}
 
 				prevFailed := stats.Failed
 				PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun, stats)
 
 				if stats.Failed > prevFailed {
-					if p != nil && cancel != nil {
-						p.Stop("")
-						cancel()
-						p = nil
-						cancel = nil
-					}
+					spinner.Stop("")
 					hasError = true
 					continue
 				}
 
 				if dryRun {
 					dryRunSlugs = append(dryRunSlugs, templateSlug)
-				}
-				if p != nil && cancel != nil {
-					if dryRun {
-						p.Stop(fmt.Sprintf("(dry run) %s", templateSlug))
-					} else {
-						p.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
-					}
-					cancel()
-					p = nil
-					cancel = nil
-				} else if !dryRun {
-					log.Infof("Pushed template: %s", templateSlug)
+					spinner.Stop(fmt.Sprintf("(dry run) %s", templateSlug))
+				} else {
+					spinner.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
 				}
 				hasError = false
 			}

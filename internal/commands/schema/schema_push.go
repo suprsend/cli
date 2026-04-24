@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var schemaPushCmd = &cobra.Command{
@@ -39,8 +37,7 @@ var schemaPushCmd = &cobra.Command{
 		}
 
 		hasError := false
-		var p *pin.Pin
-		var cancel context.CancelFunc
+		var spinner *utils.Spinner
 
 		if slug != "" {
 			stats.Total = 1
@@ -82,23 +79,12 @@ var schemaPushCmd = &cobra.Command{
 					log.Infof("DRY RUN: would %s schema '%s' to %s", action, slug, workspace)
 					stats.Success++
 				} else {
-					if !utils.IsOutputPiped() {
-						p = pin.New(fmt.Sprintf("Pushing %s...", slug),
-							pin.WithSpinnerColor(pin.ColorCyan),
-							pin.WithTextColor(pin.ColorYellow),
-						)
-						cancel = p.Start(context.Background())
-					}
+					spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
 					err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
-					if p != nil && cancel != nil {
-						if err == nil {
-							p.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-						} else {
-							p.Stop("")
-						}
-						cancel()
-					} else if err == nil {
-						log.Infof("Pushed schema: %s", slug)
+					if err == nil {
+						spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
+					} else {
+						spinner.Stop("")
 					}
 					if err != nil {
 						log.WithError(err).Errorf("Failed to push schema %s", slug)
@@ -156,22 +142,13 @@ var schemaPushCmd = &cobra.Command{
 				continue
 			}
 			slug := entry.Name()
-			if !hasError && !utils.IsOutputPiped() {
-				p = pin.New(fmt.Sprintf("Pushing %s...", slug),
-					pin.WithSpinnerColor(pin.ColorCyan),
-					pin.WithTextColor(pin.ColorYellow),
-				)
-				cancel = p.Start(context.Background())
+			if !hasError {
+				spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
 			}
 
 			schema, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
 			if err != nil {
-				if p != nil && cancel != nil {
-					p.Stop("")
-					cancel()
-					p = nil
-					cancel = nil
-				}
+				spinner.Stop("")
 				hasError = true
 				log.WithError(err).Errorf("Failed to read schema files for %s", slug)
 				stats.Failed++
@@ -182,24 +159,14 @@ var schemaPushCmd = &cobra.Command{
 			if dryRun {
 				dryRunSlugs = append(dryRunSlugs, slug)
 				stats.Success++
-				if p != nil && cancel != nil {
-					p.Stop(fmt.Sprintf("(dry run) %s", slug))
-					cancel()
-					p = nil
-					cancel = nil
-				}
+				spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
 				hasError = false
 				continue
 			}
 
 			err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
 			if err != nil {
-				if p != nil && cancel != nil {
-					p.Stop("")
-					cancel()
-					p = nil
-					cancel = nil
-				}
+				spinner.Stop("")
 				hasError = true
 				log.WithError(err).Errorf("Failed to push schema %s", slug)
 				stats.Failed++
@@ -208,14 +175,7 @@ var schemaPushCmd = &cobra.Command{
 			}
 
 			stats.Success++
-			if p != nil && cancel != nil {
-				p.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-				cancel()
-				p = nil
-				cancel = nil
-			} else {
-				log.Infof("Pushed schema: %s", slug)
-			}
+			spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
 			hasError = false
 		}
 

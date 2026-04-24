@@ -1,13 +1,11 @@
 package workflow
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var workflowCommitCmd = &cobra.Command{
@@ -42,15 +40,7 @@ var workflowCommitCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Committing workflow...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Committing workflow...")
 
 		err := mgmntClient.FinalizeWorkflow(workspace, slug, commitMessage)
 		if err != nil {
@@ -58,11 +48,7 @@ var workflowCommitCmd = &cobra.Command{
 			return err
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully committed workflow '%s' to live mode", slug))
-		} else {
-			log.Infof("Successfully committed workflow '%s' to live mode", slug)
-		}
+		spinner.Stop(fmt.Sprintf("Successfully committed workflow '%s' to live mode", slug))
 		return nil
 	},
 }

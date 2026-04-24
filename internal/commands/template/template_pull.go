@@ -4,7 +4,6 @@ Copyright © 2025 SuprSend
 package template
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 )
 
 type TemplateResult struct {
@@ -130,23 +128,13 @@ var templatePullCmd = &cobra.Command{
 			return
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		results, err := FetchTemplates(mgmntClient, workspace, mode, slug)
 		if err != nil {
-			if p != nil {
-				p.Stop("Failed")
-			}
+			spinner.Stop("Failed")
 			log.WithError(err).Error(err.Error())
 			return
 		}
@@ -156,10 +144,7 @@ var templatePullCmd = &cobra.Command{
 			totalVariants += len(r.Variants)
 		}
 
-		msg := fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants, workspace)
-		if p != nil {
-			p.Stop(msg)
-		}
+		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants, workspace))
 
 		stats, err := WriteTemplatesToFiles(results, outputDir)
 		if err != nil {

@@ -1,7 +1,6 @@
 package category
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var categoryPullCmd = &cobra.Command{
@@ -45,15 +43,7 @@ var categoryPullCmd = &cobra.Command{
 			log.Errorf("Error with output directory: %v", err)
 			return err
 		}
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		categories, err := mgmntClient.ListCategories(workspace, mode)
@@ -62,9 +52,7 @@ var categoryPullCmd = &cobra.Command{
 			return err
 		}
 		filePath := filepath.Join(outputDir, "categories.json")
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
-		}
+		spinner.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
 		err = writeCategoriesFile(categories, filePath)
 		if err != nil {
 			log.WithError(err).Error("Couldn't write categories to file")

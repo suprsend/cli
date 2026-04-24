@@ -4,13 +4,11 @@ Copyright © 2025 SuprSend
 package template
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var templateGetCmd = &cobra.Command{
@@ -32,32 +30,18 @@ var templateGetCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
-		var p *pin.Pin
-		var cancel context.CancelFunc
-		if !utils.IsOutputPiped() {
-			p = pin.New("Getting template...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel = p.Start(context.Background())
-		}
+		spinner := utils.NewSpinner("Getting template...")
 
 		template, err := mgmntClient.GetTemplate(workspace, slug, mode)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template")
 			return err
 		}
 
 		variants, err := mgmntClient.GetTemplateVariants(workspace, slug, mode)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template variants")
 			return err
 		}
@@ -67,10 +51,7 @@ var templateGetCmd = &cobra.Command{
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully got template '%s' with %d variant(s)", slug, len(variants)))
-			cancel()
-		}
+		spinner.Stop(fmt.Sprintf("Successfully got template '%s' with %d variant(s)", slug, len(variants)))
 
 		result := TemplateResult{
 			Slug:            template.Slug,

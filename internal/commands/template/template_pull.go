@@ -174,7 +174,7 @@ var templatePullCmd = &cobra.Command{
 }
 
 func init() {
-	templatePullCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of templates to pull (draft, live)")
+	templatePullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	templatePullCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to pull")
 	templatePullCmd.PersistentFlags().StringP("dir", "d", "", "Output directory for templates (default: ./suprsend/templates)")
 	templatePullCmd.PersistentFlags().BoolP("force", "F", false, "Force using default directory without prompting")

@@ -57,7 +57,7 @@ var templateListCmd = &cobra.Command{
 func init() {
 	templateListCmd.PersistentFlags().IntP("limit", "l", 20, "Limit the number of templates to list")
 	templateListCmd.PersistentFlags().Int("offset", 0, "Offset the number of templates to list (default: 0)")
-	templateListCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of templates to list (draft, live), default: live")
+	templateListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	templateListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output Style (pretty, yaml, json)")
 	templateListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)

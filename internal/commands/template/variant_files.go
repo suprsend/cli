@@ -48,6 +48,18 @@ func shouldExtractPlainText(variant Variant) bool {
 func shouldExtractSlackBlock(variant Variant) bool {
 	return variantIs(variant, []string{"slack", "ms_teams"}, "content.body_type", "block")
 }
+func shouldExtractMsTeamsCard(variant Variant) bool {
+	ch, _ := variant["channel"].(string)
+	if ch != "ms_teams" {
+		return false
+	}
+	_, _, lang, ok := getNestedValue(variant, "content.templating_language")
+	if !ok {
+		return false
+	}
+	s, _ := lang.(string)
+	return s == "jsonnet"
+}
 func shouldExtractInbox(variant Variant) bool {
 	ch, _ := variant["channel"].(string)
 	return ch == "inbox"
@@ -64,6 +76,7 @@ var fileRefKeys = map[string]fileRefConfig{
 	"content.body.raw.text":             {Filename: func(_ Variant) string { return "body.raw.txt" }, ShouldExtract: shouldExtractRaw},
 	"content.body.plain_text.text":      {Filename: func(_ Variant) string { return "body.plain_text.txt" }, ShouldExtract: shouldExtractPlainText},
 	"content.body_block":                {Filename: func(_ Variant) string { return "body.block.jsonnet" }, StringifyJSON: true, ShouldExtract: shouldExtractSlackBlock},
+	"content.body_card":                 {Filename: func(_ Variant) string { return "body.card.jsonnet" }, StringifyJSON: true, ShouldExtract: shouldExtractMsTeamsCard},
 	"content.body":                      {Filename: func(_ Variant) string { return "body.md" }, ShouldExtract: shouldExtractInbox},
 	// "content.body_text":                 {Filename: func(_ Variant) string { return "body_text.txt" }},
 }

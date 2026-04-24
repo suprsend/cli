@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/config"
+	"github.com/suprsend/cli/internal/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -64,7 +65,12 @@ func EnsureConfig(path string) (*Config, string, error) {
 		configPath = filepath.Join(homeDir, ".suprsend.yaml")
 	}
 
+	if utils.IsOutputPiped() {
+		return nil, configPath, fmt.Errorf("cannot prompt in non-interactive mode")
+	}
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// Check if output is piped or redirected before prompting
 		log.Warnf("No config found at %s", configPath)
 		log.Info("Would you like to create a default config? (Y/n): ")
 		scanner := bufio.NewScanner(os.Stdin)

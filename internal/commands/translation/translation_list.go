@@ -52,9 +52,9 @@ var translationListCmd = &cobra.Command{
 }
 
 func init() {
-	translationListCmd.Flags().StringP("include-content", "c", "false", "Include translation file content in the response (true/false)")
+	translationListCmd.Flags().String("include-content", "false", "Include translation file content in the response (true/false)")
 	translationListCmd.Flags().IntP("limit", "l", 20, "Maximum number of translations to return")
-	translationListCmd.Flags().IntP("offset", "f", 0, "Number of translations to skip for pagination")
+	translationListCmd.Flags().Int("offset", 0, "Number of translations to skip for pagination")
 	translationListCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
 	translationListCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	TranslationCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")

@@ -108,6 +108,6 @@ func init() {
 	schemaPullCmd.Flags().StringP("dir", "d", "", "Directory to save schema files to (default: ./suprsend/schemas)")
 	schemaPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	schemaPullCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to pull (omit to pull all)")
-	schemaPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	schemaPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	SchemaCmd.AddCommand(schemaPullCmd)
 }

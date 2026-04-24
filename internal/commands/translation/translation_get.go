@@ -65,7 +65,7 @@ var translationGetCmd = &cobra.Command{
 }
 
 func init() {
-	translationGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
+	translationGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	translationGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	TranslationCmd.AddCommand(translationGetCmd)
 }

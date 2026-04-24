@@ -94,7 +94,7 @@ var templateGetCmd = &cobra.Command{
 }
 
 func init() {
-	templateGetCmd.PersistentFlags().String("slug", "", "Template slug")
+	templateGetCmd.PersistentFlags().StringP("slug", "g", "", "Template slug")
 	templateGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	templateGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json, yaml, or pretty")
 	TemplateCmd.AddCommand(templateGetCmd)

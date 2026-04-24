@@ -78,6 +78,6 @@ var categoryPullCmd = &cobra.Command{
 func init() {
 	categoryPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	categoryPullCmd.Flags().StringP("dir", "d", "", "Directory to save category files to (default: ./"+defaultCategoryDir+")")
-	categoryPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	categoryPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	CategoryCmd.AddCommand(categoryPullCmd)
 }

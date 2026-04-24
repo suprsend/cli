@@ -42,6 +42,6 @@ var translationCommitCmd = &cobra.Command{
 }
 
 func init() {
-	translationCommitCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	translationCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	TranslationCmd.AddCommand(translationCommitCmd)
 }

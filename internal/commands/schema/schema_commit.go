@@ -51,6 +51,6 @@ var schemaCommitCmd = &cobra.Command{
 }
 
 func init() {
-	schemaCommitCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	schemaCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	SchemaCmd.AddCommand(schemaCommitCmd)
 }

@@ -85,7 +85,7 @@ var categoryGetCmd = &cobra.Command{
 }
 
 func init() {
-	categoryGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
+	categoryGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	categoryGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	CategoryCmd.AddCommand(categoryGetCmd)
 }

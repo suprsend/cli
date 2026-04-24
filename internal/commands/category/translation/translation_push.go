@@ -159,7 +159,7 @@ func PushTranslations(workspace, locale, dir string) error {
 }
 
 func init() {
-	translationPushCmd.Flags().StringP("locale", "l", "", "Locale code to push, e.g., es, fr (omit to push all)")
+	translationPushCmd.Flags().String("locale", "", "Locale code to push, e.g., es, fr (omit to push all)")
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: "+defaultDir+")")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

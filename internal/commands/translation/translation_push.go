@@ -192,7 +192,7 @@ var translationPushCmd = &cobra.Command{
 
 func init() {
 	translationPushCmd.Flags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
-	translationPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	translationPushCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: ./suprsend/translations)")
 	translationPushCmd.Flags().StringP("json", "j", "", `Translations as a JSON object mapping locale codes (without .json extension) to their translation content objects, e.g. '{"en":{"key":"value"},"fr":{"key":"valeur"}}'`)
 	TranslationCmd.AddCommand(translationPushCmd)

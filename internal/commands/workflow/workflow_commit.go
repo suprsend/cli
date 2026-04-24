@@ -52,6 +52,6 @@ var workflowCommitCmd = &cobra.Command{
 }
 
 func init() {
-	workflowCommitCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	workflowCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	WorkflowCmd.AddCommand(workflowCommitCmd)
 }

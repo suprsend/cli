@@ -212,7 +212,7 @@ var schemaPushCmd = &cobra.Command{
 func init() {
 	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory containing schema files (default: ./suprsend/schemas)")
 	schemaPushCmd.Flags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
-	schemaPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	schemaPushCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")
 	schemaPushCmd.PersistentFlags().StringP("json", "j", "", `Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'`)
 	SchemaCmd.AddCommand(schemaPushCmd)

@@ -113,6 +113,6 @@ func init() {
 	workflowPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	workflowPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save workflow files to (default: ./suprsend/workflows)")
 	workflowPullCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to pull (omit to pull all)")
-	workflowPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	workflowPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	WorkflowCmd.AddCommand(workflowPullCmd)
 }

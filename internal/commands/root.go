@@ -44,7 +44,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
 	rootCmd.PersistentFlags().StringVarP(&conf.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.Flags().StringVarP(&conf.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
-	rootCmd.PersistentFlags().BoolVarP(&conf.NoColorOutput, "no-color", "n", false, "Disable color output (default: $NO_COLOR)")
+	rootCmd.PersistentFlags().BoolVar(&conf.NoColorOutput, "no-color", false, "Disable color output (default: $NO_COLOR)")
 
 	viper.BindPFlag("service_token", rootCmd.PersistentFlags().Lookup("service-token"))
 	viper.BindPFlag("NO_COLOR", rootCmd.PersistentFlags().Lookup("no-color"))

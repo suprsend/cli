@@ -139,7 +139,7 @@ Examples:
 func init() {
 	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./"+defaultCategoryDir+")")
 	categoryPushCmd.PersistentFlags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
-	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	categoryPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

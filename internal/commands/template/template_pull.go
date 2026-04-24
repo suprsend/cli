@@ -176,6 +176,6 @@ func init() {
 	templatePullCmd.PersistentFlags().StringP("mode", "m", "live", "Mode of templates to pull (draft, live)")
 	templatePullCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to pull")
 	templatePullCmd.PersistentFlags().StringP("dir", "d", "", "Output directory for templates (default: ./suprsend/templates)")
-	templatePullCmd.PersistentFlags().BoolP("force", "f", false, "Force using default directory without prompting")
+	templatePullCmd.PersistentFlags().BoolP("force", "F", false, "Force using default directory without prompting")
 	TemplateCmd.AddCommand(templatePullCmd)
 }

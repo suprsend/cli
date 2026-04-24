@@ -249,7 +249,7 @@ var workflowPushCmd = &cobra.Command{
 func init() {
 	workflowPushCmd.PersistentFlags().StringP("dir", "d", "", "Directory containing workflow subdirectories (default: ./suprsend/workflows)")
 	workflowPushCmd.PersistentFlags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
-	workflowPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	workflowPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to push (omit to push all)")
 	workflowPushCmd.PersistentFlags().StringP("json", "j", "", `Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'`)
 	WorkflowCmd.AddCommand(workflowPushCmd)

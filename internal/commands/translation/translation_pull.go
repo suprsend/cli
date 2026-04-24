@@ -77,7 +77,7 @@ var translationPullCmd = &cobra.Command{
 
 func init() {
 	translationPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	translationPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	translationPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	translationPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save translation files to")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

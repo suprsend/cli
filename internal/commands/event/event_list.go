@@ -48,7 +48,7 @@ var eventListCmd = &cobra.Command{
 
 func init() {
 	eventListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of events to return")
-	eventListCmd.PersistentFlags().IntP("offset", "f", 0, "Number of events to skip for pagination")
+	eventListCmd.PersistentFlags().Int("offset", 0, "Number of events to skip for pagination")
 	eventListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	EventCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	EventCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")

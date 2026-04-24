@@ -67,8 +67,8 @@ var workflowGetCmd = &cobra.Command{
 }
 
 func init() {
-	workflowGetCmd.PersistentFlags().String("slug", "", "Workflow slug")
-	workflowGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
+	workflowGetCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug")
+	workflowGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	workflowGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	WorkflowCmd.AddCommand(workflowGetCmd)
 }

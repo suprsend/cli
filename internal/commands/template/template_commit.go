@@ -96,7 +96,7 @@ var templateCommitCmd = &cobra.Command{
 }
 
 func init() {
-	templateCommitCmd.Flags().StringP("commit-message", "m", "", "Commit message describing the changes")
-	templateCommitCmd.Flags().BoolP("force", "f", false, "Force commit by skipping variants with errors")
+	templateCommitCmd.Flags().String("commit-message", "", "Commit message describing the changes")
+	templateCommitCmd.Flags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
 	TemplateCmd.AddCommand(templateCommitCmd)
 }

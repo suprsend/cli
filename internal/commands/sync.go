@@ -118,7 +118,7 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 
 	// Flags consumed in Run
-	syncCmd.Flags().StringP("from", "f", "staging", "Source workspace to pull assets from")
+	syncCmd.Flags().StringP("from", "S", "staging", "Source workspace to pull assets from")
 	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace to push assets to")
 	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage during sync")
 	syncCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")

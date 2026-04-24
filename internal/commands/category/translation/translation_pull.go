@@ -116,6 +116,6 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 
 func init() {
 	translationPullCmd.Flags().StringP("dir", "d", "", "Directory to save translation files to (default: "+defaultDir+")")
-	translationPullCmd.Flags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	translationPullCmd.Flags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

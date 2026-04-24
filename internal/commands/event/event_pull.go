@@ -64,6 +64,6 @@ var eventPullCmd = &cobra.Command{
 
 func init() {
 	eventPullCmd.Flags().StringP("dir", "d", "", "Directory to save event files to (default: ./suprsend/events)")
-	eventPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	eventPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	EventCmd.AddCommand(eventPullCmd)
 }

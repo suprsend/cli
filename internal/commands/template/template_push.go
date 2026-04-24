@@ -366,8 +366,8 @@ func readTemplateVariants(templateDir string) ([]map[string]any, error) {
 func init() {
 	templatePushCmd.PersistentFlags().StringP("dir", "d", "", "Input directory for templates (default: ./suprsend/templates)")
 	templatePushCmd.PersistentFlags().BoolP("commit", "c", false, "Commit the pushed templates to live")
-	templatePushCmd.PersistentFlags().StringP("commit-message", "m", "", "Commit message describing the changes")
+	templatePushCmd.PersistentFlags().String("commit-message", "", "Commit message describing the changes")
 	templatePushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to push")
-	templatePushCmd.PersistentFlags().BoolP("force", "f", false, "Force commit by skipping variants with errors")
+	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

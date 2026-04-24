@@ -95,6 +95,13 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 
 	for _, tmpl := range results {
 		templateDir := filepath.Join(outputDir, tmpl.Slug)
+		if err := os.RemoveAll(templateDir); err != nil {
+			return stats, fmt.Errorf("failed to remove existing directory for template '%s': %w", tmpl.Slug, err)
+		}
+	}
+
+	for _, tmpl := range results {
+		templateDir := filepath.Join(outputDir, tmpl.Slug)
 		if err := os.MkdirAll(templateDir, 0o755); err != nil {
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create directory for template '%s': %v", tmpl.Slug, err))

@@ -36,6 +36,16 @@ var categoryCommitCmd = &cobra.Command{
 			return nil
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			msg := fmt.Sprintf("This will promote categories to live in workspace \"%s\". Continue?", workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				fmt.Fprintln(os.Stdout, "Aborted.")
+				return nil
+			}
+		}
+
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
 			p = pin.New("Loading...",
@@ -65,5 +75,6 @@ func init() {
 	categoryCommitCmd.Flags().StringP("dir", "d", "", "Directory containing category and translation files (default: ./"+defaultCategoryDir+")")
 	categoryCommitCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	categoryCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	CategoryCmd.AddCommand(categoryCommitCmd)
 }

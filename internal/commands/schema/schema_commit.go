@@ -31,6 +31,16 @@ var schemaCommitCmd = &cobra.Command{
 			return nil
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			msg := fmt.Sprintf("This will promote schema '%s' to live in workspace \"%s\". Continue?", slug, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				fmt.Fprintln(os.Stdout, "Aborted.")
+				return nil
+			}
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -61,5 +71,6 @@ func init() {
 	schemaCommitCmd.Flags().StringP("slug", "g", "", "Schema slug")
 	schemaCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	schemaCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	schemaCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	SchemaCmd.AddCommand(schemaCommitCmd)
 }

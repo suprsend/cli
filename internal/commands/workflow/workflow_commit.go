@@ -32,6 +32,16 @@ var workflowCommitCmd = &cobra.Command{
 			return nil
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			msg := fmt.Sprintf("This will promote workflow '%s' to live in workspace \"%s\". Continue?", slug, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				fmt.Fprintln(os.Stdout, "Aborted.")
+				return nil
+			}
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		var p *pin.Pin
 		if !utils.IsOutputPiped() {
@@ -62,5 +72,6 @@ func init() {
 	workflowCommitCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	workflowCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	workflowCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	workflowCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	WorkflowCmd.AddCommand(workflowCommitCmd)
 }

@@ -32,6 +32,7 @@ var syncCmd = &cobra.Command{
 		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
 
 		if fromWorkspace == toWorkspace {
 			log.Error("Cannot sync within the same workspace. Source and destination workspaces must be different.")
@@ -57,6 +58,15 @@ var syncCmd = &cobra.Command{
 		default:
 			log.Errorf("Invalid asset type: '%s'. Valid options are: all, workflow, schema, event, category, translation, template", assets)
 			return
+		}
+
+		if commit && !dryRun && !force {
+			msg := fmt.Sprintf("This will sync %s from \"%s\" to \"%s\" and commit each. Continue?", assets, fromWorkspace, toWorkspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return
+			}
 		}
 
 		log.Infof("Syncing assets from %s to %s ...", fromWorkspace, toWorkspace)
@@ -127,6 +137,7 @@ func init() {
 	syncCmd.Flags().BoolP("commit", "c", false, "Promote changes from draft to live after syncing")
 	syncCmd.Flags().String("commit-message", "", "Commit message applied to every committed resource in this sync run (required when --commit is set)")
 	syncCmd.Flags().BoolP("dry-run", "n", false, "Print what would be synced without making any changes")
+	syncCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 }
 
 func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {

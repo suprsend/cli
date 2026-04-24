@@ -28,6 +28,16 @@ var workflowDisableCmd = &cobra.Command{
 			return nil
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			msg := fmt.Sprintf("This will disable workflow '%s' in workspace \"%s\". Live traffic for this workflow will stop. Continue?", slug, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				fmt.Println("Aborted.")
+				return nil
+			}
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, false)
@@ -44,5 +54,6 @@ var workflowDisableCmd = &cobra.Command{
 func init() {
 	workflowDisableCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	workflowDisableCmd.Flags().BoolP("dry-run", "n", false, "Print what would be changed without making any changes")
+	workflowDisableCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	WorkflowCmd.AddCommand(workflowDisableCmd)
 }

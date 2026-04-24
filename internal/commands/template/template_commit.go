@@ -36,6 +36,15 @@ var templateCommitCmd = &cobra.Command{
 			return nil
 		}
 
+		if !force {
+			msg := fmt.Sprintf("This will promote template '%s' to live in workspace \"%s\". Continue?", slug, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				fmt.Fprintln(os.Stdout, "Aborted.")
+				return nil
+			}
+		}
+
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
 		var variants []map[string]any

@@ -4,6 +4,7 @@ Copyright © 2025 SuprSend
 package utils
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,6 +21,23 @@ import (
 	"github.com/tidwall/pretty"
 	"gopkg.in/yaml.v3"
 )
+
+// ConfirmDestructiveAction prints prompt + "[y/N]" on stderr and reads the answer from stdin.
+// Returns true if the user confirmed. Skips the prompt and returns true when stdin is not a TTY.
+func ConfirmDestructiveAction(prompt string) (bool, error) {
+	fi, err := os.Stdin.Stat()
+	if err != nil || (fi.Mode()&os.ModeCharDevice) == 0 {
+		return true, nil
+	}
+	fmt.Fprintf(os.Stderr, "%s [y/N] ", prompt)
+	reader := bufio.NewReader(os.Stdin)
+	answer, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes", nil
+}
 
 // IsOutputPiped checks if os.Stdout is connected to a pipe or redirected.
 func IsOutputPiped() bool {

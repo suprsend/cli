@@ -30,6 +30,11 @@ type TemplateAPIResponse struct {
 
 type TemplateVariantResponse struct {
 	Results []map[string]any `json:"results"`
+	Meta    struct {
+		Count  int `json:"count"`
+		Limit  int `json:"limit"`
+		Offset int `json:"offset"`
+	} `json:"meta"`
 }
 
 func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]map[string]any, error) {
@@ -40,25 +45,41 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	url := fmt.Sprintf("%sv2/%s/template/%s/variant/?mode=%s&include_content=true", c.mgmnt_base_URL, workspace, slug, mode)
+	apiLimit := 50
+	allVariants := []map[string]any{}
+	currentOffset := 0
+	for {
+		urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/?mode=%s&include_content=true&limit=%d&offset=%d",
+			c.mgmnt_base_URL, workspace, slug, mode, apiLimit, currentOffset)
 
-	log.Debugf("Getting template variants for slug: %s, workspace: %s, mode: %s", slug, workspace, mode)
-	resp, err := client.R().
-		SetDebug(c.debug).
-		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
-		SetResult(&TemplateVariantResponse{}).
-		Get(url)
-	if err != nil {
-		return nil, err
-	}
-	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+		log.Debugf("Getting template variants for slug: %s, workspace: %s, mode: %s, limit: %d, offset: %d", slug, workspace, mode, apiLimit, currentOffset)
+		resp, err := client.R().
+			SetDebug(c.debug).
+			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+			SetResult(&TemplateVariantResponse{}).
+			Get(urlStr)
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		if resp.IsError() {
+			var errorResp ErrorResponse
+			if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
+				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
+			}
+			return nil, fmt.Errorf("request failed: %s", resp.Status())
+		}
+
+		page := resp.Result().(*TemplateVariantResponse)
+		if len(page.Results) == 0 {
+			break
+		}
+		allVariants = append(allVariants, page.Results...)
+		currentOffset += len(page.Results)
+		if len(page.Results) < apiLimit {
+			break
+		}
 	}
-	return resp.Result().(*TemplateVariantResponse).Results, nil
+	return allVariants, nil
 }
 
 func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels []string) error {

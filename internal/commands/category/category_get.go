@@ -13,6 +13,14 @@ var categoryGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get categories and translations",
 	Long:  "Retrieve preference categories and their translations from a workspace. Returns the full category structure along with translations for all non-English locales. Use --mode to switch between draft and live versions.",
+	Example: `  # Get all categories and translations
+  suprsend category get
+
+  # Get draft categories
+  suprsend category get --mode draft
+
+  # Get with JSON output
+  suprsend category get --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
 	},

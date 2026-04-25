@@ -14,7 +14,15 @@ import (
 var templateListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List templates for a workspace",
-	Long:  `List templates for a workspace`,
+	Long:  `List templates in a workspace with pagination. Returns template slug, name, and enabled channel info. Use --mode to switch between draft and live versions.`,
+	Example: `  # List all templates (live mode)
+  suprsend template list
+
+  # List draft templates
+  suprsend template list --mode draft
+
+  # Paginate with JSON output
+  suprsend template list --limit 50 --output json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		spinner := utils.NewSpinner("Loading...")
 		workspace, _ := cmd.Flags().GetString("workspace")

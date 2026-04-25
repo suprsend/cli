@@ -16,6 +16,14 @@ var templateGetCmd = &cobra.Command{
 	Use:   "get [<slug>]",
 	Short: "Get template details including variants",
 	Long:  "Retrieve a specific template by slug, including all its channel variants and mock data. Use --mode to switch between draft and live versions.",
+	Example: `  # Get a template by slug (positional)
+  suprsend template get welcome-email
+
+  # Get using the flag form
+  suprsend template get --slug welcome-email
+
+  # Get the draft version
+  suprsend template get welcome-email --mode draft`,
 	Args:  cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o json` outputs the full template with variants.",

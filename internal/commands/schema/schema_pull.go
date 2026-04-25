@@ -15,6 +15,14 @@ var schemaPullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull schemas",
 	Long:  `Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.`,
+	Example: `  # Pull all schemas to default directory (suprsend/schemas/)
+  suprsend schema pull
+
+  # Pull a single schema by slug
+  suprsend schema pull order-placed
+
+  # Pull to a custom directory using the flag form
+  suprsend schema pull --slug order-placed --dir ./my-schemas`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir, _ := cmd.Flags().GetString("dir")

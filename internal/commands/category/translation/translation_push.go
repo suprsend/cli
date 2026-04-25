@@ -17,6 +17,14 @@ var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push preference translations",
 	Long:  "Upload local preference category translation files to a workspace. Reads {locale}.json files from the input directory. English translations cannot be pushed. Use --locale to push a single locale, or omit to push all.",
+	Example: `  # Push all locale translations from default directory
+  suprsend category translation push
+
+  # Push a specific locale only
+  suprsend category translation push --locale es
+
+  # Push from a custom directory
+  suprsend category translation push --dir ./my-categories`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		locale, _ := cmd.Flags().GetString("locale")

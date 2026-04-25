@@ -23,6 +23,17 @@ var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync SuprSend assets from one workspace to another",
 	Long:  `Sync notification assets from one workspace to another. Pulls assets from the source workspace and pushes them to the destination. Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.`,
+	Example: `  # Sync all assets from staging to production
+  suprsend sync --from staging --to production
+
+  # Sync only workflows
+  suprsend sync --from staging --to production --assets workflow
+
+  # Sync and commit immediately (prompts for confirmation)
+  suprsend sync --from staging --to production --commit
+
+  # Dry run: preview what would be synced without making changes
+  suprsend sync --from staging --to production --dry-run`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mode, _ := cmd.Flags().GetString("mode")
 		fromWorkspace, _ := cmd.Flags().GetString("from")

@@ -13,6 +13,14 @@ var eventGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get events",
 	Long:  "Retrieve all events and their schema mappings from a workspace. Returns event definitions including names, descriptions, and payload schemas.",
+	Example: `  # Get all events (JSON output recommended for event details)
+  suprsend event get
+
+  # Get with JSON output
+  suprsend event get --output json
+
+  # Get from a specific workspace
+  suprsend event get --workspace production`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
 	},

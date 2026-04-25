@@ -11,8 +11,16 @@ import (
 
 var worklowEnableCmd = &cobra.Command{
 	Use:   "enable [<slug>]",
-	Short: "Enables a workflow.",
+	Short: "Enable a workflow",
 	Long:  "Enable a workflow to make it active and ready to receive triggers. Pass the workflow slug as a positional argument or via --slug.",
+	Example: `  # Enable a workflow by slug (positional)
+  suprsend workflow enable welcome
+
+  # Enable using the flag form
+  suprsend workflow enable --slug welcome
+
+  # Dry run: see what would change without making changes
+  suprsend workflow enable welcome --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

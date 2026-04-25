@@ -16,6 +16,14 @@ var workflowPushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push workflows from local to SuprSend workspace",
 	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single workflow, or omit to push all.`,
+	Example: `  # Push all workflows from default directory
+  suprsend workflow push
+
+  # Push a single workflow and commit to live immediately
+  suprsend workflow push welcome --commit
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend workflow push --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

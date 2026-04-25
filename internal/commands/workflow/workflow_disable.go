@@ -14,6 +14,14 @@ var workflowDisableCmd = &cobra.Command{
 	Use:   "disable [<slug>]",
 	Short: "Disable a workflow",
 	Long:  "Disable a workflow to stop it from processing triggers. Pass the workflow slug as a positional argument or via --slug.",
+	Example: `  # Disable a workflow (prompts for confirmation)
+  suprsend workflow disable welcome
+
+  # Disable without confirmation prompt
+  suprsend workflow disable welcome --force
+
+  # Dry run: see what would change without making changes
+  suprsend workflow disable welcome --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

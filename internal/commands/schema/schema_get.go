@@ -13,6 +13,14 @@ var schemaGetCmd = &cobra.Command{
 	Use:   "get [<slug>]",
 	Short: "Get schema details",
 	Long:  "Retrieve the full definition of a specific schema by its slug. Returns the JSON Schema object including type, properties, and validation rules. Use --mode to switch between draft and live versions.",
+	Example: `  # Get a schema by slug (positional)
+  suprsend schema get order-placed
+
+  # Get using the flag form
+  suprsend schema get --slug order-placed
+
+  # Get the draft version
+  suprsend schema get order-placed --mode draft`,
 	Args:  cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",

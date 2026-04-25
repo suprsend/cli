@@ -13,6 +13,14 @@ var schemaCommitCmd = &cobra.Command{
 	Use:   "commit [<slug>]",
 	Short: "Commit schema from draft to live",
 	Long:  `Promote a schema from draft to live mode. Pass the schema slug as a positional argument or via --slug. Once committed, the schema changes become active immediately.`,
+	Example: `  # Commit a schema to live (positional slug)
+  suprsend schema commit order-placed
+
+  # Commit using the flag form
+  suprsend schema commit --slug order-placed
+
+  # Commit in the production workspace
+  suprsend schema commit order-placed --workspace production`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)

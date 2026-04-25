@@ -13,6 +13,14 @@ var workflowCommitCmd = &cobra.Command{
 	Use:   "commit [<slug>]",
 	Short: "Commit workflow from draft to live",
 	Long:  `Promote a workflow from draft to live mode. Pass the workflow slug as a positional argument or via --slug. Once committed, the workflow changes become active immediately.`,
+	Example: `  # Commit a workflow to live (positional slug)
+  suprsend workflow commit welcome
+
+  # Commit using the flag form
+  suprsend workflow commit --slug welcome
+
+  # Dry run: see what would be committed without making changes
+  suprsend workflow commit welcome --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)

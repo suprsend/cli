@@ -16,6 +16,14 @@ var workflowListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List workflows for a workspace",
 	Long:  `List workflows in a workspace with pagination. Returns workflow slug, name, status, and version info. Use --mode to switch between draft and live versions.`,
+	Example: `  # List all workflows (live mode)
+  suprsend workflow list
+
+  # List draft workflows
+  suprsend workflow list --mode draft
+
+  # Paginate with JSON output
+  suprsend workflow list --limit 50 --offset 50 --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},

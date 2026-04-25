@@ -15,6 +15,14 @@ var translationPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull preference translations",
 	Long:  "Download preference category translations from a workspace to local JSON files. Creates one file per locale (e.g., es.json, fr.json) in the output directory.",
+	Example: `  # Pull all locale translations to default directory
+  suprsend category translation pull
+
+  # Pull to a custom directory
+  suprsend category translation pull --dir ./my-categories
+
+  # Pull in the production workspace
+  suprsend category translation pull --workspace production`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")

@@ -10,8 +10,16 @@ import (
 
 var translationListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List Translations",
+	Short: "List translations",
 	Long:  "List template translation files in a workspace. Returns translation file names and metadata. Use --mode to switch between draft and live versions.",
+	Example: `  # List all translations (live mode)
+  suprsend translation list
+
+  # List draft translations
+  suprsend translation list --mode draft
+
+  # List with JSON output
+  suprsend translation list --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},

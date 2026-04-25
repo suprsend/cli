@@ -22,6 +22,14 @@ var categoryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List categories",
 	Long:  "List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, and mandatory channels. Use --mode to switch between draft and live.",
+	Example: `  # List all categories (live mode)
+  suprsend category list
+
+  # List draft categories
+  suprsend category list --mode draft
+
+  # List with JSON output
+  suprsend category list --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},

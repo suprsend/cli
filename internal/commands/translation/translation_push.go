@@ -17,6 +17,14 @@ var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push translation files to a workspace",
 	Long:  "Upload local template translation JSON files to a workspace. Reads all .json files from the input directory and pushes them. Use --commit to also finalize the changes immediately.",
+	Example: `  # Push translations from default directory
+  suprsend translation push
+
+  # Push and commit to live immediately
+  suprsend translation push --commit
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend translation push --dry-run`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")

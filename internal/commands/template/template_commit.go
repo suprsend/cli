@@ -15,7 +15,15 @@ import (
 var templateCommitCmd = &cobra.Command{
 	Use:   "commit [<slug>]",
 	Short: "Commit a template from draft to live",
-	Long:  `Commit a template from draft to live in a workspace. Pass the template slug as a positional argument or via --slug. Example: suprsend template commit <slug>`,
+	Long:  `Commit a template from draft to live in a workspace. Pass the template slug as a positional argument or via --slug. Once committed, the template changes become visible to users.`,
+	Example: `  # Commit a template to live (positional slug)
+  suprsend template commit welcome-email
+
+  # Commit using the flag form
+  suprsend template commit --slug welcome-email
+
+  # Dry run: see what would be committed without making changes
+  suprsend template commit welcome-email --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)

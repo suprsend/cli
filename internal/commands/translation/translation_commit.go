@@ -13,6 +13,14 @@ var translationCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit translation",
 	Long:  "Promote template translation changes from draft to live mode. Finalizes all pending translation changes in the workspace.",
+	Example: `  # Commit all pending translation changes to live
+  suprsend translation commit
+
+  # Commit in the production workspace
+  suprsend translation commit --workspace production
+
+  # Dry run: see what would be committed without making changes
+  suprsend translation commit --dry-run`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")

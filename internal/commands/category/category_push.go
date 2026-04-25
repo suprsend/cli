@@ -21,21 +21,19 @@ type jsonCategoryInput struct {
 
 var categoryPushCmd = &cobra.Command{
 	Use:   "push",
-	Long: `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are staged as drafts. Use --commit to also promote to live.
-
-Examples:
-  # Push from local files (default)
-  suprsend category --workspace <workspace> push
+	Short: "Push categories to a workspace",
+	Long:  `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are staged as drafts. Use --commit to also promote to live.`,
+	Example: `  # Push from local files (default directory)
+  suprsend category push
 
   # Push from a custom directory
-  suprsend category --workspace <workspace> push --dir ./my-dir
+  suprsend category push --dir ./my-categories
+
+  # Push and commit to live immediately
+  suprsend category push --commit
 
   # Push categories inline via JSON
-  suprsend category --workspace <workspace> push --json '{"categories": {...}}'
-
-  # Push categories + translations inline via JSON
-  suprsend category --workspace <workspace> push --json '{"categories": {...}, "translations": {"es": {...}}}'`,
-	Short: "Push categories to a workspace",
+  suprsend category push --json '{"categories": {...}}'`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")

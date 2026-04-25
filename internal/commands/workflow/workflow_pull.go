@@ -16,6 +16,14 @@ var workflowPullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull workflows from SuprSend workspace to local",
 	Long:  `Download workflow definitions from a workspace to local JSON files. Saves one JSON file per workflow (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single workflow, or omit to pull all.`,
+	Example: `  # Pull all workflows to default directory (suprsend/workflows/)
+  suprsend workflow pull
+
+  # Pull a single workflow by slug
+  suprsend workflow pull welcome
+
+  # Pull to a custom directory using the flag form
+  suprsend workflow pull --slug welcome --dir ./my-workflows`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

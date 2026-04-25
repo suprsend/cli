@@ -16,6 +16,14 @@ var workflowTrigger = &cobra.Command{
 	Use:   "trigger [<slug>]",
 	Short: "Trigger a specific workflow",
 	Long:  "Trigger a specific workflow by passing a slug as a positional argument or via --slug.",
+	Example: `  # Trigger a workflow by slug (positional)
+  suprsend workflow trigger welcome
+
+  # Trigger using the flag form
+  suprsend workflow trigger --slug welcome
+
+  # Trigger with a custom payload from a file
+  suprsend workflow trigger welcome --path ./payload.json`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)

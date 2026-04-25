@@ -14,8 +14,16 @@ import (
 
 var categoryPullCmd = &cobra.Command{
 	Use:   "pull",
-	Long:  "Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.",
 	Short: "Pull categories from a workspace",
+	Long:  "Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.",
+	Example: `  # Pull categories to default directory (suprsend/categories/)
+  suprsend category pull
+
+  # Pull to a custom directory
+  suprsend category pull --dir ./my-categories
+
+  # Pull draft categories
+  suprsend category pull --mode draft`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")

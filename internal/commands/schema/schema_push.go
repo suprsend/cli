@@ -16,6 +16,14 @@ var schemaPushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push schemas",
 	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema.",
+	Example: `  # Push all schemas from default directory
+  suprsend schema push
+
+  # Push a single schema and commit to live immediately
+  suprsend schema push order-placed --commit
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend schema push --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

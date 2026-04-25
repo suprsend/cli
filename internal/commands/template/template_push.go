@@ -196,6 +196,14 @@ var templatePushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push templates and their variants from local to SuprSend workspace",
 	Long:  `Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.`,
+	Example: `  # Push all templates from default directory
+  suprsend template push
+
+  # Push a single template and commit to live immediately
+  suprsend template push welcome-email --commit
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend template push --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")

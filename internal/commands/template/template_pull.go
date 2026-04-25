@@ -95,6 +95,14 @@ var templatePullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull templates and their variants from SuprSend workspace",
 	Long:  `Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all.`,
+	Example: `  # Pull all templates to default directory (suprsend/templates/)
+  suprsend template pull
+
+  # Pull a single template by slug
+  suprsend template pull welcome-email
+
+  # Pull to a custom directory using the flag form
+  suprsend template pull --slug welcome-email --dir ./my-templates`,
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		workspace, _ := cmd.Flags().GetString("workspace")

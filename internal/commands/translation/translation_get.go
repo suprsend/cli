@@ -14,6 +14,14 @@ var translationGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get translations",
 	Long:  "Retrieve all template translations from a workspace. Returns translation content keyed by locale code. Use --mode to switch between draft and live versions.",
+	Example: `  # Get all translations (live mode)
+  suprsend translation get
+
+  # Get draft translations
+  suprsend translation get --mode draft
+
+  # Get with JSON output
+  suprsend translation get --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
 	},

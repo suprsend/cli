@@ -15,6 +15,14 @@ var categoryCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit categories",
 	Long:  "Promote preference categories from draft to live mode. Also pushes any local translation files from the translations subdirectory before committing.",
+	Example: `  # Commit categories to live
+  suprsend category commit
+
+  # Commit in the production workspace
+  suprsend category commit --workspace production
+
+  # Commit with a message
+  suprsend category commit --commit-message "Update notification preferences"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMsg, _ := cmd.Flags().GetString("commit-message")

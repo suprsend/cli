@@ -13,6 +13,14 @@ var schemaListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List schemas",
 	Long:  `List trigger payload schemas in a workspace with pagination. Returns schema slug, name, and version info. Use --mode to switch between draft and live versions.`,
+	Example: `  # List all schemas (live mode)
+  suprsend schema list
+
+  # List draft schemas
+  suprsend schema list --mode draft
+
+  # Paginate with JSON output
+  suprsend schema list --limit 50 --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},

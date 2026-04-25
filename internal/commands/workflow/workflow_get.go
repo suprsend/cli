@@ -13,6 +13,14 @@ var workflowGetCmd = &cobra.Command{
 	Use:   "get [<slug>]",
 	Short: "Get workflow details",
 	Long:  "Retrieve detailed information for a specific workflow by its slug. Returns the full workflow definition including nodes, connections, and configuration. Use --mode to switch between draft and live versions.",
+	Example: `  # Get a workflow by slug (positional)
+  suprsend workflow get welcome
+
+  # Get using the flag form
+  suprsend workflow get --slug welcome
+
+  # Get the draft version
+  suprsend workflow get welcome --mode draft`,
 	Args:  cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",

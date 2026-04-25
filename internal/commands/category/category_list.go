@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -34,7 +35,7 @@ var categoryListCmd = &cobra.Command{
 		categories, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		outputType, _ := cmd.Flags().GetString("output")
 

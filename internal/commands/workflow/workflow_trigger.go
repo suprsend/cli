@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/suprsend-go"
 )
@@ -28,19 +29,19 @@ var workflowTrigger = &cobra.Command{
 		path, _ := cmd.Flags().GetString("path")
 		if err != nil {
 			log.WithError(err).Error("Error getting workspace client")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 		spinner := utils.NewSpinner("Triggering workflow...")
 		wfRequestBody, err := os.ReadFile(path)
 		if err != nil {
 			log.WithError(err).Error("Error reading workflow file")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 		wfRequestBodyMap := make(map[string]any)
 		err = json.Unmarshal(wfRequestBody, &wfRequestBodyMap)
 		if err != nil {
 			log.WithError(err).Error("Error unmarshalling workflow file")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
 		wf := &suprsend.WorkflowTriggerRequest{
@@ -50,7 +51,7 @@ var workflowTrigger = &cobra.Command{
 		_, err = wsClient.Workflows.Trigger(wf)
 		if err != nil {
 			log.WithError(err).Error("Error triggering workflow")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Successfully triggered workflow '%s'", slug))
 		return nil

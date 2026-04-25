@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
@@ -46,10 +47,10 @@ Examples:
 		if jsonPayload != "" {
 			var input jsonCategoryInput
 			if err := json.Unmarshal([]byte(jsonPayload), &input); err != nil {
-				return fmt.Errorf("failed to parse --json payload: %w", err)
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			if input.Categories == nil {
-				return fmt.Errorf("--json payload missing required \"categories\" field")
+				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeUnknown)
 			}
 
 			mgmntClient := utils.GetSuprSendMgmntClient()
@@ -73,7 +74,7 @@ Examples:
 
 			if err := mgmntClient.PushCategories(workspace, input.Categories, commit, commitMessage); err != nil {
 				log.WithError(err).Error("Couldn't push categories")
-				return err
+				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
 			spinner.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
 			return nil
@@ -93,13 +94,13 @@ Examples:
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		categories, err := ReadFromFile(path)
 		if err != nil {
 			log.WithError(err).Error("Couldn't read categories from file")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
 		spinner2 := utils.NewSpinner("Pushing categories...")
@@ -117,7 +118,7 @@ Examples:
 		err = mgmnt_client.PushCategories(workspace, categories, commit, commitMessage)
 		if err != nil {
 			log.WithError(err).Error("Couldn't push categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner2.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
 		return nil

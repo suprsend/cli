@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -27,7 +28,7 @@ var workflowPushCmd = &cobra.Command{
 		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
-			return fmt.Errorf("--json requires --slug to be specified")
+			return clierr.New("--json requires --slug to be specified", clierr.CodeUnknown)
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -45,7 +46,7 @@ var workflowPushCmd = &cobra.Command{
 			var workflow map[string]any
 			if jsonPayload != "" {
 				if err := json.Unmarshal([]byte(jsonPayload), &workflow); err != nil {
-					return fmt.Errorf("failed to parse --json payload: %w", err)
+					return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 				}
 			} else {
 				if path == "" {
@@ -53,11 +54,11 @@ var workflowPushCmd = &cobra.Command{
 				}
 				if _, err := os.Stat(path); os.IsNotExist(err) {
 					log.Errorf("Directory %s does not exist", path)
-					return err
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 				}
 				if err := validateInputDirectory(path); err != nil {
 					log.Errorf("Error with input directory: %v\n", err)
-					return err
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 				}
 
 				filePath := filepath.Join(path, slug, "workflow.json")
@@ -119,7 +120,7 @@ var workflowPushCmd = &cobra.Command{
 				for _, errorMsg := range stats.Errors {
 					log.Infof("  - %s", errorMsg)
 				}
-				return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
+				return clierr.New(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
 			}
 			return nil
 		}
@@ -130,18 +131,18 @@ var workflowPushCmd = &cobra.Command{
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		if err := validateInputDirectory(path); err != nil {
 			log.Errorf("Error with input directory: %v\n", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		files, err := os.ReadDir(path)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to read local workflows directory")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		for _, file := range files {
@@ -232,7 +233,7 @@ var workflowPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
-			return fmt.Errorf("%d workflow(s) failed to push", stats.Failed)
+			return clierr.New(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
 		}
 		return nil
 	},

@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 )
 
 var useName string
@@ -20,33 +21,33 @@ var profileUseCmd = &cobra.Command{
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return err
+			return clierr.Wrap(err, clierr.CodeUnknown, "")
 		}
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		if useName == "" {
 			useName = promptForProfileToUse(cfg)
 			if useName == "" {
 				log.Error("No profile name provided")
-				return fmt.Errorf("no profile name provided")
+				return clierr.New("no profile name provided", clierr.CodeUnknown)
 			}
 		}
 
 		if _, exists := cfg.Profiles[useName]; !exists {
 			log.Infof("Profile %q does not exist. Use the command 'suprsend profiles list' to see all profiles.", useName)
-			return fmt.Errorf("profile %q does not exist", useName)
+			return clierr.New(fmt.Sprintf("profile %q does not exist", useName), clierr.CodeUnknown)
 		}
 
 		cfg.ActiveProfile = useName
 
 		if err := SaveConfig(cfg, path); err != nil {
 			log.WithError(err).Error("Failed to save config")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		log.Infof("Active profile set to %q.", useName)

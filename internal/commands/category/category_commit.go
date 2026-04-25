@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 )
@@ -51,7 +52,7 @@ var categoryCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeCategories(workspace, commitMsg)
 		if err != nil {
 			log.WithError(err).Error("Couldn't commit categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Committed categories to %s", workspace))
 		return nil

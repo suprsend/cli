@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 )
@@ -41,7 +42,7 @@ var categoryPullCmd = &cobra.Command{
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
 			log.Errorf("Error with output directory: %v", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 		spinner := utils.NewSpinner("Loading...")
 
@@ -49,19 +50,19 @@ var categoryPullCmd = &cobra.Command{
 		categories, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		filePath := filepath.Join(outputDir, "categories.json")
 		spinner.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
 		err = writeCategoriesFile(categories, filePath)
 		if err != nil {
 			log.WithError(err).Error("Couldn't write categories to file")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
 		translationDir := filepath.Join(outputDir, "translations")
 		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		return nil

@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -31,7 +32,7 @@ var worklowEnableCmd = &cobra.Command{
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, true)
 		if err != nil {
 			log.Error(err.Error())
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		log.Infof("Enabled workflow: %s", slug)

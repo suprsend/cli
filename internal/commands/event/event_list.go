@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -24,7 +25,7 @@ var eventListCmd = &cobra.Command{
 		events, err := mgmntClient.ListEvents(workspace, limit, offset)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch events")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		spinner.Stop(fmt.Sprintf("Showing %d events out of %d from workspace %s\n", len(events.Results), events.Meta.Count, workspace))

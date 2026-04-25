@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -41,7 +42,7 @@ var workflowPullCmd = &cobra.Command{
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
 			log.Errorf("Error with output directory: %v", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 		spinner := utils.NewSpinner("Loading...")
 
@@ -50,7 +51,7 @@ var workflowPullCmd = &cobra.Command{
 			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
 			if err != nil {
 				log.Errorf("Failed to get workflow detail: %v", err)
-				return err
+				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
 			if workflowResp != nil {
 				(*workflowResp)["$schema"] = "https://schema.suprsend.com/workflow/v1/schema.json"
@@ -58,16 +59,16 @@ var workflowPullCmd = &cobra.Command{
 			workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
 			if err != nil {
 				log.Errorf("Failed to marshal workflow: %v", err)
-				return err
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			slugDir := filepath.Join(outputDir, slug)
 			if err := os.MkdirAll(slugDir, 0o755); err != nil {
 				log.Errorf("Failed to create workflow directory: %v", err)
-				return err
+				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 			}
 			if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
 				log.Errorf("Failed to write workflow file: %v", err)
-				return err
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			spinner.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
 			return nil
@@ -76,14 +77,14 @@ var workflowPullCmd = &cobra.Command{
 		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)
 		if err != nil {
 			log.Errorf("Failed to get workflows: %v", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Pulled %d workflows from %s", len(workflows_resp.Results), workspace))
 
 		stats, err := WriteWorkflowsToFiles(*workflows_resp, outputDir)
 		if err != nil {
 			log.Errorf("Failed to save workflows: %v", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
 		log.Info("=== Workflow Pull Summary ===")

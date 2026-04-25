@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -27,7 +28,7 @@ var schemaListCmd = &cobra.Command{
 		schemas, err := mgmntClient.ListSchema(workspace, limit, offset, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Listed %d schemas from %s with offset %d", len(schemas.Results), workspace, offset))
 

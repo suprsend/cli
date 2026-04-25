@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -45,7 +46,7 @@ var workflowCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeWorkflow(workspace, slug, commitMessage)
 		if err != nil {
 			log.Error(err.Error())
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		spinner.Stop(fmt.Sprintf("Successfully committed workflow '%s' to live mode", slug))

@@ -31,10 +31,13 @@ var rootCmd = &cobra.Command{
 	This CLI lets you interact with your SuprSend workspace and do actions like fetching/modifying template, workflows etc.`),
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute runs the root command and handles structured error output.
 func Execute() error {
-	return rootCmd.Execute()
+	err := rootCmd.Execute()
+	if err != nil {
+		utils.WriteError(err)
+	}
+	return err
 }
 
 func init() {
@@ -71,6 +74,15 @@ func init() {
 	rootCmd.AddCommand(template.TemplateCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if outputType, err := cmd.Flags().GetString("output"); err == nil && outputType != "" {
+			conf.OutputType = outputType
+		}
+		// Silence cobra's own error/usage output only in JSON errors mode,
+		// so cobra's default pretty-mode "Error: ..." line still works normally.
+		if config.ShouldJSONErrors() {
+			rootCmd.SilenceErrors = true
+			rootCmd.SilenceUsage = true
+		}
 		if err := config.SetUpLogs(); err != nil {
 			return err
 		}

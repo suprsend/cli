@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -44,7 +45,7 @@ var schemaCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeSchema(workspace, slug, commitMessage)
 		if err != nil {
 			log.Error(err.Error())
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		spinner.Stop(fmt.Sprintf("Successfully committed schema '%s' to live mode", slug))

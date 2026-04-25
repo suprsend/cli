@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -52,7 +53,7 @@ var templateCommitCmd = &cobra.Command{
 			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to pre-commit validate template %s", slug)
-				return err
+				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
 
 			validationSpinner.Stop("")
@@ -70,7 +71,7 @@ var templateCommitCmd = &cobra.Command{
 
 			if len(variants) == 0 {
 				log.Errorf("No valid variants to commit for template %s", slug)
-				return fmt.Errorf("no valid variants to commit for template %s", slug)
+				return clierr.New(fmt.Sprintf("no valid variants to commit for template %s", slug), clierr.CodeAPIInternal)
 			}
 		}
 
@@ -78,7 +79,7 @@ var templateCommitCmd = &cobra.Command{
 
 		if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, variants); err != nil {
 			log.WithError(err).Errorf("Failed to commit template %s", slug)
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		spinner.Stop(fmt.Sprintf("Successfully committed template '%s' to live", slug))

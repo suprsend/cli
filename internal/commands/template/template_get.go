@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -36,14 +37,14 @@ var templateGetCmd = &cobra.Command{
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		variants, err := mgmntClient.GetTemplateVariants(workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template variants")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		mockData, err := mgmntClient.GetTemplateMockData(workspace, slug)

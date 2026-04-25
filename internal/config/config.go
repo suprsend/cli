@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -93,11 +94,30 @@ func InitConfig(cfgFile string) {
 	}
 }
 
+var isStderrPiped = sync.OnceValue(func() bool {
+	fi, err := os.Stderr.Stat()
+	return err == nil && (fi.Mode()&os.ModeCharDevice) == 0
+})
+
+// IsStderrPiped reports whether os.Stderr is not connected to a terminal.
+// Result is cached after the first call.
+func IsStderrPiped() bool {
+	return isStderrPiped()
+}
+
+// ShouldJSONErrors returns true when errors must be emitted as structured JSON.
+func ShouldJSONErrors() bool {
+	return Cfg.OutputType == "json" || IsStderrPiped()
+}
+
 // setUpLogs set the log output ans the log level
 func SetUpLogs() error {
 	log.SetFormatter(&cliFormatter{noColor: viper.GetBool("NO_COLOR")})
-	if Cfg.OutputType == "json" {
-		log.SetFormatter(&log.JSONFormatter{})
+
+	// In JSON errors mode suppress logrus entirely — utils.WriteError is the sole stderr writer.
+	if Cfg.OutputType == "json" || IsStderrPiped() {
+		log.SetLevel(log.FatalLevel)
+		return nil
 	}
 
 	if Cfg.Quiet {

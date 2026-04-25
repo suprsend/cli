@@ -13,12 +13,15 @@ import (
 	"strconv"
 	"strings"
 
+	"errors"
+
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/tidwall/pretty"
 	"github.com/yarlson/pin"
@@ -89,6 +92,18 @@ func (s *Spinner) Stop(msg string) {
 		s.cancel()
 		s.p = nil
 	}
+}
+
+// WriteError writes err to stderr as a structured JSON CLIError when in JSON errors mode.
+func WriteError(err error) {
+	if err == nil || !config.ShouldJSONErrors() {
+		return
+	}
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) {
+		ce = clierr.Wrap(err, clierr.CodeUnknown, "")
+	}
+	fmt.Fprintln(os.Stderr, string(ce.JSON()))
 }
 
 func supportsColor() bool {

@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -37,7 +38,7 @@ var translationPushCmd = &cobra.Command{
 			// Parse as map of filename -> content
 			var translations map[string]map[string]any
 			if err := json.Unmarshal([]byte(jsonPayload), &translations); err != nil {
-				return fmt.Errorf("failed to parse --json payload: %w", err)
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 
 			for filename, content := range translations {
@@ -76,7 +77,7 @@ var translationPushCmd = &cobra.Command{
 			files, err := os.ReadDir(outputDir)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to read local translation directory")
-				return err
+				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 			}
 
 			log.Infof("Pushing translations to %s", workspace)
@@ -163,7 +164,7 @@ var translationPushCmd = &cobra.Command{
 		if commit {
 			if err := mgmntClient.FinalizeTranslation(workspace, commitMessage); err != nil {
 				log.Errorf("Failed to commit translation: %v", err)
-				return err
+				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
 			log.Infof("Committed translation: %s", commitMessage)
 		}

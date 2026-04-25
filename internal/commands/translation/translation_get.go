@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -27,7 +28,7 @@ var translationGetCmd = &cobra.Command{
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting translations")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		output := map[string]any{}

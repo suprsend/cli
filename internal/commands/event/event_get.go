@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -25,7 +26,7 @@ var eventGetCmd = &cobra.Command{
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting events")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "check your service token and workspace")
 		}
 
 		spinner.Stop(fmt.Sprintf("Successfully got %d event(s)", len(eventsResp.Results)))

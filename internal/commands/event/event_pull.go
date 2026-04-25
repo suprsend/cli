@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -42,14 +43,14 @@ var eventPullCmd = &cobra.Command{
 		eventsResp, err := mgmntClient.GetEvents(workspace)
 		if err != nil {
 			log.Errorf("Failed to get events: %v", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Pulled %d events", len(eventsResp.Results)))
 
 		_, err = WriteEventsToFiles(eventsResp, dirPath)
 		if err != nil {
 			log.Errorf("Failed to save events: %v", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 		return nil
 	},

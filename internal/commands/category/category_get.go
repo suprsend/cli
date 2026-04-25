@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -26,14 +27,14 @@ var categoryGetCmd = &cobra.Command{
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		localesResp, err := mgmntClient.ListPreferenceTranslations(workspace)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error listing preference translations")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		translations := map[string]any{}
@@ -46,7 +47,7 @@ var categoryGetCmd = &cobra.Command{
 			if err != nil {
 				spinner.Stop("")
 				log.WithError(err).Errorf("Error getting translations for locale %s", locale)
-				return err
+				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
 			translations[locale] = content
 		}

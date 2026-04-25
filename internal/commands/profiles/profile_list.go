@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -20,12 +21,12 @@ var listProfilesCmd = &cobra.Command{
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return err
+			return clierr.Wrap(err, clierr.CodeUnknown, "")
 		}
 		cfg, _, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		var names []string

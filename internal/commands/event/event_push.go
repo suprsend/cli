@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -28,7 +29,7 @@ var eventPushCmd = &cobra.Command{
 		if jsonPayload != "" {
 			var events map[string]any
 			if err = json.Unmarshal([]byte(jsonPayload), &events); err != nil {
-				return fmt.Errorf("failed to parse --json payload: %w", err)
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			err = mgmntClient.PushEventsFromPayload(workspace, events)
 		} else {
@@ -36,11 +37,11 @@ var eventPushCmd = &cobra.Command{
 				dir = filepath.Join(".", "suprsend", "events")
 			}
 			if _, statErr := os.Stat(dir); os.IsNotExist(statErr) {
-				return fmt.Errorf("events directory not found: %s", dir)
+				return clierr.New(fmt.Sprintf("events directory not found: %s", dir), clierr.CodeFileNotFound)
 			}
 			events, readErr := ReadEventsFromDir(dir)
 			if readErr != nil {
-				return readErr
+				return clierr.Wrap(readErr, clierr.CodeFileParseFailed, "")
 			}
 			err = mgmntClient.PushEventsFromPayload(workspace, map[string]any{"events": events})
 		}
@@ -48,7 +49,7 @@ var eventPushCmd = &cobra.Command{
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Error("Failed to push events")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop("Successfully pushed events")
 		return nil

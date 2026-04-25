@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -30,7 +31,7 @@ var workflowListCmd = &cobra.Command{
 		workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch workflows")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		spinner.Stop(fmt.Sprintf("Listed %d workflows from %s with offset %d", len(workflows.Results), workspace, offset))

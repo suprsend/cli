@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -37,7 +38,7 @@ var translationCommitCmd = &cobra.Command{
 		err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
 		if err != nil {
 			log.Errorf("%s", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
 		return nil

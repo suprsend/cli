@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -45,7 +46,7 @@ var schemaPushCmd = &cobra.Command{
 			var schema map[string]any
 			if jsonPayload != "" {
 				if err := json.Unmarshal([]byte(jsonPayload), &schema); err != nil {
-					return fmt.Errorf("failed to parse --json payload: %w", err)
+					return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 				}
 			} else {
 				if path == "" {
@@ -53,11 +54,11 @@ var schemaPushCmd = &cobra.Command{
 				}
 				if _, err := os.Stat(path); os.IsNotExist(err) {
 					log.Errorf("Directory %s does not exist", path)
-					return err
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 				}
 				if err := validateInputDirectory(path); err != nil {
 					log.Errorf("Error with input directory: %v\n", err)
-					return err
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 				}
 
 				merged, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
@@ -106,7 +107,7 @@ var schemaPushCmd = &cobra.Command{
 				for _, errorMsg := range stats.Errors {
 					log.Infof("  - %s", errorMsg)
 				}
-				return fmt.Errorf("%d schema(s) failed to push", stats.Failed)
+				return clierr.New(fmt.Sprintf("%d schema(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
 			}
 			return nil
 		}
@@ -117,18 +118,18 @@ var schemaPushCmd = &cobra.Command{
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		if err := validateInputDirectory(path); err != nil {
 			log.Errorf("Error with input directory: %v\n", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		entries, err := os.ReadDir(path)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to read local schema directory")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		for _, entry := range entries {

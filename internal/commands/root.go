@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/commands/category"
 	"github.com/suprsend/cli/internal/commands/event"
@@ -104,6 +105,10 @@ func init() {
 
 		// env > flag > config file -> profile
 		serviceToken := getServiceTokenWithPriority()
+		if serviceToken == "" {
+			return clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
+				WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
+		}
 		conf.ServiceToken = serviceToken
 
 		utils.InitSDKWithUrls(
@@ -150,7 +155,5 @@ func getServiceTokenWithPriority() string {
 		return activeProfile.ServiceToken
 	}
 
-	// No token found
-	log.Fatalln("No service token found in environment, command line, or config file")
 	return ""
 }

@@ -25,6 +25,45 @@ const (
 	CodeUnknown           = "unknown"
 )
 
+// Numeric exit codes — stable taxonomy from the CLI spec (§9).
+const (
+	ExitSuccess      = 0  // every resource in scope completed without error
+	ExitGeneralError = 1  // general error / API failure / any partial failure
+	ExitValidation   = 2  // validation error (local, pre-API)
+	ExitAuth         = 3  // auth failure
+	ExitNotFound     = 4  // resource not found
+	ExitRateLimited  = 5  // rate limited
+	ExitInvalidUsage = 64 // invalid CLI usage (missing flag, bad combination)
+)
+
+// exitCodeMap maps string error codes to numeric exit codes.
+var exitCodeMap = map[string]int{
+	CodeAuthMissingToken:  ExitAuth,
+	CodeAuthInvalidToken:  ExitAuth,
+	CodeAuthForbidden:     ExitAuth,
+	CodeAPINotFound:       ExitNotFound,
+	CodeAPIRateLimited:    ExitRateLimited,
+	CodeSchemaValidation:  ExitValidation,
+	CodeFileNotFound:      ExitValidation,
+	CodeFileParseFailed:   ExitValidation,
+	CodeInvalidUsage:      ExitInvalidUsage,
+	CodeDryRunOnly:        ExitSuccess,
+	CodeConfigMissing:     ExitGeneralError,
+	CodeConfigInvalid:     ExitGeneralError,
+	CodeAPIConflict:       ExitGeneralError,
+	CodeAPIInternal:       ExitGeneralError,
+	CodeDanglingReference: ExitGeneralError,
+	CodeUnknown:           ExitGeneralError,
+}
+
+// ExitCode returns the numeric OS exit code corresponding to this error's code.
+func (e *CLIError) ExitCode() int {
+	if code, ok := exitCodeMap[e.Code]; ok {
+		return code
+	}
+	return ExitGeneralError
+}
+
 // CLIError is a structured, machine-readable error whose JSON shape matches the spec:
 //
 //	{"error": "...", "code": "...", "resource": "...", "details": {...}, "hint": "..."}

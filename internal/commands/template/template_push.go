@@ -12,6 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -205,7 +206,7 @@ var templatePushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend template push --dry-run`,
 	Args:  cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
 		commit, _ := cmd.Flags().GetBool("commit")
@@ -221,7 +222,7 @@ var templatePushCmd = &cobra.Command{
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -265,7 +266,7 @@ var templatePushCmd = &cobra.Command{
 			entries, err := os.ReadDir(path)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to read templates directory")
-				return
+				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 			}
 
 			for _, entry := range entries {
@@ -314,7 +315,7 @@ var templatePushCmd = &cobra.Command{
 			for _, s := range dryRunSlugs {
 				log.Infof("  - %s", s)
 			}
-			return
+			return nil
 		}
 
 		log.Info("=== Template Push Summary ===")
@@ -327,7 +328,9 @@ var templatePushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
+			return clierr.New(fmt.Sprintf("%d template(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
 		}
+		return nil
 	},
 }
 

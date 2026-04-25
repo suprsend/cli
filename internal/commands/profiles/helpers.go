@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 	"gopkg.in/yaml.v3"
@@ -46,6 +47,9 @@ func cleanInput(input string) string {
 }
 
 func promptForProfileName() string {
+	if !utils.IsInputInteractive() {
+		return ""
+	}
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter profile name to remove: ")
 	name, _ := reader.ReadString('\n')
@@ -65,12 +69,10 @@ func EnsureConfig(path string) (*Config, string, error) {
 		configPath = filepath.Join(homeDir, ".suprsend.yaml")
 	}
 
-	if utils.IsOutputPiped() {
-		return nil, configPath, fmt.Errorf("cannot prompt in non-interactive mode")
-	}
-
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Check if output is piped or redirected before prompting
+		if !utils.IsInputInteractive() {
+			return nil, configPath, clierr.New("config file not found and cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+		}
 		log.Warnf("No config found at %s", configPath)
 		log.Info("Would you like to create a default config? (Y/n): ")
 		scanner := bufio.NewScanner(os.Stdin)

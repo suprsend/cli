@@ -45,6 +45,16 @@ func ConfirmDestructiveAction(prompt string) (bool, error) {
 	return answer == "y" || answer == "yes", nil
 }
 
+// IsInputInteractive returns true when stdin is a TTY — i.e. a human can respond to prompts.
+// Use this to gate any interactive prompt; IsOutputPiped is for color/spinner decisions only.
+func IsInputInteractive() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
 // IsOutputPiped checks if os.Stdout is connected to a pipe or redirected.
 func IsOutputPiped() bool {
 	fi, err := os.Stdout.Stat()

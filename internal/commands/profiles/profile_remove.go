@@ -16,8 +16,7 @@ var profileRemoveCmd = &cobra.Command{
 		if removeName == "" {
 			removeName = promptForProfileName()
 			if removeName == "" {
-				log.Error("No profile name provided")
-				return nil
+				return clierr.New("required flag missing (--name), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
 			}
 		}
 

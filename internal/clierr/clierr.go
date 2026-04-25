@@ -21,6 +21,7 @@ const (
 	CodeAPIInternal       = "api-internal"
 	CodeDanglingReference = "dangling-reference"
 	CodeDryRunOnly        = "dry-run-only"
+	CodeInvalidUsage      = "invalid-usage"
 	CodeUnknown           = "unknown"
 )
 

@@ -29,7 +29,7 @@ type WorkflowPushStats struct {
 
 
 func promptForOutputDirectory() (string, bool) {
-	if utils.IsOutputPiped() {
+	if !utils.IsInputInteractive() {
 		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}
@@ -43,7 +43,7 @@ func promptForOutputDirectory() (string, bool) {
 	if input == "" {
 		return defaultDir, true
 	}
-	return input, false
+	return input, true
 }
 
 func ensureOutputDirectory(dirPath string) error {
@@ -98,7 +98,7 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 			return stats, fmt.Errorf("error accessing '%s': %v", outputDir, err)
 		}
 	} else if !info.IsDir() {
-		return stats, err
+		return stats, fmt.Errorf("path '%s' exists but is not a directory", outputDir)
 	}
 
 	for _, wf := range resp.Results {

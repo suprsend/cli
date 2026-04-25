@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var (
@@ -30,7 +31,7 @@ var profilesModifyCmd = &cobra.Command{
 		}
 		if modifyName != "" {
 			if _, exists := cfg.Profiles[modifyName]; !exists {
-				return fmt.Errorf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName)
+				return clierr.New(fmt.Sprintf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName), clierr.CodeInvalidUsage)
 			}
 		}
 
@@ -55,6 +56,9 @@ var profilesModifyCmd = &cobra.Command{
 
 			log.Infof("Profile %s modified successfully", modifyName)
 		} else {
+			if !utils.IsInputInteractive() {
+				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+			}
 			runModifyInteractive(cfg, path)
 		}
 		return nil

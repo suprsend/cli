@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var (
@@ -54,6 +55,9 @@ var profilesAddCmd = &cobra.Command{
 
 			log.Infof("Profile %s added successfully", addName)
 		} else {
+			if !utils.IsInputInteractive() {
+				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+			}
 			runAddInteractive(cfg, path)
 		}
 		return nil

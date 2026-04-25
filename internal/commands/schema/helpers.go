@@ -38,7 +38,7 @@ type FilteredSchema struct {
 
 
 func promptForOutputDirectory() (string, bool) {
-	if utils.IsOutputPiped() {
+	if !utils.IsInputInteractive() {
 		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}
@@ -122,7 +122,7 @@ func WriteSchemasToFiles(schemasResp *mgmnt.SchemasResponse, dirPath string) (*S
 			return stats, fmt.Errorf("error accessing '%s': %v", dirPath, err)
 		}
 	} else if !info.IsDir() {
-		return stats, err
+		return stats, fmt.Errorf("path '%s' exists but is not a directory", dirPath)
 	}
 
 	for _, schema := range schemasResp.Results {

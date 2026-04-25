@@ -13,9 +13,7 @@ import (
 var defaultDir = filepath.Join(".", "suprsend", "preference_categories", "translations")
 
 func promptForOutputDirectory() (string, bool) {
-	// Use utils.IsOutputPiped if available, else fallback to interactive only
-	// (Assume utils.IsOutputPiped is available as in other packages)
-	if utils.IsOutputPiped() {
+	if !utils.IsInputInteractive() {
 		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}

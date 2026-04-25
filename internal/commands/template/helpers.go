@@ -28,7 +28,7 @@ type TemplatePushStats struct {
 
 
 func promptForOutputDirectory() (string, bool) {
-	if utils.IsOutputPiped() {
+	if !utils.IsInputInteractive() {
 		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}

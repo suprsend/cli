@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var useName string
@@ -33,8 +34,7 @@ var profileUseCmd = &cobra.Command{
 		if useName == "" {
 			useName = promptForProfileToUse(cfg)
 			if useName == "" {
-				log.Error("No profile name provided")
-				return clierr.New("no profile name provided", clierr.CodeUnknown)
+				return clierr.New("required flag missing (--name), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
 			}
 		}
 
@@ -61,6 +61,9 @@ func init() {
 }
 
 func promptForProfileToUse(cfg *Config) string {
+	if !utils.IsInputInteractive() {
+		return ""
+	}
 	if len(cfg.Profiles) == 0 {
 		fmt.Println("No profiles found. Create a profile first with 'suprsend profiles add'")
 		return ""

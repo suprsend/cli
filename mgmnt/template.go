@@ -92,6 +92,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/", c.mgmnt_base_URL, workspace, slug)
 
+	// The API is an upsert — POSTing to an existing slug updates it rather than returning 409.
 	log.Debugf("Creating template %s in workspace %s", slug, workspace)
 	resp, err := client.R().
 		SetDebug(c.debug).

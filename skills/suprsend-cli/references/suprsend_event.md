@@ -8,6 +8,13 @@ Manage events. Subcommands let you list events, pull event definitions to local 
 suprsend event [flags]
 ```
 
+## Examples
+
+```
+  suprsend event get --output json
+  suprsend event pull --dir ./suprsend/events
+```
+
 ### Options
 
 ```
@@ -20,7 +27,8 @@ suprsend event [flags]
 
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color           Disable color output (default: $NO_COLOR)
+      --no-color           Disable color output (default: $NO_COLOR)
+  -q, --quiet              Suppress all log output (only fatal errors are shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 

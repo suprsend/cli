@@ -1,15 +1,27 @@
-## suprsend genskills
+## suprsend env
 
-Generate SKILLS.md
+Show recognized environment variables and their current values
+
+### Synopsis
+
+Print all environment variables recognized by suprsend, their current values,
+and how each one affects the CLI. Values for sensitive variables (tokens) are
+redacted. Useful for verifying configuration in CI/CD pipelines and agent contexts.
 
 ```
-suprsend genskills [dir] [flags]
+suprsend env [flags]
+```
+
+### Examples
+
+```
+  suprsend env
 ```
 
 ### Options
 
 ```
-  -h, --help   help for genskills
+  -h, --help   help for env
 ```
 
 ### Options inherited from parent commands

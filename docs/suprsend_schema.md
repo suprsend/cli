@@ -10,6 +10,15 @@ Manage trigger payload schemas. Schemas define the JSON structure for workflow a
 suprsend schema [flags]
 ```
 
+### Examples
+
+```
+  suprsend schema list
+  suprsend schema get order-placed
+  suprsend schema pull --dir ./suprsend/schemas
+  suprsend schema push order-placed --commit
+```
+
 ### Options
 
 ```
@@ -22,7 +31,8 @@ suprsend schema [flags]
 
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color           Disable color output (default: $NO_COLOR)
+      --no-color           Disable color output (default: $NO_COLOR)
+  -q, --quiet              Suppress all log output (only fatal errors are shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 

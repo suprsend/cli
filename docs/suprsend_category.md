@@ -10,6 +10,15 @@ Manage notification preference categories. Categories organize notification pref
 suprsend category [flags]
 ```
 
+### Examples
+
+```
+  suprsend category list
+  suprsend category get --output json
+  suprsend category pull --dir ./suprsend/categories
+  suprsend category push --commit
+```
+
 ### Options
 
 ```
@@ -22,7 +31,8 @@ suprsend category [flags]
 
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color           Disable color output (default: $NO_COLOR)
+      --no-color           Disable color output (default: $NO_COLOR)
+  -q, --quiet              Suppress all log output (only fatal errors are shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 

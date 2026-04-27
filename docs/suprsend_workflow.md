@@ -10,6 +10,15 @@ Manage workflows. Subcommands let you list, get details, pull to local files, pu
 suprsend workflow [flags]
 ```
 
+### Examples
+
+```
+  suprsend workflow list
+  suprsend workflow get welcome
+  suprsend workflow pull --dir ./suprsend/workflows
+  suprsend workflow push welcome --commit
+```
+
 ### Options
 
 ```
@@ -22,7 +31,8 @@ suprsend workflow [flags]
 
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color           Disable color output (default: $NO_COLOR)
+      --no-color           Disable color output (default: $NO_COLOR)
+  -q, --quiet              Suppress all log output (only fatal errors are shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 
@@ -31,7 +41,7 @@ suprsend workflow [flags]
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend workflow commit](suprsend_workflow_commit.md)	 - Commit workflow from draft to live
 * [suprsend workflow disable](suprsend_workflow_disable.md)	 - Disable a workflow
-* [suprsend workflow enable](suprsend_workflow_enable.md)	 - Enables a workflow.
+* [suprsend workflow enable](suprsend_workflow_enable.md)	 - Enable a workflow
 * [suprsend workflow get](suprsend_workflow_get.md)	 - Get workflow details
 * [suprsend workflow list](suprsend_workflow_list.md)	 - List workflows for a workspace
 * [suprsend workflow pull](suprsend_workflow_pull.md)	 - Pull workflows from SuprSend workspace to local

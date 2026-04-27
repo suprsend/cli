@@ -4,10 +4,19 @@ Manage templates
 
 ### Synopsis
 
-Manage templates
+Manage notification templates. Templates define the content and structure of notifications across channels (email, SMS, push, in-app, etc.). Subcommands let you list, get details, pull to local files, push from local files, and commit templates.
 
 ```
 suprsend template [flags]
+```
+
+### Examples
+
+```
+  suprsend template list
+  suprsend template get welcome-email
+  suprsend template pull --dir ./suprsend/templates
+  suprsend template push welcome-email --commit
 ```
 
 ### Options
@@ -22,7 +31,8 @@ suprsend template [flags]
 
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color           Disable color output (default: $NO_COLOR)
+      --no-color           Disable color output (default: $NO_COLOR)
+  -q, --quiet              Suppress all log output (only fatal errors are shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 

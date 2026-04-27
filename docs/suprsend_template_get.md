@@ -4,10 +4,23 @@ Get template details including variants
 
 ### Synopsis
 
-Retrieve a specific template by slug, including all its channel variants and mock data. Requires --slug. Use --mode to switch between draft and live versions.
+Retrieve a specific template by slug, including all its channel variants and mock data. Use --mode to switch between draft and live versions.
 
 ```
-suprsend template get [flags]
+suprsend template get [<slug>] [flags]
+```
+
+### Examples
+
+```
+  # Get a template by slug (positional)
+  suprsend template get welcome-email
+
+  # Get using the flag form
+  suprsend template get --slug welcome-email
+
+  # Get the draft version
+  suprsend template get welcome-email --mode draft
 ```
 
 ### Options
@@ -16,14 +29,15 @@ suprsend template get [flags]
   -h, --help            help for get
   -m, --mode string     Version mode: draft or live (default "live")
   -o, --output string   Output format: json, yaml, or pretty (default "json")
-  -g, --slug string     Template slug to retrieve (required)
+  -g, --slug string     Template slug
 ```
 
 ### Options inherited from parent commands
 
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color               Disable color output (default: $NO_COLOR)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -q, --quiet                  Suppress all log output (only fatal errors are shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace to list templates from (default "staging")

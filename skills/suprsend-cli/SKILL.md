@@ -31,6 +31,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend completion fish`](references/suprsend_completion_fish.md) - Generate the autocompletion script for fish
 - [`suprsend completion powershell`](references/suprsend_completion_powershell.md) - Generate the autocompletion script for powershell
 - [`suprsend completion zsh`](references/suprsend_completion_zsh.md) - Generate the autocompletion script for zsh
+- [`suprsend env`](references/suprsend_env.md) - Show recognized environment variables and their current values
 - [`suprsend event`](references/suprsend_event.md) - Manage events
 - [`suprsend event get`](references/suprsend_event_get.md) - Get events
 - [`suprsend event list`](references/suprsend_event_list.md) - List events
@@ -69,12 +70,13 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend translation`](references/suprsend_translation.md) - Manage Translations
 - [`suprsend translation commit`](references/suprsend_translation_commit.md) - Commit translation
 - [`suprsend translation get`](references/suprsend_translation_get.md) - Get translations
-- [`suprsend translation list`](references/suprsend_translation_list.md) - List Translations
-- [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull Translation files
+- [`suprsend translation list`](references/suprsend_translation_list.md) - List translations
+- [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull translation files
 - [`suprsend translation push`](references/suprsend_translation_push.md) - Push translation files to a workspace
 - [`suprsend workflow`](references/suprsend_workflow.md) - Manage workflows
+- [`suprsend workflow commit`](references/suprsend_workflow_commit.md) - Commit workflow from draft to live
 - [`suprsend workflow disable`](references/suprsend_workflow_disable.md) - Disable a workflow
-- [`suprsend workflow enable`](references/suprsend_workflow_enable.md) - Enables a workflow.
+- [`suprsend workflow enable`](references/suprsend_workflow_enable.md) - Enable a workflow
 - [`suprsend workflow get`](references/suprsend_workflow_get.md) - Get workflow details
 - [`suprsend workflow list`](references/suprsend_workflow_list.md) - List workflows for a workspace
 - [`suprsend workflow pull`](references/suprsend_workflow_pull.md) - Pull workflows from SuprSend workspace to local

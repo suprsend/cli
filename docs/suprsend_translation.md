@@ -10,6 +10,15 @@ Manage template translations. Subcommands let you list, pull, push, and commit t
 suprsend translation [flags]
 ```
 
+### Examples
+
+```
+  suprsend translation list
+  suprsend translation get --output json
+  suprsend translation pull --dir ./suprsend/translations
+  suprsend translation push --commit
+```
+
 ### Options
 
 ```
@@ -22,7 +31,8 @@ suprsend translation [flags]
 
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color           Disable color output (default: $NO_COLOR)
+      --no-color           Disable color output (default: $NO_COLOR)
+  -q, --quiet              Suppress all log output (only fatal errors are shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 
@@ -31,7 +41,7 @@ suprsend translation [flags]
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend translation commit](suprsend_translation_commit.md)	 - Commit translation
 * [suprsend translation get](suprsend_translation_get.md)	 - Get translations
-* [suprsend translation list](suprsend_translation_list.md)	 - List Translations
-* [suprsend translation pull](suprsend_translation_pull.md)	 - Pull Translation files
+* [suprsend translation list](suprsend_translation_list.md)	 - List translations
+* [suprsend translation pull](suprsend_translation_pull.md)	 - Pull translation files
 * [suprsend translation push](suprsend_translation_push.md)	 - Push translation files to a workspace
 

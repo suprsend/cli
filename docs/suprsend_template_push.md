@@ -4,19 +4,33 @@ Push templates and their variants from local to SuprSend workspace
 
 ### Synopsis
 
-Push templates and their variants from local to SuprSend workspace
+Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.
 
 ```
-suprsend template push [flags]
+suprsend template push [<slug>] [flags]
+```
+
+### Examples
+
+```
+  # Push all templates from default directory
+  suprsend template push
+
+  # Push a single template and commit to live immediately
+  suprsend template push welcome-email --commit
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend template push --dry-run
 ```
 
 ### Options
 
 ```
   -c, --commit                  Commit the pushed templates to live
-  -m, --commit-message string   Commit message describing the changes
+      --commit-message string   Commit message describing the changes
   -d, --dir string              Input directory for templates (default: ./suprsend/templates)
-  -f, --force                   Force commit by skipping variants with errors
+  -n, --dry-run                 Print what would be pushed without making any changes
+  -F, --force                   Force commit by skipping variants with errors
   -h, --help                    help for push
   -g, --slug string             Slug of a specific template to push
 ```
@@ -25,7 +39,8 @@ suprsend template push [flags]
 
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color               Disable color output (default: $NO_COLOR)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -q, --quiet                  Suppress all log output (only fatal errors are shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace to list templates from (default "staging")

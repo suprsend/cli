@@ -8,6 +8,19 @@ Retrieve all template translations from a workspace. Returns translation content
 suprsend translation get [flags]
 ```
 
+## Examples
+
+```
+  # Get all translations (live mode)
+  suprsend translation get
+
+  # Get draft translations
+  suprsend translation get --mode draft
+
+  # Get with JSON output
+  suprsend translation get --output json
+```
+
 ### Tips
 
 - Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.
@@ -16,7 +29,7 @@ suprsend translation get [flags]
 
 ```
   -h, --help            help for get
-      --mode string     Version mode: draft or live (default "live")
+  -m, --mode string     Version mode: draft or live (default "live")
   -o, --output string   Output format: json or yaml (default "json")
 ```
 
@@ -24,7 +37,8 @@ suprsend translation get [flags]
 
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color               Disable color output (default: $NO_COLOR)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -q, --quiet                  Suppress all log output (only fatal errors are shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")

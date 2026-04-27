@@ -217,11 +217,17 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 		// Check if the value is a @file reference
 		strVal, isStr := val.(string)
 		if !isStr {
-			// Non-string value: for JSON-backed fields, accept structured data as-is
-			if filepath.Ext(cfg.Filename(variant)) == ".json" {
+			// Non-string value: if this field must be a JSON string for the API,
+			// stringify it now so inline objects in variant.json are handled correctly.
+			if cfg.StringifyJSON {
 				switch val.(type) {
 				case map[string]any, []any:
-					// valid JSON structure, keep it
+					b, err := json.Marshal(val)
+					if err != nil {
+						log.Warnf("Failed to stringify inline JSON at %s: %v", path, err)
+					} else {
+						parent[lastKey] = string(b)
+					}
 				default:
 					log.Warnf("Inline value at %s has unsupported type %T", path, val)
 				}

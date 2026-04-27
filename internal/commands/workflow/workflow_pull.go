@@ -61,9 +61,6 @@ var workflowPullCmd = &cobra.Command{
 				log.Errorf("Failed to get workflow detail: %v", err)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
-			if workflowResp != nil {
-				(*workflowResp)["$schema"] = "https://schema.suprsend.com/workflow/v1/schema.json"
-			}
 			workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
 			if err != nil {
 				log.Errorf("Failed to marshal workflow: %v", err)

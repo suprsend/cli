@@ -195,7 +195,6 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		}
 
 		wf["slug"] = slug
-		delete(wf, "$schema")
 
 		if dryRun {
 			log.Infof("DRY RUN: would push workflow %s to %s", slug, toWorkspace)

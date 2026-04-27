@@ -87,7 +87,6 @@ var workflowPushCmd = &cobra.Command{
 					} else {
 						// path wins: --slug flag value is authoritative
 						workflow["slug"] = slug
-						delete(workflow, "$schema")
 					}
 				}
 			}
@@ -194,7 +193,6 @@ var workflowPushCmd = &cobra.Command{
 				log.Warnf("workflows/%s: workflow.json#slug is %q but directory is %q — using directory value", slug, jsonSlug, slug)
 				workflow["slug"] = slug
 			}
-			delete(workflow, "$schema")
 
 			if dryRun {
 				dryRunSlugs = append(dryRunSlugs, slug)

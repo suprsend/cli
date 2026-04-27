@@ -511,11 +511,10 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		pushStats.Total++
 		slug := entry.Name()
 		templateDir := filepath.Join(dirPath, slug)
-		log.Infof("Pushing template %s to %s ...", slug, toWorkspace)
 		template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun, pushStats)
 	}
 
-	if pushStats.Success > 0 {
+	if pushStats.Success > 0 && !dryRun {
 		log.Printf("Pushed %d template(s) to %s", pushStats.Success, toWorkspace)
 	}
 

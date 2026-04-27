@@ -49,6 +49,16 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	}
 
 	if dryRun {
+		channels := make([]string, 0, len(variants))
+		seen := map[string]bool{}
+		for _, v := range variants {
+			ch, _ := v["channel"].(string)
+			if ch != "" && !seen[ch] {
+				channels = append(channels, ch)
+				seen[ch] = true
+			}
+		}
+		log.Infof("DRY RUN: would push template '%s' — %d variant(s), channels: %v", slug, len(variants), channels)
 		stats.Success++
 		return
 	}

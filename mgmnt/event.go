@@ -64,8 +64,7 @@ func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListE
 		return nil, err
 	}
 	if res.IsError() {
-		log.Errorf("Error getting events: %s", res.Status())
-		return nil, fmt.Errorf("error getting events: %s", res.Status())
+		return nil, apiError(res)
 	}
 	events := res.Result().(*ListEventsResponse)
 	return events, nil
@@ -105,8 +104,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 			return nil, err
 		}
 		if res.IsError() {
-			log.Errorf("Error getting events: %s", res.Status())
-			return nil, fmt.Errorf("error getting events: %s", res.Status())
+			return nil, apiError(res)
 		}
 		events := res.Result().(*EventsResponse)
 		if len(events.Results) == 0 {
@@ -144,12 +142,7 @@ func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]a
 		return err
 	}
 	if res.IsError() {
-		var errorResponse ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResponse); err != nil {
-			log.Errorf("Error parsing error response: %s", err)
-			return fmt.Errorf("error pushing event: %s", res.Status())
-		}
-		return fmt.Errorf("error pushing event: %s", errorResponse.Message)
+		return apiError(res)
 	}
 	return nil
 }

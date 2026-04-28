@@ -1,7 +1,6 @@
 package mgmnt
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -52,11 +51,7 @@ func (c *SS_MgmntClient) ListTranslations(workspace, mode, includeContent string
 		return nil, err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed with status: %s", res.Status())
+		return nil, apiError(res)
 	}
 
 	translations := res.Result().(*ListTranslation)
@@ -89,11 +84,7 @@ func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationRe
 		}
 
 		if res.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed with status: %s", res.Status())
+			return nil, apiError(res)
 		}
 
 		translations := res.Result().(*TranslationResponse)
@@ -135,11 +126,7 @@ func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation
 		return err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed with status: %s", res.Status())
+		return apiError(res)
 	}
 	return nil
 }
@@ -158,11 +145,7 @@ func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) er
 		return err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed with status: %s", res.Status())
+		return apiError(res)
 	}
 	return nil
 }

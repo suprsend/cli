@@ -62,11 +62,7 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 			return nil, err
 		}
 		if resp.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed: %s", resp.Status())
+			return nil, apiError(resp)
 		}
 
 		page := resp.Result().(*TemplateVariantResponse)
@@ -106,11 +102,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", resp.Status())
+		return apiError(resp)
 	}
 	return nil
 }
@@ -142,11 +134,7 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 		return err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", resp.Status())
+		return apiError(resp)
 	}
 	return nil
 }
@@ -185,11 +173,7 @@ func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitVa
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 	return resp.Result().(*PreCommitValidateResponse), nil
 }
@@ -222,11 +206,7 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", resp.Status())
+		return apiError(resp)
 	}
 	return nil
 }
@@ -249,11 +229,7 @@ func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string
 		return nil, nil
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 
 	var result map[string]any
@@ -281,11 +257,7 @@ func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData 
 		return err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", resp.Status())
+		return apiError(resp)
 	}
 	return nil
 }
@@ -310,11 +282,7 @@ func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, e
 		return nil, err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 	return resp.Result().(*Template), nil
 }
@@ -348,11 +316,7 @@ func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, 
 			return nil, err
 		}
 		if res.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed: %s", res.Status())
+			return nil, apiError(res)
 		}
 
 		templates := res.Result().(*TemplateAPIResponse)
@@ -416,11 +380,7 @@ func (c *SS_MgmntClient) GetVariantOrder(workspace, slug, mode string) (*Variant
 		return nil, err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 	return resp.Result().(*VariantOrderResponse), nil
 }
@@ -446,11 +406,7 @@ func (c *SS_MgmntClient) PostVariantOrder(workspace, slug, mode string, order *V
 		return err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", resp.Status())
+		return apiError(resp)
 	}
 	return nil
 }

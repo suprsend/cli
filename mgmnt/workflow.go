@@ -1,7 +1,6 @@
 package mgmnt
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -98,11 +97,7 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 			return nil, err
 		}
 		if res.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed: %s", res.Status())
+			return nil, apiError(res)
 		}
 
 		workflows := res.Result().(*WorkflowAPIResponse)
@@ -157,11 +152,7 @@ func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (
 		return nil, err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 	return resp.Result().(*map[string]any), nil
 }
@@ -192,11 +183,7 @@ func (c *SS_MgmntClient) GetWorkflowDetail(workspace, slug, mode string) (*Workf
 		return nil, err
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 
 	workflowResp := resp.Result().(*WorkflowDetailResponse)
@@ -242,11 +229,7 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 		}
 
 		if res.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed: %s", res.Status())
+			return nil, apiError(res)
 		}
 
 		workflows := res.Result().(*WorkflowsResponse)
@@ -309,11 +292,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		return err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", res.Status())
+		return apiError(res)
 	}
 	if commit {
 		validationResult := res.Result().(*WorkflowPushResponse)
@@ -353,11 +332,7 @@ func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string)
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", res.Status())
+		return apiError(res)
 	}
 	return nil
 }
@@ -404,7 +379,7 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 		if res.StatusCode() == 404 {
 			return fmt.Errorf("workflow not found: %s", slug)
 		}
-		return fmt.Errorf("%s failed: %s", action, res.Status())
+		return apiError(res)
 	}
 
 	return nil

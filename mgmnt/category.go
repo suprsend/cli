@@ -1,7 +1,6 @@
 package mgmnt
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -86,11 +85,7 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	}
 
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed with status: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 
 	result := resp.Result().(*PreferenceCategoryResponse)
@@ -124,11 +119,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed with status: %s", resp.Status())
+		return apiError(resp)
 	}
 	if commit {
 		result := resp.Result().(*CategoryPushResponse)
@@ -163,10 +154,7 @@ func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage stri
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
+		return apiError(resp)
 	}
 	return nil
 }

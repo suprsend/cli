@@ -1,7 +1,6 @@
 package mgmnt
 
 import (
-	"encoding/json"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -40,11 +39,7 @@ func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPref
 		return nil, err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed with status: %s", res.Status())
+		return nil, apiError(res)
 	}
 
 	translations := res.Result().(*ListPreferenceTranslation)
@@ -68,11 +63,7 @@ func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale st
 		return nil, err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed with status: %s", res.Status())
+		return nil, apiError(res)
 	}
 
 	translations := res.Result().(*PreferenceTranslationContent)
@@ -95,11 +86,7 @@ func (c *SS_MgmntClient) PushPreferenceTranslation(workspace, locale string, tra
 		return err
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed with status: %s", res.Status())
+		return apiError(res)
 	}
 	return nil
 }

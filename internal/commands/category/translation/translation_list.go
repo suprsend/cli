@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -32,7 +33,7 @@ var translationListCmd = &cobra.Command{
 
 func listTranslations(workspace, outputType string) error {
 	if workspace == "" {
-		return fmt.Errorf("workspace flag is required")
+		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
 
 	mgmntClient := utils.GetSuprSendMgmntClient()

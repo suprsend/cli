@@ -36,7 +36,7 @@ var schemaPushCmd = &cobra.Command{
 		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
-			return fmt.Errorf("--json requires --slug to be specified")
+			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()

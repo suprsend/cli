@@ -28,8 +28,7 @@ var templateCommitCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
-			log.Error("template slug is required: provide it as a positional argument or via --slug")
-			return fmt.Errorf("template slug is required: provide it as a positional argument or via --slug")
+			return clierr.New("template slug is required: provide it as a positional argument or via --slug", clierr.CodeInvalidUsage)
 		}
 
 		workspace, _ := cmd.Flags().GetString("workspace")

@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -34,7 +35,7 @@ var translationPullCmd = &cobra.Command{
 
 func PullTranslations(workspace, outputDir string, force bool) error {
 	if workspace == "" {
-		return fmt.Errorf("workspace flag is required")
+		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
 
 	if outputDir == "" {

@@ -31,7 +31,7 @@ var templateGetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
-			return fmt.Errorf("slug is required: provide it as a positional argument or via --slug")
+			return clierr.New("slug is required: provide it as a positional argument or via --slug", clierr.CodeInvalidUsage)
 		}
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")

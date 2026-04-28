@@ -25,8 +25,7 @@ var workflowCommitCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
-			log.Error("workflow slug is required: provide it as a positional argument or via --slug")
-			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
+			return clierr.New("workflow slug is required: provide it as a positional argument or via --slug", clierr.CodeInvalidUsage)
 		}
 
 		workspace, _ := cmd.Flags().GetString("workspace")

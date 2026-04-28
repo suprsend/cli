@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -36,7 +37,7 @@ var translationPushCmd = &cobra.Command{
 
 func PushTranslations(workspace, locale, dir string) error {
 	if workspace == "" {
-		return fmt.Errorf("workspace flag is required")
+		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
 
 	// Determine the translations directory

@@ -25,8 +25,7 @@ var schemaCommitCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
-			log.Error("schema slug is required: provide it as a positional argument or via --slug")
-			return fmt.Errorf("schema slug is required: provide it as a positional argument or via --slug")
+			return clierr.New("schema slug is required: provide it as a positional argument or via --slug", clierr.CodeInvalidUsage)
 		}
 
 		workspace, _ := cmd.Flags().GetString("workspace")

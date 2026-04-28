@@ -1,8 +1,6 @@
 package workflow
 
 import (
-	"fmt"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
@@ -26,8 +24,7 @@ var worklowEnableCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
-			log.Error("workflow slug is required: provide it as a positional argument or via --slug")
-			return fmt.Errorf("workflow slug is required: provide it as a positional argument or via --slug")
+			return clierr.New("workflow slug is required: provide it as a positional argument or via --slug", clierr.CodeInvalidUsage)
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")

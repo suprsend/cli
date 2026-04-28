@@ -6,7 +6,6 @@ package template
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/utils"
 )
@@ -23,7 +22,7 @@ var templateListCmd = &cobra.Command{
 
   # Paginate with JSON output
   suprsend template list --limit 50 --output json`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		spinner := utils.NewSpinner("Loading...")
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -34,8 +33,7 @@ var templateListCmd = &cobra.Command{
 
 		templates, err := mgmntClient.ListTemplates(workspace, limit, offset, mode)
 		if err != nil {
-			log.WithError(err).Error("Couldn't fetch templates")
-			return
+			return err
 		}
 
 		spinner.Stop(fmt.Sprintf("Listed %d templates from %s with offset %d", len(templates.Results), workspace, offset))
@@ -43,9 +41,10 @@ var templateListCmd = &cobra.Command{
 
 		if len(templates.Results) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)
-			return
+			return nil
 		}
 		utils.OutputData(templates.Results, outputType)
+		return nil
 	},
 }
 

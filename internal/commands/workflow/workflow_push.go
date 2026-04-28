@@ -41,16 +41,10 @@ var workflowPushCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
-		stats := &WorkflowPushStats{
-			Errors: []string{},
-		}
-
 		hasError := false
 		var spinner *utils.Spinner
 
 		if slug != "" {
-			stats.Total = 1
-
 			var workflow map[string]any
 			if jsonPayload != "" {
 				if err := json.Unmarshal([]byte(jsonPayload), &workflow); err != nil {
@@ -61,75 +55,45 @@ var workflowPushCmd = &cobra.Command{
 					path = filepath.Join(".", "suprsend", "workflows")
 				}
 				if _, err := os.Stat(path); os.IsNotExist(err) {
-					log.Errorf("Directory %s does not exist", path)
-					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+					return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("directory %s does not exist", path))
 				}
 				if err := validateInputDirectory(path); err != nil {
-					log.Errorf("Error with input directory: %v\n", err)
-					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "error with input directory")
 				}
 
 				filePath := filepath.Join(path, slug, "workflow.json")
-				if _, err := os.Stat(filePath); err != nil {
-					log.WithError(err).Errorf("Failed to find workflow file %s", filePath)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to find workflow file %s: %v", filePath, err))
-				} else {
-					data, err := os.ReadFile(filePath)
-					if err != nil {
-						log.WithError(err).Errorf("Failed to read workflow file %s", filePath)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read workflow file %s: %v", filePath, err))
-					} else if err := json.Unmarshal(data, &workflow); err != nil {
-						log.WithError(err).Errorf("Failed to parse JSON for %s", filePath)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", filePath, err))
-					} else {
-						// path wins: --slug flag value is authoritative
-						workflow["slug"] = slug
-					}
+				data, err := os.ReadFile(filePath)
+				if err != nil {
+					return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to read workflow file %s", filePath))
 				}
+				if err := json.Unmarshal(data, &workflow); err != nil {
+					return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse JSON for %s", filePath))
+				}
+				// path wins: --slug flag value is authoritative
+				workflow["slug"] = slug
 			}
 
-			if workflow != nil {
-				if dryRun {
-					action := "push"
-					if commit {
-						action = "push and commit"
-					}
-					log.Infof("DRY RUN: would %s workflow '%s' to %s", action, slug, workspace)
-					stats.Success++
-				} else {
-					spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-					err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
-					if err == nil {
-						spinner.Stop(fmt.Sprintf("Pushed workflow: %s", slug))
-					} else {
-						spinner.Stop("")
-					}
-					if err != nil {
-						log.WithError(err).Errorf("Failed to push workflow %s", slug)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push workflow %s: %v", slug, err))
-					} else {
-						stats.Success++
-					}
+			if dryRun {
+				action := "push"
+				if commit {
+					action = "push and commit"
 				}
+				log.Infof("DRY RUN: would %s workflow '%s' to %s", action, slug, workspace)
+				return nil
 			}
 
-			log.Info("=== Workflow Push Summary ===")
-			log.Infof("Total workflows processed: %d", stats.Total)
-			log.Infof("Successfully pushed: %d", stats.Success)
-			log.Infof("Failed to push: %d", stats.Failed)
-
-			if stats.Failed > 0 {
-				log.Info("Failed workflows:")
-				for _, errorMsg := range stats.Errors {
-					log.Infof("  - %s", errorMsg)
-				}
-				return clierr.New(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			if err != nil {
+				spinner.Stop("")
+				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push workflow %s", slug))
 			}
+			spinner.Stop(fmt.Sprintf("Pushed workflow: %s", slug))
 			return nil
+		}
+
+		stats := &WorkflowPushStats{
+			Errors: []string{},
 		}
 
 		if path == "" {

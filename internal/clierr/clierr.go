@@ -5,7 +5,6 @@ import (
 	"errors"
 )
 
-// Error code constants — stable taxonomy from the CLI spec (§8).
 const (
 	CodeAuthMissingToken  = "auth-missing-token"
 	CodeAuthInvalidToken  = "auth-invalid-token"
@@ -25,7 +24,6 @@ const (
 	CodeUnknown           = "unknown"
 )
 
-// Numeric exit codes — stable taxonomy from the CLI spec (§9).
 const (
 	ExitSuccess      = 0  // every resource in scope completed without error
 	ExitGeneralError = 1  // general error / API failure / any partial failure

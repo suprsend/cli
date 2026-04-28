@@ -4,13 +4,17 @@ Copyright © 2025 SuprSend
 package commands
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/suprsend/cli/internal/clierr"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category"
 	"github.com/suprsend/cli/internal/commands/event"
 	"github.com/suprsend/cli/internal/commands/profiles"
@@ -34,11 +38,48 @@ var rootCmd = &cobra.Command{
 
 // Execute runs the root command and handles structured error output.
 func Execute() error {
+	// Run early setup so flag-parse errors (unknown flags) also get proper
+	// silencing and log formatting — PersistentPreRunE won't fire in that case.
+	earlySetup()
 	err := rootCmd.Execute()
 	if err != nil {
+		if isCobraUsageError(err) {
+			err = clierr.Wrap(err, clierr.CodeInvalidUsage, "")
+		}
 		utils.WriteError(err)
 	}
 	return err
+}
+
+func isCobraUsageError(err error) bool {
+	var notExist *pflag.NotExistError
+	var valueRequired *pflag.ValueRequiredError
+	var invalidValue *pflag.InvalidValueError
+	var invalidSyntax *pflag.InvalidSyntaxError
+	return errors.As(err, &notExist) ||
+		errors.As(err, &valueRequired) ||
+		errors.As(err, &invalidValue) ||
+		errors.As(err, &invalidSyntax) ||
+		strings.Contains(err.Error(), "unknown command")
+}
+
+// earlySetup scans raw os.Args to apply critical initialization before Cobra
+// parses flags. This ensures correct behavior even when flag parsing fails.
+func earlySetup() {
+	conf := config.Cfg
+	args := os.Args[1:]
+	for i, arg := range args {
+		switch {
+		case arg == "--output=json" || arg == "-o=json":
+			conf.OutputType = "json"
+		case (arg == "--output" || arg == "-o") && i+1 < len(args) && args[i+1] == "json":
+			conf.OutputType = "json"
+		}
+	}
+	if config.ShouldJSONErrors() {
+		rootCmd.SilenceErrors = true
+		rootCmd.SilenceUsage = true
+	}
 }
 
 func init() {
@@ -78,11 +119,13 @@ func init() {
 		if outputType, err := cmd.Flags().GetString("output"); err == nil && outputType != "" {
 			conf.OutputType = outputType
 		}
-		// Silence cobra's own error/usage output only in JSON errors mode,
-		// so cobra's default pretty-mode "Error: ..." line still works normally.
-		if config.ShouldJSONErrors() {
-			rootCmd.SilenceErrors = true
-			rootCmd.SilenceUsage = true
+		switch conf.OutputType {
+		case "pretty", "json", "yaml":
+		default:
+			return clierr.New(
+				fmt.Sprintf("invalid output format %q: must be pretty, json, or yaml", conf.OutputType),
+				clierr.CodeInvalidUsage,
+			)
 		}
 		if err := config.SetUpLogs(); err != nil {
 			return err

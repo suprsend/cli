@@ -86,7 +86,7 @@ func init() {
 	conf := config.Cfg
 	rootCmd.Flags().StringVarP(&conf.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	rootCmd.PersistentFlags().StringVar(&conf.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
-	rootCmd.Flags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
+	rootCmd.PersistentFlags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
 	rootCmd.PersistentFlags().StringVarP(&conf.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.Flags().StringVarP(&conf.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	rootCmd.PersistentFlags().BoolVar(&conf.NoColorOutput, "no-color", false, "Disable color output (default: $NO_COLOR)")
@@ -116,9 +116,6 @@ func init() {
 	rootCmd.AddCommand(template.TemplateCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if outputType, err := cmd.Flags().GetString("output"); err == nil && outputType != "" {
-			conf.OutputType = outputType
-		}
 		switch conf.OutputType {
 		case "pretty", "json", "yaml":
 		default:

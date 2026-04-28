@@ -76,7 +76,6 @@ var categoryListCmd = &cobra.Command{
 
 func init() {
 	categoryListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	categoryListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	CategoryCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	CategoryCmd.AddCommand(categoryListCmd)
 }

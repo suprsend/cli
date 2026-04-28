@@ -109,6 +109,5 @@ var listProfilesCmd = &cobra.Command{
 }
 
 func init() {
-	listProfilesCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	ProfileCmd.AddCommand(listProfilesCmd)
 }

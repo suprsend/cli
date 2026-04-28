@@ -53,6 +53,5 @@ var schemaGetCmd = &cobra.Command{
 func init() {
 	schemaGetCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug")
 	schemaGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	schemaGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	SchemaCmd.AddCommand(schemaGetCmd)
 }

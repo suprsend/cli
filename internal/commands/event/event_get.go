@@ -46,6 +46,5 @@ var eventGetCmd = &cobra.Command{
 }
 
 func init() {
-	eventGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	EventCmd.AddCommand(eventGetCmd)
 }

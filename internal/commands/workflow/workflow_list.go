@@ -58,7 +58,6 @@ func init() {
 	workflowListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of workflows to return")
 	workflowListCmd.PersistentFlags().Int("offset", 0, "Number of workflows to skip for pagination")
 	workflowListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	workflowListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	workflowListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})

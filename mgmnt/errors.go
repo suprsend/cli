@@ -21,6 +21,9 @@ func apiError(resp *resty.Response) error {
 		msg := extractMessage(resp, "access denied: service token lacks permission for this resource")
 		return clierr.New(msg, clierr.CodeAuthForbidden).
 			WithHint("Ensure the service token has the required permissions")
+	case http.StatusNotFound:
+		msg := extractMessage(resp, "resource not found")
+		return clierr.New(msg, clierr.CodeAPINotFound)
 	}
 	msg := extractMessage(resp, "")
 	if msg != "" {

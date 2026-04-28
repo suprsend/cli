@@ -376,9 +376,6 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 	}
 
 	if res.IsError() {
-		if res.StatusCode() == 404 {
-			return fmt.Errorf("workflow not found: %s", slug)
-		}
 		return apiError(res)
 	}
 

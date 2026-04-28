@@ -49,7 +49,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&conf.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.Flags().StringVarP(&conf.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	rootCmd.PersistentFlags().BoolVar(&conf.NoColorOutput, "no-color", false, "Disable color output (default: $NO_COLOR)")
-	rootCmd.PersistentFlags().BoolVarP(&conf.Quiet, "quiet", "q", false, "Suppress all log output (only fatal errors are shown)")
+	rootCmd.PersistentFlags().BoolVarP(&conf.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
 
 	viper.BindPFlag("service_token", rootCmd.PersistentFlags().Lookup("service-token"))
 	viper.BindPFlag("NO_COLOR", rootCmd.PersistentFlags().Lookup("no-color"))

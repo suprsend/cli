@@ -122,7 +122,7 @@ func SetUpLogs() error {
 
 	if Cfg.Quiet {
 		log.SetOutput(os.Stderr)
-		log.SetLevel(log.FatalLevel)
+		log.SetLevel(log.ErrorLevel)
 		return nil
 	}
 	if viper.GetBool("debug") {

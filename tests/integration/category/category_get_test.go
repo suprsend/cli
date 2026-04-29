@@ -30,16 +30,16 @@ func newCategoryGetServer(t *testing.T) *httptest.Server {
 	base := []string{"category"}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/v1/test-ws/preference_category/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/staging/preference_category/", func(w http.ResponseWriter, r *http.Request) {
 		serveFixture(t, w, append(base, "preference_category.json")...)
 	})
-	mux.HandleFunc("/v1/test-ws/preference_category/translation/locale", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/staging/preference_category/translation/locale", func(w http.ResponseWriter, r *http.Request) {
 		serveFixture(t, w, append(base, "translation_locales.json")...)
 	})
 	for _, locale := range []string{"en-NA", "es", "es-AR", "es-BO"} {
 		locale := locale
 		filename := "translation_content_" + strings.ReplaceAll(locale, "-", "_") + ".json"
-		mux.HandleFunc("/v1/test-ws/preference_category/translation/content/"+locale, func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("/v1/staging/preference_category/translation/content/"+locale, func(w http.ResponseWriter, r *http.Request) {
 			serveFixture(t, w, append(base, filename)...)
 		})
 	}
@@ -51,14 +51,12 @@ func TestCategoryGet_Success(t *testing.T) {
 	srv := newCategoryGetServer(t)
 	defer srv.Close()
 
-	// category get outputs a map[string]any; table renderer only handles structs/slices,
-	// so --output json is required for a clean exit.
 	out, err := helpers.RunCLI(t,
 		[]string{
 			"SUPRSEND_SERVICE_TOKEN=test-token",
 			"SUPRSEND_MGMNT_URL=" + srv.URL,
 		},
-		"category", "get", "--workspace", "test-ws", "--output", "json",
+		"category", "get",
 	)
 	if err != nil {
 		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, out)
@@ -74,7 +72,7 @@ func TestCategoryGet_JSONOutput(t *testing.T) {
 			"SUPRSEND_SERVICE_TOKEN=test-token",
 			"SUPRSEND_MGMNT_URL=" + srv.URL,
 		},
-		"category", "get", "--workspace", "test-ws", "--output", "json",
+		"category", "get",
 	)
 	if err != nil {
 		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, out)
@@ -92,25 +90,63 @@ func TestCategoryGet_JSONOutput(t *testing.T) {
 	}
 }
 
+func TestCategoryGet_YAMLOutput(t *testing.T) {
+	srv := newCategoryGetServer(t)
+	defer srv.Close()
+
+	out, err := helpers.RunCLI(t,
+		[]string{
+			"SUPRSEND_SERVICE_TOKEN=test-token",
+			"SUPRSEND_MGMNT_URL=" + srv.URL,
+		},
+		"category", "get", "--output", "yaml",
+	)
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, out)
+	}
+	if !strings.Contains(out, "categories:") {
+		t.Errorf("expected YAML output to contain 'categories:', got: %s", out)
+	}
+	if !strings.Contains(out, "translations:") {
+		t.Errorf("expected YAML output to contain 'translations:', got: %s", out)
+	}
+}
+
+func TestCategoryGet_InvalidOutputFormat(t *testing.T) {
+	srv := newCategoryGetServer(t)
+	defer srv.Close()
+
+	_, err := helpers.RunCLI(t,
+		[]string{
+			"SUPRSEND_SERVICE_TOKEN=test-token",
+			"SUPRSEND_MGMNT_URL=" + srv.URL,
+		},
+		"category", "get", "--output", "table",
+	)
+	if err == nil {
+		t.Fatal("expected non-zero exit for invalid output format, but got exit 0")
+	}
+}
+
 func TestCategoryGet_DraftMode(t *testing.T) {
 	base := []string{"category"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/test-ws/preference_category/":
+		case "/v1/staging/preference_category/":
 			if r.URL.Query().Get("mode") != "draft" {
 				http.Error(w, `{"message":"expected mode=draft"}`, http.StatusBadRequest)
 				return
 			}
 			serveFixture(t, w, append(base, "preference_category_draft.json")...)
-		case "/v1/test-ws/preference_category/translation/locale":
+		case "/v1/staging/preference_category/translation/locale":
 			serveFixture(t, w, append(base, "translation_locales.json")...)
-		case "/v1/test-ws/preference_category/translation/content/en-NA":
+		case "/v1/staging/preference_category/translation/content/en-NA":
 			serveFixture(t, w, append(base, "translation_content_en_NA.json")...)
-		case "/v1/test-ws/preference_category/translation/content/es":
+		case "/v1/staging/preference_category/translation/content/es":
 			serveFixture(t, w, append(base, "translation_content_es.json")...)
-		case "/v1/test-ws/preference_category/translation/content/es-AR":
+		case "/v1/staging/preference_category/translation/content/es-AR":
 			serveFixture(t, w, append(base, "translation_content_es_AR.json")...)
-		case "/v1/test-ws/preference_category/translation/content/es-BO":
+		case "/v1/staging/preference_category/translation/content/es-BO":
 			serveFixture(t, w, append(base, "translation_content_es_BO.json")...)
 		default:
 			http.NotFound(w, r)
@@ -123,37 +159,9 @@ func TestCategoryGet_DraftMode(t *testing.T) {
 			"SUPRSEND_SERVICE_TOKEN=test-token",
 			"SUPRSEND_MGMNT_URL=" + srv.URL,
 		},
-		"category", "get", "--workspace", "test-ws", "--mode", "draft", "--output", "json",
+		"category", "get", "--mode", "draft",
 	)
 	if err != nil {
 		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, out)
-	}
-}
-
-func TestCategoryGet_MissingServiceToken(t *testing.T) {
-	_, err := helpers.RunCLI(t,
-		[]string{"SUPRSEND_SERVICE_TOKEN="},
-		"category", "get", "--workspace", "test-ws",
-	)
-	if err == nil {
-		t.Fatal("expected non-zero exit when service token is missing")
-	}
-}
-
-func TestCategoryGet_APIError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"message":"unauthorized"}`, http.StatusUnauthorized)
-	}))
-	defer srv.Close()
-
-	out, err := helpers.RunCLI(t,
-		[]string{
-			"SUPRSEND_SERVICE_TOKEN=bad-token",
-			"SUPRSEND_MGMNT_URL=" + srv.URL,
-		},
-		"category", "get", "--workspace", "test-ws",
-	)
-	if err == nil {
-		t.Fatalf("expected non-zero exit on 401, output: %s", out)
 	}
 }

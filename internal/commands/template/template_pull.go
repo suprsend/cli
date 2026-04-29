@@ -14,7 +14,13 @@ import (
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
+	"golang.org/x/sync/errgroup"
 )
+
+// templateFetchConcurrency caps in-flight template detail fetches when pulling
+// the full workspace. Each template requires three sequential GETs (variants,
+// mock data, variant order); fanning out across templates is the easy win.
+const templateFetchConcurrency = 20
 
 type TemplateResult struct {
 	Slug            string                      `json:"slug"`
@@ -66,28 +72,46 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) 
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
 	}
 
-	for _, t := range templates.Results {
-		variants, err := client.GetTemplateVariants(workspace, t.Slug, mode)
-		if err != nil {
-			log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
-			continue
-		}
-		mockData, err := client.GetTemplateMockData(workspace, t.Slug)
-		if err != nil {
-			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
-		}
-		variantOrder, err := client.GetVariantOrder(workspace, t.Slug, mode)
-		if err != nil {
-			log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
-		}
-		results = append(results, TemplateResult{
-			Slug:            t.Slug,
-			Name:            t.Name,
-			EnabledChannels: t.EnabledChannels,
-			Variants:        variants,
-			MockData:        mockData,
-			VariantOrder:    variantOrder,
+	// Per-template fetch is three sequential GETs; for workspaces with many
+	// templates the serial form takes minutes. Parallelize across templates
+	// with bounded concurrency. A failed variants fetch skips that template
+	// (slot stays nil); mock-data / variant-order failures only log.
+	slots := make([]*TemplateResult, len(templates.Results))
+	g := new(errgroup.Group)
+	g.SetLimit(templateFetchConcurrency)
+	for i, t := range templates.Results {
+		i, t := i, t
+		g.Go(func() error {
+			variants, err := client.GetTemplateVariants(workspace, t.Slug, mode)
+			if err != nil {
+				log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
+				return nil
+			}
+			mockData, err := client.GetTemplateMockData(workspace, t.Slug)
+			if err != nil {
+				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
+			}
+			variantOrder, err := client.GetVariantOrder(workspace, t.Slug, mode)
+			if err != nil {
+				log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
+			}
+			slots[i] = &TemplateResult{
+				Slug:            t.Slug,
+				Name:            t.Name,
+				EnabledChannels: t.EnabledChannels,
+				Variants:        variants,
+				MockData:        mockData,
+				VariantOrder:    variantOrder,
+			}
+			return nil
 		})
+	}
+	_ = g.Wait()
+
+	for _, s := range slots {
+		if s != nil {
+			results = append(results, *s)
+		}
 	}
 	return results, nil
 }

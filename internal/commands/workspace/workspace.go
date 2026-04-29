@@ -17,6 +17,5 @@ var WorkspaceCmd = &cobra.Command{
 }
 
 func init() {
-	WorkspaceCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	WorkspaceCmd.AddCommand(workspaceListCmd)
 }

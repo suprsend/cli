@@ -66,6 +66,5 @@ func init() {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})
 	WorkflowCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
-	WorkflowCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	WorkflowCmd.AddCommand(workflowListCmd)
 }

@@ -60,6 +60,5 @@ func init() {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})
 	TemplateCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to list templates from")
-	TemplateCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	TemplateCmd.AddCommand(templateListCmd)
 }

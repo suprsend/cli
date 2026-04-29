@@ -15,6 +15,13 @@ type TranslationItem struct {
 	VersionNo     *int   `json:"version_no"`
 	VersionStatus string `json:"version_status"`
 	Action        string `json:"action"`
+	// Content is populated only when the caller passes
+	// include_content=true. Translation payloads are free-form key/value
+	// maps (the keys are template tokens, the values are the localized
+	// strings), so map[string]any covers both flat and nested shapes
+	// without losing information. omitempty keeps it out of the JSON
+	// output when include_content was not requested.
+	Content map[string]any `json:"content,omitempty"`
 }
 
 type ListTranslation struct {

@@ -66,3 +66,15 @@ Uses goreleaser (`.goreleaser.yaml`). Builds include macOS notarization and Home
 After goreleaser, the release workflow also publishes to npm via `scripts/publish-npm.sh`. This ships seven packages at the same version: the unscoped root `suprsend` (a Node shim) and six platform packages `@suprsend/cli-<os>-<arch>` (darwin/linux/win32 × x64/arm64), each carrying the matching goreleaser binary. Package sources live under `npm/`. Users run `npx suprsend` or `npm i -g suprsend`.
 
 After npm publish, the workflow publishes the MCP server metadata to the [MCP Registry](https://modelcontextprotocol.io/registry) via `mcp-publisher`. The manifest is `server.json` at the repo root and references the `suprsend` npm package; ownership is verified by the `mcpName: io.github.suprsend/cli` field in `npm/suprsend/package.json` (which must match `server.json#name`). Authentication is via GitHub OIDC — no extra secrets needed. The MCP host launches the server as `npx -y suprsend start-mcp-server` (`packageArguments` in `server.json`).
+
+#### Pre-release tags (beta / rc / alpha / canary)
+
+Tags with a SemVer pre-release suffix (`0.3.0-beta.1`, `0.3.0-rc.2`, `1.0.0-alpha`, etc.) flow through the same release pipeline but each downstream channel branches:
+
+- **GitHub release** — `release.prerelease: auto` in `.goreleaser.yaml` auto-detects the suffix and marks the release as a pre-release.
+- **npm** — `scripts/publish-npm.sh` derives the dist-tag from the suffix (`-beta.1` → `beta`, `-rc.2` → `rc`, `-canary.5` → `canary`) and publishes all seven packages under that dist-tag, NOT under `latest`. Stable users running `npm i suprsend` are unaffected; testers opt in via `npm i suprsend@beta`.
+- **Homebrew** — `homebrew_casks[].skip_upload: auto` skips the public `suprsend/homebrew-tap` update on pre-releases. `brew upgrade suprsend` on the stable tap never bumps users to a beta build.
+- **MCP Registry** — the four publish-related steps in `release.yml` are guarded by `if: ${{ !contains(github.ref_name, '-') }}`, so the registry only ever advertises stable versions.
+- **Glama** — Glama releases are user-triggered through their admin UI; the maintainer chooses whether to mark a Glama release on a pre-release tag.
+
+The detection rule across all four channels is the same: any tag with a `-` in the version string is treated as a pre-release per SemVer 2.0. If we ever need stable releases with weird suffixes, all four guards have to be revisited together.

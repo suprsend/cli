@@ -67,7 +67,6 @@ func fetchDocsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 func newDocumentationTools() []*Tool {
 	searchDoc := &Tool{
 		Name:        "documentation.search",
-		Description: "Enables querying SuprSend documentation",
 		MCPTool: mcp.NewTool("search_suprsend_documentation",
 			mcp.WithDescription(`Search SuprSend's product documentation for technical guidance — APIs, SDKs, workflows, templates, tenants, lists, vendors, and connectors.
 
@@ -98,7 +97,6 @@ Tips: use precise technical terms ("workflow trigger conditions", not "the rule 
 
 	fetchDoc := &Tool{
 		Name:        "documentation.fetch",
-		Description: "Fetch the full documentation content for the given uri.",
 		MCPTool: mcp.NewTool("fetch_suprsend_documentation",
 			mcp.WithDescription(`Fetch the full content of a SuprSend documentation page when a snippet from search_suprsend_documentation is insufficient.
 

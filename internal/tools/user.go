@@ -281,7 +281,6 @@ func getUserObjectsSubscriptionsHandler(ctx context.Context, request mcp.CallToo
 func newUserTools() []*Tool {
 	get_suprsend_user := &Tool{
 		Name:        "users.get",
-		Description: "Enables querying user information",
 		MCPTool: mcp.NewTool("get_suprsend_user",
 			mcp.WithDescription(`Get a SuprSend user's full state by distinct_id. Users are end recipients of notifications, identified by your application's user id.
 
@@ -309,7 +308,6 @@ Returns: YAML with distinct_id, properties (custom fields like name, plan, lang)
 
 	upsert_suprsend_user := &Tool{
 		Name:        "users.upsert",
-		Description: "Enables upserting user information",
 		MCPTool: mcp.NewTool("upsert_suprsend_user",
 			mcp.WithDescription(`Modify properties or channel identifiers on a SuprSend user. One call performs ONE action; for multiple changes, call this tool multiple times.
 
@@ -431,7 +429,6 @@ Returns: the updated user on success; structured error with field reasons on fai
 	}
 	get_suprsend_user_preferences := &Tool{
 		Name:        "users.get_preferences",
-		Description: "Enables querying user preferences(also within a category)",
 		MCPTool: mcp.NewTool("get_suprsend_user_preferences",
 			mcp.WithDescription(`Read a user's category-level notification preferences and (optionally) per-channel overrides.
 
@@ -471,7 +468,6 @@ Returns: the user's preference tree. Pass category to scope to one preference; o
 
 	update_suprsend_users_preferences := &Tool{
 		Name:        "user.update_preferences",
-		Description: "Enables updating preferences for users, controlling notification preferences and channel opt-outs.",
 		MCPTool: mcp.NewTool("update_suprsend_users_preferences",
 			mcp.WithDescription(`Set ONE category's preference for ONE user — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
 
@@ -536,7 +532,6 @@ Returns: updated preference state on success; structured error on failure (e.g.,
 
 	update_suprsend_user_channel_preference := &Tool{
 		Name:        "users.update_channel_preference",
-		Description: "Enables updating channel preference for a user",
 		MCPTool: mcp.NewTool("update_suprsend_user_channel_preference",
 			mcp.WithDescription(`Block or allow specific delivery channels for ONE user, applied across ALL categories. Use this for "block all SMS to this user" or "allow only email" patterns.
 
@@ -578,7 +573,6 @@ Returns: updated channel-preference state on success.`),
 
 	get_suprsend_user_list_subscriptions := &Tool{
 		Name:        "users.get_list_subscriptions",
-		Description: "Enables querying list subscriptions for a user",
 		MCPTool: mcp.NewTool("get_suprsend_user_list_subscriptions",
 			mcp.WithDescription(`List the SuprSend Lists this user belongs to. Lists are workspace-level recipient groups (segments / mailing lists), distinct from object follows.
 
@@ -608,7 +602,6 @@ Returns: a paginated list of List metadata. Default limit is 20; raise it for la
 
 	get_suprsend_user_objects_subscriptions := &Tool{
 		Name:        "users.get_objects_subscriptions",
-		Description: "Enables querying object subscriptions for a user",
 		MCPTool: mcp.NewTool("get_suprsend_user_objects_subscriptions",
 			mcp.WithDescription(`List the objects this user is subscribed TO — what the user follows.
 

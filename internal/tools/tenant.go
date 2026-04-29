@@ -237,7 +237,6 @@ func getAllTenantsHandler(ctx context.Context, request mcp.CallToolRequest) (*mc
 func newTenantTools() []*Tool {
 	get_suprsend_tenant := &Tool{
 		Name:        "tenants.get",
-		Description: "Enables querying tenant information",
 		MCPTool: mcp.NewTool("get_suprsend_tenant",
 			mcp.WithDescription(`Get a tenant's settings, branding metadata, and custom properties by tenant_id. Tenants are sub-accounts of a workspace, modeling end-customers in multi-tenant SaaS deployments.
 
@@ -264,7 +263,6 @@ Returns: the tenant's settings (branding URLs, contact info, custom fields).`),
 
 	get_suprsend_tenants := &Tool{
 		Name:        "tenants.get_all",
-		Description: "Enables querying all tenants",
 		MCPTool: mcp.NewTool("get_suprsend_tenants",
 			mcp.WithDescription(`List all tenants in the workspace. Use to discover tenant_ids before calling get_suprsend_tenant or upsert_suprsend_tenant.
 
@@ -284,7 +282,6 @@ Returns: up to limit tenants (default 100) with their id and properties.`),
 
 	upsert_suprsend_tenant := &Tool{
 		Name:        "tenants.upsert",
-		Description: "Enables upserting tenant information",
 		MCPTool: mcp.NewTool("upsert_suprsend_tenant",
 			mcp.WithDescription(`Create a new tenant or update an existing tenant's properties. Tenants are sub-accounts of a workspace, used to model end-customers in multi-tenant SaaS apps.
 
@@ -315,7 +312,6 @@ Returns: the updated tenant on success.`),
 
 	update_tenant_default_preference := &Tool{
 		Name:        "tenants.update_preferences",
-		Description: "Enables updating category preference for a tenant",
 		MCPTool: mcp.NewTool("update_suprsend_tenant_default_preference",
 			mcp.WithDescription(`Set the default category preference inherited by NEW users created in this tenant. Existing users are not affected; their preferences are independent.
 
@@ -377,7 +373,6 @@ Returns: the updated tenant default preference on success.`),
 
 	get_tenant_default_preference := &Tool{
 		Name:        "tenants.get_preferences",
-		Description: "Enables querying default preference for a tenant",
 		MCPTool: mcp.NewTool("get_tenant_default_preference",
 			mcp.WithDescription(`Read a tenant's default category preferences — the inheritance baseline applied to new users in this tenant.
 

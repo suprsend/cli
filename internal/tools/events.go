@@ -87,8 +87,7 @@ func RegisterDynamicEventsTools(workspace string, eventsFlag string) error {
 		}
 		eventName := name
 		eventTool := &Tool{
-			Name:        "trigger_" + eventName + "_event",
-			Description: description,
+			Name: "trigger_" + eventName + "_event",
 			MCPTool: mcp.NewToolWithRawSchema("trigger_"+eventName+"_event",
 				description,
 				mergedSchema,

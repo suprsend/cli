@@ -161,7 +161,6 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 		slugLocal := slug
 		wfTool := &Tool{
 			Name:        "trigger_" + cleanSlug + "_workflow",
-			Description: fmt.Sprintf("Trigger workflow: %s - %s", name, description),
 			MCPTool: mcp.NewToolWithRawSchema("trigger_"+cleanSlug+"_workflow",
 				description,
 				mergedSchema,
@@ -178,7 +177,6 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 func newWorkflowTools() []*Tool {
 	list_workflows := &Tool{
 		Name:        "workflows.list",
-		Description: "Enables listing workflows from a workspace",
 		MCPTool: mcp.NewTool("list_workflows",
 			mcp.WithDescription(`List notification workflows in a workspace, in either draft or live mode.
 

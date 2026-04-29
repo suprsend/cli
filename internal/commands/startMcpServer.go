@@ -160,13 +160,13 @@ var listToolsCmd = &cobra.Command{
 		}
 		var resp []toolListResponse
 		for _, t := range toolset.GetAllTools() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description})
+			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
 		}
 		for _, t := range toolset.GetAllEvents() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description})
+			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
 		}
 		for _, t := range toolset.GetAllWorkflows() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description})
+			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
 		}
 		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(resp, outputType)

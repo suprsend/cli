@@ -11,7 +11,13 @@ import (
 	"github.com/suprsend/cli/internal/commands/schema"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/suprsend-go"
+	"golang.org/x/sync/errgroup"
 )
+
+// dynamicRegistrationConcurrency caps in-flight schema fetches when the MCP
+// server boots with --workflows / --events selecting many resources. Sized
+// to amortize HTTP latency without overwhelming the management API.
+const dynamicRegistrationConcurrency = 10
 
 func triggerWorkflow(_ context.Context, request mcp.CallToolRequest, workspace, slug string) (*mcp.CallToolResult, error) {
 	wfRequestRaw := request.GetArguments()
@@ -120,56 +126,67 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 		}
 	`)
 
-	for _, workflow := range workflows {
-		slug := workflow.Slug
-		if slug == "" {
+	mgmntClient := utils.GetSuprSendMgmntClient()
+	tools := make([]*Tool, len(workflows))
+
+	g := new(errgroup.Group)
+	g.SetLimit(dynamicRegistrationConcurrency)
+	for i, workflow := range workflows {
+		i, workflow := i, workflow
+		if workflow.Slug == "" || workflow.PayloadSchema.Schema == "" {
 			continue
 		}
-		name := workflow.Name
-		description := workflow.Description
-		mgmntClient := utils.GetSuprSendMgmntClient()
-		// if schema is empty, skip
-		if workflow.PayloadSchema.Schema == "" {
-			continue
+		g.Go(func() error {
+			log.Debugf("Getting schema for workflow %s, schema: %s, version: %s", workflow.Slug, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
+			payloadSchema, err := mgmntClient.GetSchema(workspace, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
+			if err != nil {
+				log.Errorf("workflow %s: skipping registration — failed to fetch payload schema: %s", workflow.Slug, err)
+				return nil
+			}
+			inputSchema, err := json.Marshal(payloadSchema.JSONSchema)
+			if err != nil {
+				log.Errorf("workflow %s: skipping registration — failed to marshal schema: %s", workflow.Slug, err)
+				return nil
+			}
+			mergedSchema, err := schema.MergeUnderDataAndValidate(string(patchSchema), string(inputSchema))
+			if err != nil {
+				log.Errorf("workflow %s: skipping registration — failed to merge schema: %s", workflow.Slug, err)
+				return nil
+			}
+			name := workflow.Name
+			if name == "" {
+				return nil
+			}
+			name = strings.ToLower(strings.ReplaceAll(name, " ", "_"))
+			description := workflow.Description
+			if description == "" {
+				description = fmt.Sprintf("Use this tool to trigger workflow with name: %q", name)
+			} else {
+				description = fmt.Sprintf("Use this tool to trigger workflow with name: %q with description: %q", name, description)
+			}
+			cleanSlug := strings.ReplaceAll(workflow.Slug, "-", "_")
+			slugLocal := workflow.Slug
+			tools[i] = &Tool{
+				Name: "trigger_" + cleanSlug + "_workflow",
+				MCPTool: mcp.NewToolWithRawSchema("trigger_"+cleanSlug+"_workflow",
+					description,
+					mergedSchema,
+				),
+				Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+					return triggerWorkflow(ctx, request, workspace, slugLocal)
+				},
+			}
+			return nil
+		})
+	}
+	// errgroup.Wait never returns an error here — failures are logged and
+	// skipped per-workflow above; registration is best-effort.
+	_ = g.Wait()
+
+	for _, t := range tools {
+		if t != nil {
+			RegisterWorkflow(t)
 		}
-		log.Debugf("Getting schema for workflow %s, schema: %s, version: %s", slug, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
-		payloadSchema, err := mgmntClient.GetSchema(workspace, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
-		if err != nil {
-			return fmt.Errorf("failed to get schema: %s", err)
-		}
-		inputSchema, err := json.Marshal(payloadSchema.JSONSchema)
-		if err != nil {
-			return fmt.Errorf("failed to marshal schema: %s", err)
-		}
-		mergedSchema, err := schema.MergeUnderDataAndValidate(string(patchSchema), string(inputSchema))
-		if err != nil {
-			log.Errorf("failed to create workflow schema for wf %s: %s", name, err)
-			continue
-		}
-		if name == "" {
-			continue
-		} else {
-			name = strings.ReplaceAll(name, " ", "_")
-			name = strings.ToLower(name)
-		}
-		if description == "" {
-			description = fmt.Sprintf("Use this tool to trigger workflow with name: \"%s\"", name)
-		} else {
-			description = fmt.Sprintf("Use this tool to trigger workflow with name: \"%s\" with description:\"%s\"", name, description)
-		}
-		cleanSlug := strings.ReplaceAll(slug, "-", "_")
-		slugLocal := slug
-		wfTool := &Tool{
-			Name:        "trigger_" + cleanSlug + "_workflow",
-			MCPTool: mcp.NewToolWithRawSchema("trigger_"+cleanSlug+"_workflow",
-				description,
-				mergedSchema,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return triggerWorkflow(ctx, request, workspace, slugLocal)
-			},
-		}
-		RegisterWorkflow(wfTool)
 	}
 	return nil
 }

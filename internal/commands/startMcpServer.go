@@ -179,8 +179,8 @@ func init() {
 
 	startMcpServerCmd.PersistentFlags().StringVarP(&transport, "transport", "t", "stdio", "Server transport: stdio, sse, or http")
 	startMcpServerCmd.PersistentFlags().StringVarP(&tools, "tools", "T", "all", "Tools to expose: all, none, or comma-separated tool names")
-	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "Event tools to register: all, none, or comma-separated event slugs")
-	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, or comma-separated workflow slugs")
+	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "Event tools to register: all, none, or comma-separated event names (tag: prefix reserved for future use)")
+	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, comma-separated slugs, or tag:<tag> entries (e.g. tag:onboarding,tag:transactional)")
 
 	listToolsCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 }

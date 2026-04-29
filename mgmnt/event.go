@@ -117,6 +117,29 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 	return &EventsResponse{Results: allEvents}, nil
 }
 
+func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, error) {
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", eventName, "/")
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	log.Debugf("Getting event detail for: %s", eventName)
+	res, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetResult(&Event{}).
+		Get(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	if res.IsError() {
+		return nil, apiError(res)
+	}
+	return res.Result().(*Event), nil
+}
+
 func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]any) error {
 	client := client.NewHTTPClient()
 	defer client.Close()

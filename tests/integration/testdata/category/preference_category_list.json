@@ -1,0 +1,531 @@
+{
+    "$schema": "https://schema.suprsend.com/preference_category/v1/schema.json",
+    "root_categories": [
+        {
+            "root_category": "system",
+            "sections": [
+                {
+                    "name": "system section",
+                    "slug": "system-section",
+                    "description": "system section",
+                    "tags": [
+                        "wwr"
+                    ],
+                    "categories": [
+                        {
+                            "category": "akhil-system",
+                            "name": "akhil-system",
+                            "description": "akhil-system",
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "qqq"
+                            ]
+                        },
+                        {
+                            "category": "sub-category",
+                            "name": "Sub Category",
+                            "description": "Sub category description",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "email"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "gjhgjhfjfjgfdjthdhtdhdhdyrhdyrdyrdrh",
+                                "aaaaeeee"
+                            ]
+                        },
+                        {
+                            "category": "weekly-product-updates",
+                            "name": "weekly-product-updates",
+                            "description": "test1 recheck mbsdmhfbdhfbhfb",
+                            "default_preference": "opt_out",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "oooo",
+                                "llll"
+                            ]
+                        },
+                        {
+                            "category": "system-android",
+                            "name": "system android",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "oooo",
+                                "qqww"
+                            ]
+                        },
+                        {
+                            "category": "recheck-system",
+                            "name": "recheck system",
+                            "description": "recheck system",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "system-retest-category",
+                            "name": "system retest category",
+                            "description": "retest",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "testing-testing-testing-testing-testing",
+                            "name": "Testing testing testing testing testing",
+                            "description": "Testing testing testing testing testing",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "infra-incident",
+                            "name": "Infra incident",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "sreehari_test",
+                            "name": "sreehari_test",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "email"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                },
+                {
+                    "name": "new2",
+                    "slug": "new2",
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "tests",
+                            "name": "tests",
+                            "description": "asdf",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "asdasdasdasderrfjfsdihdaisjaisljdaskjdlkasdlkasdkasdlkasldajsldkajsdaksdasd",
+                                "checktag"
+                            ]
+                        },
+                        {
+                            "category": "test",
+                            "name": "test",
+                            "description": "test this user",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "check5"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Nik Section",
+                    "slug": "nik-section",
+                    "description": "Nik Section desc",
+                    "tags": [
+                        "checktag",
+                        "check1",
+                        "new123",
+                        "check2",
+                        "oooo",
+                        "qqq",
+                        "new456",
+                        "wwr",
+                        "main",
+                        "sss"
+                    ],
+                    "categories": [
+                        {
+                            "category": "sub-category-1",
+                            "name": "Sub-Category 1",
+                            "description": "Sub-Category 1 Description",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                },
+                {
+                    "name": "Sanjeev System 2",
+                    "slug": "sanjeev-system-2",
+                    "description": null,
+                    "tags": [
+                        "sanjeev:preference:system"
+                    ],
+                    "categories": [
+                        {
+                            "category": "sanjeev-system",
+                            "name": "Sanjeev System",
+                            "description": "Sanjeev System category",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "wwr",
+                                "sss",
+                                "check1"
+                            ]
+                        },
+                        {
+                            "category": "sanjeev-section-2-category-1",
+                            "name": "Sanjeev Section 2 Category 1",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "sanjeev:category"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "test_Section",
+                    "slug": "test_section",
+                    "description": null,
+                    "tags": null,
+                    "categories": []
+                }
+            ]
+        },
+        {
+            "root_category": "transactional",
+            "sections": [
+                {
+                    "name": null,
+                    "slug": null,
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "return",
+                            "name": "return",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "email",
+                                "androidpush"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "trans-blocked",
+                            "name": "Trans-blocked",
+                            "description": "Trans-blocked",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "androidpush"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "bug-retest-blocked",
+                            "name": "bug retest blocked",
+                            "description": "bug retest blocked",
+                            "default_preference": "opt_out",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "brand-preference",
+                            "name": "brand preference",
+                            "description": "To verify brand preference for karthick_qa_new",
+                            "default_preference": "opt_out",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "business-opt-out",
+                            "name": "business opt out",
+                            "description": null,
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "opt-out-case",
+                            "name": "opt out case",
+                            "description": null,
+                            "default_preference": "opt_out",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "nbdfmhdbfhmdvbfmhdvfmhdsvfdmshfvdsmfhdsvfhmdsvfdhsvfdjshkfvdsjhfs",
+                                "shagdhjsavgdjshvdjshvfdjsgvfdsjgfvdjgsvss"
+                            ]
+                        },
+                        {
+                            "category": "user-android-preference",
+                            "name": "user-android-preference",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "slack",
+                                "sms"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "brand_null_user",
+                            "name": "brand_null_user",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "iospush"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "tag",
+                            "name": "tag$",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "mghjg-ljilhlih-lhkh-and",
+                            "name": "mghjg ljilhlih lhkh%^\u0026*^%^",
+                            "description": null,
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "main",
+                                "check1",
+                                "checktag"
+                            ]
+                        },
+                        {
+                            "category": "daily",
+                            "name": "daily",
+                            "description": "Send error summary once in a day",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "cat1",
+                            "name": "cat1",
+                            "description": null,
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                },
+                {
+                    "name": "Transactional karthick1",
+                    "slug": "transactional-karthick1",
+                    "description": "Transactional karthick1",
+                    "tags": [
+                        "oooo",
+                        "cfgcf"
+                    ],
+                    "categories": [
+                        {
+                            "category": "test4",
+                            "name": "test4",
+                            "description": "test4 check",
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "trans2",
+                            "name": "trans2",
+                            "description": null,
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                },
+                {
+                    "name": "new 5",
+                    "slug": "new-5",
+                    "description": null,
+                    "tags": [
+                        "new123",
+                        "ngdfgsv"
+                    ],
+                    "categories": [
+                        {
+                            "category": "check-bug2",
+                            "name": "check bug2",
+                            "description": "random desc",
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "finance",
+                                "admin"
+                            ]
+                        },
+                        {
+                            "category": "amount-refunded",
+                            "name": "Amount refunded",
+                            "description": null,
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": [
+                                "main"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "return4",
+                    "slug": "return4",
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "return78",
+                            "name": "return78",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": [
+                                "email"
+                            ],
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                },
+                {
+                    "name": "test",
+                    "slug": "test",
+                    "description": null,
+                    "tags": null,
+                    "categories": []
+                },
+                {
+                    "name": "Nik Section For Transactional",
+                    "slug": "nik-section-for-transactional",
+                    "description": "Nik Section For Transactional desc",
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "nik-sub-category",
+                            "name": "Nik Sub-Category",
+                            "description": "Nik Sub-Category 1",
+                            "default_preference": "opt_in",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "root_category": "promotional",
+            "sections": [
+                {
+                    "name": null,
+                    "slug": null,
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "refund-promotion",
+                            "name": "Refund promotion",
+                            "description": "updates",
+                            "default_preference": "opt_out",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "check-bug1",
+                            "name": "check bug1",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "promo-blocked",
+                            "name": "Promo-blocked",
+                            "description": "Promo-blocked",
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        },
+                        {
+                            "category": "check-bug-4",
+                            "name": "check bug 4",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                },
+                {
+                    "name": "Sanjeev Section Promotional 1",
+                    "slug": "sanjeev-section-promotional-1",
+                    "description": null,
+                    "tags": null,
+                    "categories": [
+                        {
+                            "category": "sanjeev-cat-in-sanjeev-promo-1",
+                            "name": "Sanjeev Cat In sanjeev promo 1",
+                            "description": null,
+                            "default_preference": "cant_unsubscribe",
+                            "default_mandatory_channels": null,
+                            "default_opt_in_channels": null,
+                            "tags": null
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "hash": "d42296e9fea450725eeaae6b02010fdea2e84daa85d974bc34eca63bd1bde498",
+    "version_no": 295,
+    "status": "active",
+    "commit_message": "Changed refund-promotion category default preference from cant_unsubscribe to opt_out",
+    "committed_at": "2026-03-27T10:49:51.659968+00:00"
+}

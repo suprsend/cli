@@ -8,6 +8,21 @@ import (
 	"testing"
 )
 
+// AssertExitCode asserts that err is an *exec.ExitError with the given exit code.
+func AssertExitCode(t *testing.T, err error, code int) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected exit code %d, but command exited 0", code)
+	}
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != code {
+		t.Errorf("expected exit code %d, got %d", code, exitErr.ExitCode())
+	}
+}
+
 const BinaryName = "suprsend-cov"
 
 func BinaryPath(t *testing.T) string {

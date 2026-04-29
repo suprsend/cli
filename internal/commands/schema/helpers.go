@@ -197,7 +197,14 @@ func writeSchemaFiles(slugDir, slug string, obj map[string]any) error {
 }
 
 // ReadAndMergeSchemaFiles reads schema.json + payload_schema.json from slugDir,
-// strips $schema keys, and returns the merged payload ready for the API.
+// strips $schema keys, validates payload_schema.json structurally, and returns
+// the merged payload ready for the API.
+//
+// Validation runs client-side so dry-run surfaces the same errors the real
+// push would hit at the API. Specifically:
+//   - payload_schema.json must compile as JSON Schema draft 2020-12.
+//   - The root schema must have type "object" (a SuprSend invariant — the
+//     API rejects other root types with "Root schema 'type' must be 'object'").
 func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
 	schemaPath := filepath.Join(slugDir, "schema.json")
 	data, err := os.ReadFile(schemaPath)
@@ -229,8 +236,27 @@ func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
 		return nil, fmt.Errorf("schemas/%s: failed to parse payload_schema.json: %w", slug, err)
 	}
 	delete(payloadSchema, "$schema")
-	payload["json_schema"] = payloadSchema
 
+	// SuprSend requires the root payload schema's type to be "object".
+	// Check before compiling so the error message matches the API's wording
+	// (jsonschema/v5 would otherwise allow non-object root types per the
+	// JSON Schema spec).
+	if t, ok := payloadSchema["type"].(string); ok && t != "object" {
+		return nil, fmt.Errorf("schemas/%s: payload_schema.json root 'type' must be 'object', got %q", slug, t)
+	}
+
+	// Re-marshal the cleaned payload schema and compile it. Catches typos
+	// like an unknown 'type' value, malformed 'properties', invalid
+	// '$ref', etc. — the same shape errors the API rejects.
+	cleanedBytes, err := json.Marshal(payloadSchema)
+	if err != nil {
+		return nil, fmt.Errorf("schemas/%s: failed to re-marshal payload_schema.json: %w", slug, err)
+	}
+	if err := compileSchema(cleanedBytes); err != nil {
+		return nil, fmt.Errorf("schemas/%s: payload_schema.json is not a valid JSON Schema: %w", slug, err)
+	}
+
+	payload["json_schema"] = payloadSchema
 	return payload, nil
 }
 

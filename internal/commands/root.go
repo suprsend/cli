@@ -22,6 +22,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/template"
 	"github.com/suprsend/cli/internal/commands/translation"
 	workflow "github.com/suprsend/cli/internal/commands/workflow"
+	"github.com/suprsend/cli/internal/commands/workspace"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 	"go.szostok.io/version/extension"
@@ -114,6 +115,7 @@ func init() {
 	rootCmd.AddCommand(translation.TranslationCmd)
 	rootCmd.AddCommand(schema.SchemaCmd)
 	rootCmd.AddCommand(template.TemplateCmd)
+	rootCmd.AddCommand(workspace.WorkspaceCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		switch conf.OutputType {

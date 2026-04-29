@@ -39,10 +39,18 @@ var profilesModifyCmd = &cobra.Command{
 			selectedProfile := cfg.Profiles[modifyName]
 
 			if modifyBaseUrl != "" {
-				selectedProfile.BaseUrl = modifyBaseUrl
+				normalized, err := validateAndNormalizeUrl(modifyBaseUrl)
+				if err != nil {
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --base-url")
+				}
+				selectedProfile.BaseUrl = normalized
 			}
 			if modifyMgmntUrl != "" {
-				selectedProfile.MgmntUrl = modifyMgmntUrl
+				normalized, err := validateAndNormalizeUrl(modifyMgmntUrl)
+				if err != nil {
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --mgmnt-url")
+				}
+				selectedProfile.MgmntUrl = normalized
 			}
 			selectedProfile.ServiceToken = modifyServiceToken
 
@@ -67,8 +75,8 @@ var profilesModifyCmd = &cobra.Command{
 
 func init() {
 	profilesModifyCmd.Flags().StringVar(&modifyName, "name", "", "Name of the profile to modify")
-	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: https://hub.suprsend.com/)")
-	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: https://management-api.suprsend.com/)")
+	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: "+DefaultBaseUrl+")")
+	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: "+DefaultMgmntUrl+")")
 	profilesModifyCmd.Flags().StringVar(&modifyServiceToken, "service-token", "", "Service Token")
 	ProfileCmd.AddCommand(profilesModifyCmd)
 }
@@ -109,20 +117,6 @@ func runModifyInteractive(cfg *Config, path string) {
 	}
 
 	ui2 := cobra_ui.New()
-
-	if modifyBaseUrl == "" {
-		modifyBaseUrl = selectedProfile.BaseUrl
-		if modifyBaseUrl == "" {
-			modifyBaseUrl = "https://hub.suprsend.com/"
-		}
-	}
-	if modifyMgmntUrl == "" {
-		modifyMgmntUrl = selectedProfile.MgmntUrl
-		if modifyMgmntUrl == "" {
-			modifyMgmntUrl = "https://management-api.suprsend.com/"
-		}
-	}
-
 	var questions []cobra_ui.Question
 
 	if modifyServiceToken == "" {
@@ -137,6 +131,56 @@ func runModifyInteractive(cfg *Config, path string) {
 				} else {
 					modifyServiceToken = selectedProfile.ServiceToken
 				}
+				return nil
+			},
+		})
+	}
+
+	// URL prompts. Pre-fill modifyBaseUrl / modifyMgmntUrl with the
+	// current profile value (or public default if unset) BEFORE building
+	// the question, so that an interrupted prompt (Ctrl+C) doesn't leave
+	// the field empty and clobber the stored URL on save. The handler
+	// overwrites the value when the user types a new URL.
+	if modifyBaseUrl == "" {
+		current := selectedProfile.BaseUrl
+		if current == "" {
+			current = DefaultBaseUrl
+		}
+		modifyBaseUrl = current
+		questions = append(questions, cobra_ui.Question{
+			Text: fmt.Sprintf("Base URL [%s]: ", current),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				if s == "" {
+					return nil
+				}
+				normalized, err := validateAndNormalizeUrl(s)
+				if err != nil {
+					return err
+				}
+				modifyBaseUrl = normalized
+				return nil
+			},
+		})
+	}
+	if modifyMgmntUrl == "" {
+		current := selectedProfile.MgmntUrl
+		if current == "" {
+			current = DefaultMgmntUrl
+		}
+		modifyMgmntUrl = current
+		questions = append(questions, cobra_ui.Question{
+			Text: fmt.Sprintf("Management URL [%s]: ", current),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				if s == "" {
+					return nil
+				}
+				normalized, err := validateAndNormalizeUrl(s)
+				if err != nil {
+					return err
+				}
+				modifyMgmntUrl = normalized
 				return nil
 			},
 		})

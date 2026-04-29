@@ -34,11 +34,25 @@ var profilesAddCmd = &cobra.Command{
 		}
 
 		if addName != "" && addServiceToken != "" {
-			if addBaseUrl == "" {
-				addBaseUrl = "https://hub.suprsend.com/"
+			// Scripted path: no prompts. Validate URLs if provided, fall
+			// back to public defaults if not.
+			if addBaseUrl != "" {
+				normalized, err := validateAndNormalizeUrl(addBaseUrl)
+				if err != nil {
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --base-url")
+				}
+				addBaseUrl = normalized
+			} else {
+				addBaseUrl = DefaultBaseUrl
 			}
-			if addMgmntUrl == "" {
-				addMgmntUrl = "https://management-api.suprsend.com/"
+			if addMgmntUrl != "" {
+				normalized, err := validateAndNormalizeUrl(addMgmntUrl)
+				if err != nil {
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --mgmnt-url")
+				}
+				addMgmntUrl = normalized
+			} else {
+				addMgmntUrl = DefaultMgmntUrl
 			}
 
 			cfg.Profiles[addName] = Profile{
@@ -66,8 +80,8 @@ var profilesAddCmd = &cobra.Command{
 
 func init() {
 	profilesAddCmd.Flags().StringVar(&addName, "name", "", "Name of the profile (required)")
-	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: https://hub.suprsend.com/)")
-	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: https://management-api.suprsend.com/)")
+	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: "+DefaultBaseUrl+")")
+	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: "+DefaultMgmntUrl+")")
 	profilesAddCmd.Flags().StringVar(&addServiceToken, "service-token", "", "Service token (required)")
 	ProfileCmd.AddCommand(profilesAddCmd)
 }
@@ -107,11 +121,46 @@ func runAddInteractive(cfg *Config, path string) {
 		})
 	}
 
+	// URL prompts. cobra_ui has no native "default value" support, so we
+	// embed the default in the prompt text and let the handler treat
+	// empty input as "accept the default". Typed URL is validated and
+	// stored. The same flow covers BYOC, staging / pre-prod / dev — any
+	// non-default endpoint works the same way.
 	if addBaseUrl == "" {
-		addBaseUrl = "https://hub.suprsend.com/"
+		questions = append(questions, cobra_ui.Question{
+			Text: fmt.Sprintf("Base URL [%s]: ", DefaultBaseUrl),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				if s == "" {
+					addBaseUrl = DefaultBaseUrl
+					return nil
+				}
+				normalized, err := validateAndNormalizeUrl(s)
+				if err != nil {
+					return err
+				}
+				addBaseUrl = normalized
+				return nil
+			},
+		})
 	}
 	if addMgmntUrl == "" {
-		addMgmntUrl = "https://management-api.suprsend.com/"
+		questions = append(questions, cobra_ui.Question{
+			Text: fmt.Sprintf("Management URL [%s]: ", DefaultMgmntUrl),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				if s == "" {
+					addMgmntUrl = DefaultMgmntUrl
+					return nil
+				}
+				normalized, err := validateAndNormalizeUrl(s)
+				if err != nil {
+					return err
+				}
+				addMgmntUrl = normalized
+				return nil
+			},
+		})
 	}
 
 	if len(questions) > 0 {

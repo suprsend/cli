@@ -2,7 +2,17 @@
 
 [![cli MCP server](https://glama.ai/mcp/servers/suprsend/cli/badges/score.svg)](https://glama.ai/mcp/servers/suprsend/cli)
 
-SuprSend CLI is a command-line interface tool for interacting with the SuprSend API, written in Go.
+SuprSend CLI is a command-line interface tool for interacting with the SuprSend API, written in Go. It also doubles as an MCP server so AI agents (Claude, Cursor, Gemini, etc.) can drive your workspace through the same set of operations.
+
+## What you can do with it
+
+- **Manage workspace resources** — `template`, `workflow`, `schema`, `event`, `category`, `translation`, `workspace`. Each supports `list`, `get`, `pull`, `push`, `commit` against your local working directory.
+- **Sync between workspaces** — `suprsend sync` pulls assets from one workspace and pushes to another, with an optional local directory as intermediate storage.
+- **Generate typed payload code** — `suprsend generate-types` emits typed code in Go, TypeScript, Python, Java, Kotlin, Swift, or Dart from your event / workflow JSON Schemas.
+- **Run as an MCP server** — `suprsend start-mcp-server` exposes tools over stdio/SSE/HTTP. Installable directly from the [MCP Registry](https://modelcontextprotocol.io/registry) (`npx -y suprsend start-mcp-server`), or wire it into Claude Code / Cursor / Gemini CLI manually.
+- **Multi-account / multi-environment profiles** — `suprsend profile add|modify|list|use|remove` stores per-account credentials and base URLs, so the same CLI works against public cloud, BYOC, staging, pre-prod, etc.
+
+Full command reference: [docs.suprsend.com/reference/cli-intro](https://docs.suprsend.com/reference/cli-intro). Or run `suprsend --help` for the command tree.
 
 ## Installation
 
@@ -40,7 +50,7 @@ Pre-compiled binaries for various platforms are available on the [Releases page]
 
 To build SuprSend CLI from source, follow these steps:
 
-1. Ensure you have Go installed on your system (version 1.20 or later).
+1. Ensure you have Go installed on your system (version 1.25 or later — see `go.mod`).
 2. Clone the repository:
     
     ```bash

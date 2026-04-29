@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,45 @@ func cleanInput(input string) string {
 	input = strings.TrimPrefix(input, "[")
 	input = strings.TrimSuffix(input, "]")
 	return input
+}
+
+// Public-cloud defaults; used when a profile doesn't override these.
+const (
+	DefaultBaseUrl  = "https://hub.suprsend.com/"
+	DefaultMgmntUrl = "https://management-api.suprsend.com/"
+)
+
+// validateAndNormalizeUrl parses, validates and normalizes a profile URL.
+// Rules:
+//   - leading / trailing whitespace is stripped
+//   - scheme must be http or https
+//   - host must be non-empty
+//   - query strings and fragments are rejected (a SuprSend BYOC URL is a
+//     base URL — `?foo=bar` or `#anchor` is almost always a typo)
+//   - the path is normalized to a trailing slash so the rest of the
+//     codebase can append routes without double-slash hazards
+//
+// Returns the normalized URL string. The caller should always store the
+// returned value rather than the user-supplied input.
+func validateAndNormalizeUrl(urlStr string) (string, error) {
+	urlStr = strings.TrimSpace(urlStr)
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL format: %v", err)
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return "", fmt.Errorf("URL scheme must be http or https")
+	}
+	if parsedURL.Host == "" {
+		return "", fmt.Errorf("URL must include a host")
+	}
+	if parsedURL.RawQuery != "" || parsedURL.Fragment != "" {
+		return "", fmt.Errorf("URL must not include a query string or fragment")
+	}
+	if !strings.HasSuffix(parsedURL.Path, "/") {
+		parsedURL.Path += "/"
+	}
+	return parsedURL.String(), nil
 }
 
 func promptForProfileName() string {
@@ -145,12 +185,12 @@ func GetResolvedBaseUrl() string {
 	// get the value from the active profile
 	configPath := GetConfigFilePath()
 	if configPath == "" {
-		return "https://hub.suprsend.com/"
+		return DefaultBaseUrl
 	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
-		return "https://hub.suprsend.com/"
+		return DefaultBaseUrl
 	}
 
 	activeProfile := cfg.Profiles[cfg.ActiveProfile]
@@ -159,7 +199,7 @@ func GetResolvedBaseUrl() string {
 	}
 
 	// Default value
-	return "https://hub.suprsend.com/"
+	return DefaultBaseUrl
 }
 
 func GetResolvedMgmntUrl() string {
@@ -171,12 +211,12 @@ func GetResolvedMgmntUrl() string {
 	// get the value from the active profile
 	configPath := GetConfigFilePath()
 	if configPath == "" {
-		return "https://management-api.suprsend.com/"
+		return DefaultMgmntUrl
 	}
 
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
-		return "https://management-api.suprsend.com/"
+		return DefaultMgmntUrl
 	}
 
 	activeProfile := cfg.Profiles[cfg.ActiveProfile]
@@ -185,7 +225,7 @@ func GetResolvedMgmntUrl() string {
 	}
 
 	// Default value
-	return "https://management-api.suprsend.com/"
+	return DefaultMgmntUrl
 }
 
 // MaskServiceToken masks a service token showing only first 4 and last 4 characters

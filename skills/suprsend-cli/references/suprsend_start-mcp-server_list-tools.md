@@ -11,7 +11,8 @@ suprsend start-mcp-server list-tools [flags]
 ### Options
 
 ```
-  -h, --help   help for list-tools
+  -h, --help            help for list-tools
+  -o, --output string   Output format: pretty, json, or yaml (default "pretty")
 ```
 
 ### Options inherited from parent commands

@@ -16,10 +16,7 @@ func getTenantHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -44,10 +41,7 @@ func upsertTenantHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -69,7 +63,7 @@ func upsertTenantHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	tenant_payload := &suprsend.Tenant{
 		TenantName:             utils.GetStringPtr(tenant_properties, "tenant_name"),
-		Logo:                   utils.GetStringPtr(tenant_properties, "tenant_logo_ptr"),
+		Logo:                   utils.GetStringPtr(tenant_properties, "logo"),
 		Timezone:               utils.GetStringPtr(tenant_properties, "timezone"),
 		PrimaryColor:           utils.GetStringPtr(tenant_properties, "primary_color"),
 		SecondaryColor:         utils.GetStringPtr(tenant_properties, "secondary_color"),
@@ -104,30 +98,31 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	if tenantId == "" {
+		return mcp.NewToolResultError("tenant_id is required"), nil
+	}
 
 	category, err := request.RequireString("category")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	if category == "" {
+		return mcp.NewToolResultError("category is required"), nil
+	}
 
 	args := request.GetArguments()
 
-	rawPayload, ok := args["payload"].(map[string]any)
-	if !ok {
-		return mcp.NewToolResultError("payload must be an object"), nil
-	}
-
-	pref, ok := rawPayload["preference"].(string)
+	pref, ok := args["preference"].(string)
 	if !ok {
 		return mcp.NewToolResultError("preference must be a string"), nil
 	}
 
-	visibleToSubscriber, ok := rawPayload["visible_to_subscriber"].(bool)
+	visibleToSubscriber, ok := args["visible_to_subscriber"].(bool)
 	if !ok {
 		return mcp.NewToolResultError("visible_to_subscriber must be bool"), nil
 	}
 
-	mandatoryChannelsAny, ok := rawPayload["mandatory_channels"]
+	mandatoryChannelsAny, ok := args["mandatory_channels"]
 	if !ok {
 		mandatoryChannelsAny = []any{}
 	}
@@ -145,7 +140,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		mandatoryChannels = append(mandatoryChannels, s)
 	}
 
-	blockedChannelsAny, ok := rawPayload["blocked_channels"]
+	blockedChannelsAny, ok := args["blocked_channels"]
 	if !ok {
 		blockedChannelsAny = []any{}
 	}
@@ -170,10 +165,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		BlockedChannels:     blockedChannels,
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -193,16 +185,13 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 	return mcp.NewToolResultText(string(yamlPref)), nil
 }
 
-func getCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func getDefaultPreferenceTenant(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tenantId, err := request.RequireString("tenant_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	workspace, err := request.RequireString("workspace")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	workspace := request.GetString("workspace", "staging")
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
 	if err != nil {
@@ -222,92 +211,200 @@ func getCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReques
 	return mcp.NewToolResultText(string(yamlPref)), nil
 }
 
+func getAllTenantsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	workspace := request.GetString("workspace", "staging")
+	limit := request.GetInt("limit", 100)
+
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	tenants, err := suprsendClient.Tenants.List(ctx, &suprsend.TenantListOptions{
+		Limit: limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	yamlTenants, err := yaml.Marshal(tenants)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(yamlTenants)), nil
+}
+
 func newTenantTools() []*Tool {
 	get_suprsend_tenant := &Tool{
 		Name:        "tenants.get",
-		Description: "Enables querying tenant information",
 		MCPTool: mcp.NewTool("get_suprsend_tenant",
-			mcp.WithDescription(`Use this tool to get all properties for a tenant in SuprSend. If the workspace is not specified. ask the user to provide it before using this tool.`),
+			mcp.WithDescription(`Get a tenant's settings, branding metadata, and custom properties by tenant_id. Tenants are sub-accounts of a workspace, modeling end-customers in multi-tenant SaaS deployments.
+
+When to use: the user references a tenant by id and you need its full state.
+
+When NOT to use:
+- To enumerate all tenants — use get_suprsend_tenants.
+- For tenant-level preference defaults — use get_tenant_default_preference.
+
+Returns: the tenant's settings (branding URLs, contact info, custom fields).`),
 			mcp.WithString("tenant_id",
 				mcp.Description(`The tenant_id of the tenant to get.`),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
+				mcp.Description(`SuprSend workspace to get the tenant from.`),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getTenantHandler,
 	}
 
+	get_suprsend_tenants := &Tool{
+		Name:        "tenants.get_all",
+		MCPTool: mcp.NewTool("get_suprsend_tenants",
+			mcp.WithDescription(`List all tenants in the workspace. Use to discover tenant_ids before calling get_suprsend_tenant or upsert_suprsend_tenant.
+
+Returns: up to limit tenants (default 100) with their id and properties.`),
+			mcp.WithNumber("limit",
+				mcp.Description("Number of tenants to get. Default is 100."),
+			),
+			mcp.WithString("workspace",
+				mcp.Description(`SuprSend workspace to get the tenants from.`),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
+		),
+		Handler: getAllTenantsHandler,
+	}
+
 	upsert_suprsend_tenant := &Tool{
 		Name:        "tenants.upsert",
-		Description: "Enables upserting tenant information",
 		MCPTool: mcp.NewTool("upsert_suprsend_tenant",
-			mcp.WithDescription(`Use this tool to upsert a new tenant or update an existing tenant's properties.`),
+			mcp.WithDescription(`Create a new tenant or update an existing tenant's properties. Tenants are sub-accounts of a workspace, used to model end-customers in multi-tenant SaaS apps.
+
+tenant_properties is merged with existing — not replaced. Pass only the fields you want to change. Common fields include name, branding URLs, and contact info.
+
+When NOT to use:
+- For preference defaults — use update_suprsend_tenant_default_preference.
+- For users / objects within a tenant — use upsert_suprsend_user / upsert_suprsend_object.
+
+Returns: the updated tenant on success.`),
 			mcp.WithString("tenant_id",
 				mcp.Description(`The tenant_id of the tenant to upsert.`),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
+				mcp.Description(`SuprSend workspace to get the tenant from.`),
 			),
 			mcp.WithObject("tenant_properties",
 				mcp.Description("The properties to upsert for the tenant."),
 				mcp.Properties(tenantPropertiesSchema),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: upsertTenantHandler,
 	}
 
-	update_suprsend_category_preference_tenant := &Tool{
+	update_tenant_default_preference := &Tool{
 		Name:        "tenants.update_preferences",
-		Description: "Enables updating category preference for a tenant",
-		MCPTool: mcp.NewTool("update_suprsend_category_preference_tenant",
-			mcp.WithDescription("Use this tool to update a category preference for a tenant."),
+		MCPTool: mcp.NewTool("update_suprsend_tenant_default_preference",
+			mcp.WithDescription(`Set the default category preference inherited by NEW users created in this tenant. Existing users are not affected; their preferences are independent.
+
+preference values:
+- opt_in — new users are opted into this category.
+- opt_out — new users are opted out.
+- cant_unsubscribe — new users are opted in AND locked from toggling.
+
+mandatory_channels — channels users cannot disable for this category. blocked_channels — channels that cannot be enabled. visible_to_subscriber — whether end-users see this category in their preference UI.
+
+When NOT to use:
+- For per-user overrides — use update_suprsend_users_preferences.
+- For per-object overrides — use update_suprsend_category_preference_object.
+
+Side effects: changes apply only to users created AFTER this call. To retroactively update existing users, call update_suprsend_users_preferences per user.
+
+Returns: the updated tenant default preference on success.`),
 			mcp.WithString("tenant_id",
 				mcp.Description("The tenant_id of the tenant to update."),
 				mcp.Required(),
 			),
 			mcp.WithString("category",
-				mcp.Description("category_slug of an category to get."),
+				mcp.Description("category_slug of an category to update."),
 				mcp.Required(),
 			),
-			mcp.WithObject("payload",
-				mcp.Description("The properties to upsert for the tenant."),
+			mcp.WithString(
+				"preference",
+				mcp.Description("The preference to update for the tenant."),
+				mcp.Required(),
+				mcp.Enum(
+					"opt_in",
+					"opt_out",
+					"cant_unsubscribe",
+				),
+			),
+			mcp.WithBoolean("visible_to_subscriber",
+				mcp.Description("Whether the category is visible to subscribers."),
+				mcp.Required(),
+			),
+			mcp.WithArray("mandatory_channels",
+				mcp.Description("The channels to make mandatory for the category."),
+				mcp.WithStringItems(),
+				mcp.Required(),
+			),
+			mcp.WithArray("blocked_channels",
+				mcp.Description("The channels to block for the category."),
+				mcp.WithStringItems(),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
+				mcp.Description(`SuprSend workspace to update the tenant from.`),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: updateCategoryPreferenceTenant,
 	}
 
-	get_suprsend_categories_preference_tenant := &Tool{
+	get_tenant_default_preference := &Tool{
 		Name:        "tenants.get_preferences",
-		Description: "Enables querying all categories preference for a tenant",
-		MCPTool: mcp.NewTool("get_suprsend_categories_preference_tenant",
-			mcp.WithDescription("Use this tool to query categories for a tenant."),
+		MCPTool: mcp.NewTool("get_tenant_default_preference",
+			mcp.WithDescription(`Read a tenant's default category preferences — the inheritance baseline applied to new users in this tenant.
+
+When to use:
+- Before update_suprsend_tenant_default_preference, to read current defaults.
+- To diagnose why new users have unexpected preference state.
+
+When NOT to use:
+- For individual user / object preferences — use get_suprsend_user_preferences or get_suprsend_object_preferences.
+
+Returns: the tenant's full default-preference tree.`),
 			mcp.WithString("tenant_id",
-				mcp.Description("The tenant_id of the tenant to update."),
+				mcp.Description("The tenant_id of the tenant to get the default preference from."),
 				mcp.Required(),
 			),
 			mcp.WithString("workspace",
-				mcp.Description(`SuprSend workspace to get the user from.`),
-				mcp.Required(),
+				mcp.Description(`SuprSend workspace to get the tenant from.`),
 			),
-			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
-		Handler: getCategoryPreferenceTenant,
+		Handler: getDefaultPreferenceTenant,
 	}
-
-	return []*Tool{get_suprsend_tenant, upsert_suprsend_tenant, update_suprsend_category_preference_tenant, get_suprsend_categories_preference_tenant}
+	tools := []*Tool{
+		get_suprsend_tenant,
+		get_suprsend_tenants,
+		upsert_suprsend_tenant,
+		update_tenant_default_preference,
+		get_tenant_default_preference,
+	}
+	return tools
 }
 
 func init() {
@@ -350,6 +447,14 @@ var tenantPropertiesSchema = map[string]any{
 			"facebook":  utils.StringSchema("Facebook URL"),
 			"twitter":   utils.StringSchema("Twitter URL"),
 			"instagram": utils.StringSchema("Instagram URL"),
+			"discord":   utils.StringSchema("Discord URL"),
+			"telegram":  utils.StringSchema("Telegram URL"),
+			"linkedin":  utils.StringSchema("Linkedin URL"),
+			"medium":    utils.StringSchema("Medium URL"),
+			"tiktok":    utils.StringSchema("Tiktok URL"),
+			"website":   utils.StringSchema("Website URL"),
+			"x":         utils.StringSchema("X URL"),
+			"youtube":   utils.StringSchema("Youtube URL"),
 		},
 	},
 	"custom_properties": map[string]any{

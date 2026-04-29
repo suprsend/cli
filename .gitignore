@@ -11,6 +11,9 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Debug binaries (created by Go debugger)
+__debug_bin*
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 .env
@@ -19,6 +22,8 @@
 .vscode/
 dist/
 bin/
+!npm/**/bin/
+!npm/**/bin/**
 .DS_Store
 TODO.md
 .air.toml

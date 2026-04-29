@@ -6,23 +6,27 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
 var listProfilesCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all profiles",
-	Long:  "List all profiles from the config",
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  "List all profiles from the config. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	Annotations: map[string]string{
+		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return
+			return clierr.Wrap(err, clierr.CodeUnknown, "")
 		}
 		cfg, _, err := EnsureConfig(path)
 		if err != nil {
-			log.WithError(err)
-			return
+			log.WithError(err).Error("Failed to load config")
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		var names []string
@@ -33,10 +37,13 @@ var listProfilesCmd = &cobra.Command{
 
 		if len(names) == 0 {
 			log.Info("No profiles found. Use 'suprsend profiles add' to add a profile")
-			return
+			return nil
 		}
 
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			return err
+		}
 		hasBaseUrl := false
 		hasMgmntUrl := false
 		hasServiceToken := false
@@ -100,10 +107,11 @@ var listProfilesCmd = &cobra.Command{
 
 			utils.OutputData(profileData, outputType)
 		}
+		return nil
 	},
 }
 
 func init() {
-	listProfilesCmd.Flags().StringP("output", "o", "pretty", "Output type: pretty, json, yaml")
+	listProfilesCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	ProfileCmd.AddCommand(listProfilesCmd)
 }

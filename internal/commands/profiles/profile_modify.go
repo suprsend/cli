@@ -6,6 +6,8 @@ import (
 	"github.com/sabouaram/cobra_ui"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var (
@@ -18,19 +20,18 @@ var (
 var profilesModifyCmd = &cobra.Command{
 	Use:   "modify",
 	Short: "Modify a profile",
-	Long:  "Modify a profile in the configs. Pass --base-url / --mgmnt-url to point the profile at non-default URLs (BYOC, staging, pre-prod, dev, ...).",
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  "Modify a profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load or create config")
-			return
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 		if modifyName != "" {
 			if _, exists := cfg.Profiles[modifyName]; !exists {
-				log.Infof("Profile %q does not exist. Use the command 'suprsend profile list' to see all profiles.", modifyName)
-				return
+				return clierr.New(fmt.Sprintf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName), clierr.CodeInvalidUsage)
 			}
 		}
 
@@ -40,16 +41,14 @@ var profilesModifyCmd = &cobra.Command{
 			if modifyBaseUrl != "" {
 				normalized, err := validateAndNormalizeUrl(modifyBaseUrl)
 				if err != nil {
-					log.WithError(err).Error("Invalid --base-url")
-					return
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --base-url")
 				}
 				selectedProfile.BaseUrl = normalized
 			}
 			if modifyMgmntUrl != "" {
 				normalized, err := validateAndNormalizeUrl(modifyMgmntUrl)
 				if err != nil {
-					log.WithError(err).Error("Invalid --mgmnt-url")
-					return
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --mgmnt-url")
 				}
 				selectedProfile.MgmntUrl = normalized
 			}
@@ -60,13 +59,17 @@ var profilesModifyCmd = &cobra.Command{
 			err := SaveConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
-				return
+				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 			}
 
 			log.Infof("Profile %s modified successfully", modifyName)
 		} else {
+			if !utils.IsInputInteractive() {
+				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+			}
 			runModifyInteractive(cfg, path)
 		}
+		return nil
 	},
 }
 

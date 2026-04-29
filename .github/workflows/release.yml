@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write # Required to create releases and upload artifacts
+  id-token: write # Required for OIDC: AWS (cosign signing) + npm (trusted publishing)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Requests AWS credentials using OIDC to assume the specified role
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2.0.4
+        with:
+          deno-version: latest
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.1
+        with:
+          cosign-release: 'v3.0.5'
+
+      - name: Store public key for signature verification
+        run: cosign public-key --key "awskms:///${{ secrets.AWS_KMS_KEY_ID }}" > /tmp/public_key.pem
+
+      # Key setup for homebrew tap deployment
+      - name: Setup tap deploy key
+        run: |
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > /tmp/tap_key
+          chmod 600 /tmp/tap_key
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_KMS_KEY_ID: ${{ secrets.AWS_KMS_KEY_ID }}
+
+          # Environment variables for Homebrew tap deployment and macOS signing/notarization
+          PRIVATE_KEY_PATH: /tmp/tap_key
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+
+      - name: Verify signature
+        run: |
+          cosign verify-blob \
+            --key /tmp/public_key.pem \
+            --bundle dist/checksums.txt.sig \
+            dist/checksums.txt
+
+      - name: Upload public key to release
+        run: gh release upload "${{ github.ref_name }}" /tmp/public_key.pem --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Node 24 + setup-node@v6 is what npm documents for trusted publishing.
+      # Older combos (Node 20 + setup-node@v4 ship npm 10.x) sign the provenance
+      # but don't perform the OIDC token exchange, so publishes 404 against the
+      # setup-node placeholder _authToken. See
+      # https://docs.npmjs.com/trusted-publishers#supported-cicd-providers
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npm
+        run: scripts/publish-npm.sh "${GITHUB_REF_NAME#v}"
+
+      # MCP Registry only hosts metadata; the npm package above is the artifact.
+      # Registry validation pulls the published package and matches mcpName
+      # against server.json#name, so this step must run after npm publish.
+      #
+      # Pre-release tags (0.x.y-beta.z, 0.x.y-rc.z, ...) are skipped so the
+      # registry only ever advertises stable versions. The npm publish above
+      # still happens for pre-releases under a non-`latest` dist-tag, so beta
+      # users have somewhere to install from.
+      - name: Install mcp-publisher
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+
+      - name: Stamp version into server.json
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp
+          mv server.tmp server.json
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: ./mcp-publisher publish
+
+      - name: Clean up keys
+        if: always()
+        run: |
+          rm -f /tmp/tap_key
+          rm -f /tmp/public_key.pem
+

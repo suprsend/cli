@@ -1,8 +1,27 @@
 # SuprSend CLI
 
+[![cli MCP server](https://glama.ai/mcp/servers/suprsend/cli/badges/score.svg)](https://glama.ai/mcp/servers/suprsend/cli)
+
 SuprSend CLI is a command-line interface tool for interacting with the SuprSend API, written in Go.
 
 ## Installation
+
+### npm / npx
+
+Run without installing:
+
+```bash
+npx suprsend --help
+```
+
+Or install globally:
+
+```bash
+npm i -g suprsend
+suprsend --help
+```
+
+Works on macOS, Linux, and Windows (x64 and arm64). Requires Node.js ≥ 18 (for `npx`).
 
 ### Homebrew
 
@@ -52,16 +71,22 @@ suprsend --help
 ```
 
 ## Documentation
-Please refer to documentation [here](docs/suprsend.md)
+Please refer to documentation [here](https://docs.suprsend.com/reference/cli-intro) OR if you want to access the cobra generated docs those are [here](docs/suprsend.md)
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-### Generating build-artifacts locally
+### Generating build artifacts locally
+
+`make build` compiles the embedded type-morph Deno binary (requires [Deno](https://deno.land/)), then generates CLI documentation in `docs/` and AI skills in `skills/`.
+
 ```bash
 make build
 ```
+
+A CI check on PRs to `main` verifies that `docs/` and `skills/` are up to date. Run `make build` and commit the output before opening a PR.
+
 ### Removing local build artifacts
 ```bash
 make clean

@@ -11,6 +11,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/schema"
 	"github.com/suprsend/cli/internal/utils"
 	suprsend "github.com/suprsend/suprsend-go"
+	"golang.org/x/sync/errgroup"
 )
 
 func triggerEvent(_ context.Context, request mcp.CallToolRequest, workspace, name string) (*mcp.CallToolResult, error) {
@@ -47,57 +48,68 @@ func triggerEvent(_ context.Context, request mcp.CallToolRequest, workspace, nam
 
 func RegisterDynamicEventsTools(workspace string, eventsFlag string) error {
 	events := utils.FetchEventsMcp(workspace, eventsFlag)
-	for _, event := range events {
-		name := event.Name
-		description := event.Description
-		mgmntClient := utils.GetSuprSendMgmntClient()
-		payloadSchema, err := mgmntClient.GetSchema(workspace, event.PayloadSchema.Schema, event.PayloadSchema.Version)
-		if err != nil {
-			return fmt.Errorf("failed to get schema: %s", err)
+	mgmntClient := utils.GetSuprSendMgmntClient()
+	tools := make([]*Tool, len(events))
+
+	patchSchema := `{
+	"properties":{
+		"distinct_id":{
+			"type":"string"
 		}
-		inputSchema, err := json.Marshal(payloadSchema.JSONSchema)
-		if err != nil {
-			return fmt.Errorf("failed to marshal schema: %s", err)
+	},
+	"required":["distinct_id"]
+	}`
+
+	g := new(errgroup.Group)
+	g.SetLimit(dynamicRegistrationConcurrency)
+	for i, event := range events {
+		i, event := i, event
+		if event.Name == "" || event.PayloadSchema.Schema == "" {
+			continue
 		}
-		patchSchema := `{
-		"properties":{
-			"distinct_id":{
-				"type":"string"
+		g.Go(func() error {
+			payloadSchema, err := mgmntClient.GetSchema(workspace, event.PayloadSchema.Schema, event.PayloadSchema.Version)
+			if err != nil {
+				log.Errorf("event %s: skipping registration — failed to fetch payload schema: %s", event.Name, err)
+				return nil
 			}
-		},
-		"required":["distinct_id"]
-		}`
-		mergedSchema, err := schema.MergeAndValidate(string(inputSchema), patchSchema)
-		if err != nil {
-			log.Errorf("failed to create event schema for event %s: %s", name, err)
-			continue
+			inputSchema, err := json.Marshal(payloadSchema.JSONSchema)
+			if err != nil {
+				log.Errorf("event %s: skipping registration — failed to marshal schema: %s", event.Name, err)
+				return nil
+			}
+			mergedSchema, err := schema.MergeAndValidate(string(inputSchema), patchSchema)
+			if err != nil {
+				log.Errorf("event %s: skipping registration — failed to merge schema: %s", event.Name, err)
+				return nil
+			}
+			name := strings.ToLower(strings.ReplaceAll(event.Name, " ", "_"))
+			description := event.Description
+			if description == "" {
+				description = fmt.Sprintf("Use this tool to trigger event with name: %q", name)
+			} else {
+				description = fmt.Sprintf("Use this tool to trigger event with name: %q with description: %q", name, description)
+			}
+			eventName := name
+			tools[i] = &Tool{
+				Name: "trigger_" + eventName + "_event",
+				MCPTool: mcp.NewToolWithRawSchema("trigger_"+eventName+"_event",
+					description,
+					mergedSchema,
+				),
+				Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+					return triggerEvent(ctx, request, workspace, eventName)
+				},
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	for _, t := range tools {
+		if t != nil {
+			RegisterEvent(t)
 		}
-		if name == "" {
-			continue
-		} else {
-			// clean up the name, replace all spaces and convert to lowercase
-			name = strings.ReplaceAll(name, " ", "_")
-			name = strings.ToLower(name)
-		}
-		// if description is empty, don't add it to the description
-		if description == "" {
-			description = fmt.Sprintf("Use this tool to trigger event with name: \"%s\"", name)
-		} else {
-			description = fmt.Sprintf("Use this tool to trigger event with name: \"%s\" with description: \"%s\"", name, description)
-		}
-		eventName := name
-		eventTool := &Tool{
-			Name:        "trigger_" + eventName + "_event",
-			Description: description,
-			MCPTool: mcp.NewToolWithRawSchema("trigger_"+eventName+"_event",
-				description,
-				mergedSchema,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return triggerEvent(ctx, request, workspace, eventName)
-			},
-		}
-		RegisterEvent(eventTool)
 	}
 	return nil
 }

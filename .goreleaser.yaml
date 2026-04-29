@@ -81,8 +81,28 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    args:
+      - "sign-blob"
+      - "--key"
+      - "awskms:///{{ .Env.AWS_KMS_KEY_ID }}"
+      - "--bundle"
+      - "${signature}"
+      - "${artifact}"
+      - "--yes"
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
+
+# Auto-detect pre-release tags (e.g. 0.2.24-beta.1, 0.3.0-rc.2) and mark
+# the corresponding GitHub release as a pre-release. Stable tags (0.2.24)
+# are full releases. The same flag is honoured downstream by
+# `release.prerelease`-aware sections like `homebrew_casks.skip_upload: auto`.
+release:
+  prerelease: auto
 
 changelog:
   sort: asc
@@ -93,6 +113,11 @@ changelog:
 
 homebrew_casks:
   - name: suprsend
+    # Don't update the public Homebrew tap on pre-release tags. `auto` skips
+    # whenever the GitHub release is marked as pre-release (per the rule
+    # above), so `brew upgrade` on the stable tap never bumps users to a
+    # beta / rc build.
+    skip_upload: auto
     ids: [tarballs]
     binary: suprsend
     directory: Casks
@@ -135,7 +160,7 @@ notarize:
         # The password to be used to open the certificate.
         #
         # Templates: allowed.
-        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
+        # password: "{{.Env.MACOS_SIGN_PASSWORD}}"
 
       # Then, we notarize the binaries.
       #

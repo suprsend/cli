@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
 
@@ -27,29 +27,30 @@ type WorkflowPushStats struct {
 	Errors  []string
 }
 
-func isDebugMode() bool {
-	return viper.GetBool("debug")
-}
 
-func promptForOutputDirectory() string {
+func promptForOutputDirectory() (string, bool) {
+	if !utils.IsInputInteractive() {
+		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
+		return "", false
+	}
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := filepath.Join(".", "suprsend", "workflow")
+	defaultDir := filepath.Join(".", "suprsend", "workflows")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the workflows?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultDir
+		return defaultDir, true
 	}
-	return input
+	return input, true
 }
 
 func ensureOutputDirectory(dirPath string) error {
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(os.Stdout, "Creating directory: %s\n", dirPath)
+			log.Infof("Creating directory: %s", dirPath)
 			return os.MkdirAll(dirPath, 0o755)
 		}
 		return fmt.Errorf("error checking directory: %w", err)
@@ -80,17 +81,6 @@ func validateInputDirectory(dirPath string) error {
 	return nil
 }
 
-func debugLog(format string, args ...interface{}) {
-	if isDebugMode() {
-		log.Infof(format, args...)
-	}
-}
-
-func debugErrorLog(format string, args ...interface{}) {
-	if isDebugMode() {
-		log.Errorf(format, args...)
-	}
-}
 
 func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*WorkflowWriteStats, error) {
 	stats := &WorkflowWriteStats{
@@ -108,7 +98,7 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 			return stats, fmt.Errorf("error accessing '%s': %v", outputDir, err)
 		}
 	} else if !info.IsDir() {
-		return stats, err
+		return stats, fmt.Errorf("path '%s' exists but is not a directory", outputDir)
 	}
 
 	for _, wf := range resp.Results {
@@ -120,27 +110,30 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 		}
 
 		slug, _ := obj["slug"].(string)
-		filename := filepath.Join(outputDir, fmt.Sprintf("%s.json", slug))
+		slugDir := filepath.Join(outputDir, slug)
+		if err := os.MkdirAll(slugDir, 0o755); err != nil {
+			stats.Failed++
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create directory for '%s': %v", slug, err))
+			continue
+		}
 
-		fileData, err := json.MarshalIndent(wf, "", "  ")
+		fileData, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
-			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to marshal workflow '%s': %v\n", slug, err)
+			log.Errorf("Failed to marshal workflow '%s': %v", slug, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal workflow '%s': %v", slug, err))
 			continue
 		}
 
-		if err := os.WriteFile(filename, fileData, 0o644); err != nil {
-			debugErrorLog("Error: %s", err)
-			fmt.Fprintf(os.Stdout, "Error: Failed to write file '%s': %v\n", filename, err)
+		filename := filepath.Join(slugDir, "workflow.json")
+		if err := os.WriteFile(filename, append(fileData, '\n'), 0o644); err != nil {
+			log.Errorf("Failed to write file '%s': %v", filename, err)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write file '%s': %v", filename, err))
 			continue
 		}
 
-		debugLog("Wrote: %s", filename)
-		fmt.Fprintf(os.Stdout, "Wrote workflow to %s\n", filename)
+		log.Infof("Wrote workflow to %s", filename)
 		stats.Success++
 	}
 

@@ -67,22 +67,19 @@ func fetchDocsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 func newDocumentationTools() []*Tool {
 	searchDoc := &Tool{
 		Name:        "documentation.search",
-		Description: "Enables querying SuprSend documentation",
 		MCPTool: mcp.NewTool("search_suprsend_documentation",
-			mcp.WithDescription(`Use this tool to get technical guidance or answers related to SuprSend. It is especially helpful when:
-				- You have questions about SuprSend's capabilities, features, or integrations (e.g., Workflows, Templates, Tenants, Lists, Vendors, Connectors, etc.).
-				- You are unsure how a specific SuprSend functionality or API works.
-				- You are writing or debugging an integration with SuprSend.
-			How to use:
-				- Frame your queries using precise technical terms; avoid vague language.
-				- The tool returns a JSON array, where each item contains:
-				- uri: The documentation path.
-				- snippet: A relevant excerpt from the documentation.
-			Answering process:
-				- Review all provided snippets to answer the question.
-				- If the snippets are insufficient, use the corresponding uri to fetch the full documentation with the fetch_suprsend_documentation tool.
-				- Process each resource in the order provided.
-				- Use information from both the snippets and the full documentation to construct your final answer.`),
+			mcp.WithDescription(`Search SuprSend's product documentation for technical guidance — APIs, SDKs, workflows, templates, tenants, lists, vendors, and connectors.
+
+When to use:
+- The user asks how a SuprSend feature works or how to integrate one.
+- You need to verify a behavior before calling a write tool.
+- You're debugging an integration error.
+
+When NOT to use: for runtime operations on SuprSend resources (users, objects, tenants, workflows) — those have dedicated tools.
+
+Returns: a JSON array of {uri, snippet}. Snippets are excerpts; if a snippet doesn't fully answer, follow up with fetch_suprsend_documentation on the relevant uri.
+
+Tips: use precise technical terms ("workflow trigger conditions", not "the rule thing"); add synonyms if the first query returns nothing.`),
 			mcp.WithString("query",
 				mcp.Description(`Search query. The query should: 
 					- Identify the core concepts and intent 
@@ -92,20 +89,29 @@ func newDocumentationTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: searchDocsHandler,
 	}
 
 	fetchDoc := &Tool{
 		Name:        "documentation.fetch",
-		Description: "Fetch the full documentation content for the given uri.",
 		MCPTool: mcp.NewTool("fetch_suprsend_documentation",
-			mcp.WithDescription(`Use this tool to fetch the full documentation content for the given uri.`),
+			mcp.WithDescription(`Fetch the full content of a SuprSend documentation page when a snippet from search_suprsend_documentation is insufficient.
+
+When to use: after search_suprsend_documentation, when the snippet excerpt doesn't fully answer and you need surrounding context, code examples, or full reference material.
+
+When NOT to use: to discover documentation — search first; don't construct uris yourself.
+
+Returns: the page contents as markdown.`),
 			mcp.WithString("uri",
 				mcp.Description(`The uri of the documentation to fetch.`),
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: fetchDocsHandler,
 	}

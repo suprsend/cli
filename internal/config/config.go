@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -9,6 +12,35 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+type cliFormatter struct {
+	noColor bool
+}
+
+func (f *cliFormatter) Format(entry *log.Entry) ([]byte, error) {
+	var buf bytes.Buffer
+	if entry.Level == log.InfoLevel {
+		fmt.Fprintf(&buf, "%s\n", entry.Message)
+		return buf.Bytes(), nil
+	}
+	var levelLabel string
+	if f.noColor {
+		levelLabel = fmt.Sprintf("%-5s", entry.Level.String())
+	} else {
+		switch entry.Level {
+		case log.WarnLevel:
+			levelLabel = color.YellowString("%-5s", entry.Level.String())
+		case log.ErrorLevel:
+			levelLabel = color.RedString("%-5s", entry.Level.String())
+		case log.DebugLevel:
+			levelLabel = color.CyanString("%-5s", entry.Level.String())
+		default:
+			levelLabel = fmt.Sprintf("%-5s", entry.Level.String())
+		}
+	}
+	fmt.Fprintf(&buf, "%s %s\n", levelLabel, entry.Message)
+	return buf.Bytes(), nil
+}
 
 // Config holds the application's configuration.
 type Config struct {
@@ -18,6 +50,7 @@ type Config struct {
 	ServiceToken  string
 	NoColorOutput bool
 	Workspace     string
+	Quiet         bool
 }
 
 // cfg is the global configuration instance.
@@ -61,17 +94,37 @@ func InitConfig(cfgFile string) {
 	}
 }
 
+var isStderrPiped = sync.OnceValue(func() bool {
+	fi, err := os.Stderr.Stat()
+	return err == nil && (fi.Mode()&os.ModeCharDevice) == 0
+})
+
+// IsStderrPiped reports whether os.Stderr is not connected to a terminal.
+// Result is cached after the first call.
+func IsStderrPiped() bool {
+	return isStderrPiped()
+}
+
+// ShouldJSONErrors returns true when errors must be emitted as structured JSON.
+func ShouldJSONErrors() bool {
+	return Cfg.OutputType == "json" || IsStderrPiped()
+}
+
 // setUpLogs set the log output ans the log level
 func SetUpLogs() error {
-	log.SetFormatter(&log.TextFormatter{
-		DisableColors: viper.GetBool("NO_COLOR"),
-		FullTimestamp: true,
-		PadLevelText:  true,
-	})
-	if Cfg.OutputType == "json" {
-		log.SetFormatter(&log.JSONFormatter{})
+	log.SetFormatter(&cliFormatter{noColor: viper.GetBool("NO_COLOR")})
+
+	// In JSON errors mode suppress logrus entirely — utils.WriteError is the sole stderr writer.
+	if Cfg.OutputType == "json" || IsStderrPiped() {
+		log.SetLevel(log.FatalLevel)
+		return nil
 	}
 
+	if Cfg.Quiet {
+		log.SetOutput(os.Stderr)
+		log.SetLevel(log.ErrorLevel)
+		return nil
+	}
 	if viper.GetBool("debug") {
 		Cfg.Verbosity = "debug"
 	}

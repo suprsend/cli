@@ -9,6 +9,8 @@ import (
 	"github.com/sabouaram/cobra_ui"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var (
@@ -21,14 +23,14 @@ var (
 var profilesAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a new profile",
-	Long:  "Add a new profile to the configs. Pass --base-url / --mgmnt-url to point the profile at non-default URLs (BYOC, staging, pre-prod, dev, ...); omit them to use the public SuprSend Cloud defaults.",
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  "Add a new profile to the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load or create config")
-			return
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		if addName != "" && addServiceToken != "" {
@@ -37,8 +39,7 @@ var profilesAddCmd = &cobra.Command{
 			if addBaseUrl != "" {
 				normalized, err := validateAndNormalizeUrl(addBaseUrl)
 				if err != nil {
-					log.WithError(err).Error("Invalid --base-url")
-					return
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --base-url")
 				}
 				addBaseUrl = normalized
 			} else {
@@ -47,8 +48,7 @@ var profilesAddCmd = &cobra.Command{
 			if addMgmntUrl != "" {
 				normalized, err := validateAndNormalizeUrl(addMgmntUrl)
 				if err != nil {
-					log.WithError(err).Error("Invalid --mgmnt-url")
-					return
+					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --mgmnt-url")
 				}
 				addMgmntUrl = normalized
 			} else {
@@ -64,13 +64,17 @@ var profilesAddCmd = &cobra.Command{
 			err := SaveConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
-				return
+				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 			}
 
 			log.Infof("Profile %s added successfully", addName)
 		} else {
+			if !utils.IsInputInteractive() {
+				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+			}
 			runAddInteractive(cfg, path)
 		}
+		return nil
 	},
 }
 

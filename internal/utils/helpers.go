@@ -2,14 +2,24 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 	suprsend "github.com/suprsend/suprsend-go"
 )
+
+// DeepCopyMap returns a deep copy of a map[string]any via JSON round-trip.
+func DeepCopyMap(m map[string]any) map[string]any {
+	b, _ := json.Marshal(m)
+	var out map[string]any
+	json.Unmarshal(b, &out)
+	return out
+}
 
 type WorkflowPayloadSchema struct {
 	Schema string `json:"schema"`
@@ -21,7 +31,47 @@ type WorkflowInfo struct {
 	Slug          string
 	Name          string
 	Description   string
+	Tags          []string
 	PayloadSchema WorkflowPayloadSchema
+}
+
+// parseSelector splits a comma-separated --workflows / --events flag value into
+// plain slugs/names and tag selectors. Entries prefixed with `tag:` are tag
+// selectors; everything else is matched against the resource's slug or name.
+//
+// Examples:
+//
+//	"all"                            → all=true
+//	"none" | ""                      → none=true
+//	"welcome,order-placed"           → slugs=[welcome, order-placed]
+//	"tag:onboarding,tag:transac"     → tags=[onboarding, transac]
+//	"welcome,tag:onboarding"         → slugs=[welcome], tags=[onboarding]
+func parseSelector(flag string) (all bool, none bool, slugs []string, tags []string) {
+	flag = strings.TrimSpace(flag)
+	if flag == "" || flag == "none" {
+		return false, true, nil, nil
+	}
+	if flag == "all" {
+		return true, false, nil, nil
+	}
+	for _, raw := range strings.Split(flag, ",") {
+		entry := strings.TrimSpace(raw)
+		if entry == "" {
+			continue
+		}
+		if tag, ok := strings.CutPrefix(entry, "tag:"); ok {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tags = append(tags, tag)
+			}
+			continue
+		}
+		slugs = append(slugs, entry)
+	}
+	if len(slugs) == 0 && len(tags) == 0 {
+		return false, true, nil, nil
+	}
+	return false, false, slugs, tags
 }
 
 func GenerateUUID() string {
@@ -29,20 +79,11 @@ func GenerateUUID() string {
 }
 
 func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
-	if workflowsFlag == "none" {
+	all, none, slugs, tags := parseSelector(workflowsFlag)
+	if none {
 		return nil
-	}
-	var workflowsToBeFetched []string
-	if workflowsFlag != "all" {
-		workflowsToBeFetched = strings.Split(workflowsFlag, ",")
-		for i, workflow := range workflowsToBeFetched {
-			workflowsToBeFetched[i] = strings.TrimSpace(workflow)
-		}
 	}
 
-	if len(workflowsToBeFetched) == 0 && workflowsFlag != "all" {
-		return nil
-	}
 	mgmntClient := GetSuprSendMgmntClient()
 	if mgmntClient == nil {
 		return nil
@@ -58,34 +99,55 @@ func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
 		if !ok {
 			continue
 		}
-		workflowInfo := WorkflowInfo{}
+		info := WorkflowInfo{}
 		if slug, ok := workflowMap["slug"].(string); ok {
-			workflowInfo.Slug = slug
+			info.Slug = slug
 		}
 		if name, ok := workflowMap["name"].(string); ok {
-			workflowInfo.Name = name
-		} else {
-			workflowInfo.Name = ""
+			info.Name = name
 		}
 		if description, ok := workflowMap["description"].(string); ok {
-			workflowInfo.Description = description
-		} else {
-			workflowInfo.Description = ""
+			info.Description = description
+		}
+		if rawTags, ok := workflowMap["tags"].([]any); ok {
+			for _, t := range rawTags {
+				if s, ok := t.(string); ok {
+					info.Tags = append(info.Tags, s)
+				}
+			}
 		}
 		if payloadSchema, ok := workflowMap["payload_schema"].(map[string]any); ok {
-			workflowInfo.PayloadSchema.Schema = payloadSchema["schema"].(string)
+			info.PayloadSchema.Schema, _ = payloadSchema["schema"].(string)
 			if versionNo, ok := payloadSchema["version_no"].(string); ok {
-				workflowInfo.PayloadSchema.Version = versionNo
-			} else {
-				workflowInfo.PayloadSchema.Version = ""
+				info.PayloadSchema.Version = versionNo
 			}
 		}
 
-		if workflowsFlag == "all" || slices.Contains(workflowsToBeFetched, workflowInfo.Name) {
-			result = append(result, workflowInfo)
+		if matchesSelector(info.Slug, info.Name, info.Tags, all, slugs, tags) {
+			result = append(result, info)
 		}
 	}
 	return result
+}
+
+// matchesSelector returns true when a resource's slug, name, or any of its
+// tags matches the parsed selector. `all` short-circuits to true.
+func matchesSelector(slug, name string, resourceTags []string, all bool, slugs, tags []string) bool {
+	if all {
+		return true
+	}
+	if slug != "" && slices.Contains(slugs, slug) {
+		return true
+	}
+	if name != "" && slices.Contains(slugs, name) {
+		return true
+	}
+	for _, t := range resourceTags {
+		if slices.Contains(tags, t) {
+			return true
+		}
+	}
+	return false
 }
 
 type EventPayloadSchema struct {
@@ -101,20 +163,11 @@ type EventInfo struct {
 }
 
 func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
-	// eventFlag can be `none` or `all` or a comma separated list of event slugs
-	if eventsFlag == "none" {
-		return nil
-	}
-	var eventsToBeFetched []string
-	if eventsFlag != "all" {
-		eventsToBeFetched = strings.Split(eventsFlag, ",")
-		// trim the events
-		for i, event := range eventsToBeFetched {
-			eventsToBeFetched[i] = strings.TrimSpace(event)
-		}
-	}
-
-	if len(eventsToBeFetched) == 0 && eventsFlag != "all" {
+	// Selector accepts `none`, `all`, comma-separated names, and (for forward
+	// compatibility) `tag:<tag>` entries — events don't yet expose tags from
+	// the API, so tag selectors will simply match nothing today.
+	all, none, names, tags := parseSelector(eventsFlag)
+	if none {
 		return nil
 	}
 
@@ -132,30 +185,22 @@ func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
 		if !ok {
 			continue
 		}
-		eventInfo := EventInfo{}
+		info := EventInfo{}
 		if name, ok := eventMap["name"].(string); ok {
-			eventInfo.Name = name
-		} else {
-			eventInfo.Name = ""
+			info.Name = name
 		}
 		if description, ok := eventMap["description"].(string); ok {
-			eventInfo.Description = description
-		} else {
-			eventInfo.Description = ""
+			info.Description = description
 		}
 		if payloadSchema, ok := eventMap["payload_schema"].(map[string]any); ok {
-			eventInfo.PayloadSchema.Schema = payloadSchema["schema"].(string)
-			// check if version_no is nil
+			info.PayloadSchema.Schema, _ = payloadSchema["schema"].(string)
 			if versionNo, ok := payloadSchema["version_no"].(string); ok {
-				eventInfo.PayloadSchema.Version = versionNo
-			} else {
-				eventInfo.PayloadSchema.Version = ""
+				info.PayloadSchema.Version = versionNo
 			}
 		}
 
-		// add th event to the result only if either eventsFlag is "all" or the event is in the eventsToBeFetched list
-		if eventsFlag == "all" || slices.Contains(eventsToBeFetched, eventInfo.Name) {
-			result = append(result, eventInfo)
+		if matchesSelector(info.Name, info.Name, nil, all, names, tags) {
+			result = append(result, info)
 		}
 	}
 	return result
@@ -196,6 +241,13 @@ func StringSchema(desc string) map[string]any {
 	}
 }
 
+func BoolSchema(desc string) map[string]any {
+	return map[string]any{
+		"type":        "boolean",
+		"description": desc,
+	}
+}
+
 func ArraySchema(desc string) map[string]any {
 	return map[string]any{
 		"type":        "array",
@@ -213,7 +265,14 @@ func RequiresKey(action string) bool {
 	return actions[action]
 }
 
-func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, identity_provider string, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
+func RequiresValue(action string) bool {
+	actions := map[string]bool{
+		"set": true, "append": true, "increment": true,
+	}
+	return actions[action]
+}
+
+func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -244,6 +303,9 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 	case "set":
 		objectInstance.Set(map[string]any{key: value})
 		out = fmt.Sprintf("Key set successfully for user with object_id: %s for key: %s and value: %s", objectIdentifier.Id, key, value)
+	case "set_once":
+		objectInstance.SetOnce(map[string]any{key: value})
+		out = fmt.Sprintf("Key set once successfully for user with object_id: %s for key: %s and value: %s", objectIdentifier.Id, key, value)
 	case "unset":
 		objectInstance.Unset([]string{key})
 		out = fmt.Sprintf("Key unset successfully for user with object_id: %s for key: %s and value: %s", objectIdentifier.Id, key, value)
@@ -278,17 +340,17 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 		objectInstance.RemoveWhatsapp(value)
 		out = fmt.Sprintf("Whatsapp removed successfully for user with object_id: %s for key: %s and value: %s", objectIdentifier.Id, key, value)
 	case "add_androidpush":
-		objectInstance.AddAndroidpush(value, identity_provider)
-		out = fmt.Sprintf("Android push added successfully for user with object_id: %s for key: %s and value: %s and identity_provider: %s", objectIdentifier.Id, key, value, identity_provider)
+		objectInstance.AddAndroidpush(value, "")
+		out = fmt.Sprintf("Android push added successfully for user with object_id: %s for key: %s and value: %s ", objectIdentifier.Id, key, value)
 	case "remove_androidpush":
-		objectInstance.RemoveAndroidpush(value, identity_provider)
-		out = fmt.Sprintf("Android push removed successfully for user with object_id: %s for key: %s and value: %s and identity_provider: %s", objectIdentifier.Id, key, value, identity_provider)
+		objectInstance.RemoveAndroidpush(value, "")
+		out = fmt.Sprintf("Android push removed successfully for user with object_id: %s for key: %s and value: %s ", objectIdentifier.Id, key, value)
 	case "add_iospush":
-		objectInstance.AddIospush(value, identity_provider)
-		out = fmt.Sprintf("iOS push added successfully for user with object_id: %s for key: %s and value: %s and identity_provider: %s", objectIdentifier.Id, key, value, identity_provider)
+		objectInstance.AddIospush(value, "")
+		out = fmt.Sprintf("iOS push added successfully for user with object_id: %s for key: %s and value: %s ", objectIdentifier.Id, key, value)
 	case "remove_iospush":
-		objectInstance.RemoveIospush(value, identity_provider)
-		out = fmt.Sprintf("iOS push removed successfully for user with object_id: %s for key: %s and value: %s and identity_provider: %s", objectIdentifier.Id, key, value, identity_provider)
+		objectInstance.RemoveIospush(value, "")
+		out = fmt.Sprintf("iOS push removed successfully for user with object_id: %s for key: %s and value: %s ", objectIdentifier.Id, key, value)
 	case "add_slack", "remove_slack":
 		payload, slackOut, err := prepareSlackPayload(slack_details)
 		if err != nil {
@@ -300,12 +362,34 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 			objectInstance.RemoveSlack(payload)
 		}
 		out = fmt.Sprintf(slackOut, objectIdentifier.Id, value)
+	case "add_ms_teams", "remove_ms_teams":
+		payload, msTeamsOut, err := prepareMSTeamsPayload(ms_teams_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_ms_teams" {
+			objectInstance.AddMSTeams(payload)
+		} else {
+			objectInstance.RemoveMSTeams(payload)
+		}
+		out = fmt.Sprintf(msTeamsOut, objectIdentifier.Id, value)
+	case "add_webpush", "remove_webpush":
+		payload, webpushOut, err := prepareWebpushPayload(webpush_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_webpush" {
+			objectInstance.AddWebpush(payload, "vapid")
+		} else {
+			objectInstance.RemoveWebpush(payload, "vapid")
+		}
+		out = fmt.Sprintf(webpushOut, objectIdentifier.Id, value)
 	}
 
 	return out, err
 }
 
-func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, identity_provider, distinct_id string, workspace string) (string, error) {
+func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, distinct_id string, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -329,6 +413,9 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 	case "set":
 		userInstance.Set(map[string]any{key: value})
 		out = fmt.Sprintf("Key set successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
+	case "set_once":
+		userInstance.SetOnce(map[string]any{key: value})
+		out = fmt.Sprintf("Key set once successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
 	case "unset":
 		userInstance.Unset([]string{key})
 		out = fmt.Sprintf("Key unset successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
@@ -336,6 +423,9 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 		userInstance.Append(map[string]any{key: value})
 		out = fmt.Sprintf("Key appended successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
 	case "increment":
+		if _, err := strconv.Atoi(value); err != nil {
+			return "", errors.New("value must be an integer")
+		}
 		userInstance.Increment(map[string]any{key: value})
 		out = fmt.Sprintf("Key incremented successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
 	case "add_email":
@@ -363,17 +453,17 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 		userInstance.RemoveWhatsapp(value)
 		out = fmt.Sprintf("Whatsapp removed successfully for user with distinct_id: %s for key: %s and value: %s", distinct_id, key, value)
 	case "add_androidpush":
-		userInstance.AddAndroidpush(value, identity_provider)
-		out = fmt.Sprintf("Android push added successfully for user with distinct_id: %s for key: %s and value: %s and identity_provider: %s", distinct_id, key, value, identity_provider)
+		userInstance.AddAndroidpush(value, "")
+		out = fmt.Sprintf("Android push added successfully for user with distinct_id: %s for key: %s and value: %s ", distinct_id, key, value)
 	case "remove_androidpush":
-		userInstance.RemoveAndroidpush(value, identity_provider)
-		out = fmt.Sprintf("Android push removed successfully for user with distinct_id: %s for key: %s and value: %s and identity_provider: %s", distinct_id, key, value, identity_provider)
+		userInstance.RemoveAndroidpush(value, "")
+		out = fmt.Sprintf("Android push removed successfully for user with distinct_id: %s for key: %s and value: %s ", distinct_id, key, value)
 	case "add_iospush":
-		userInstance.AddIospush(value, identity_provider)
-		out = fmt.Sprintf("iOS push added successfully for user with distinct_id: %s for key: %s and value: %s and identity_provider: %s", distinct_id, key, value, identity_provider)
+		userInstance.AddIospush(value, "")
+		out = fmt.Sprintf("iOS push added successfully for user with distinct_id: %s for key: %s and value: %s ", distinct_id, key, value)
 	case "remove_iospush":
-		userInstance.RemoveIospush(value, identity_provider)
-		out = fmt.Sprintf("iOS push removed successfully for user with distinct_id: %s for key: %s and value: %s and identity_provider: %s", distinct_id, key, value, identity_provider)
+		userInstance.RemoveIospush(value, "")
+		out = fmt.Sprintf("iOS push removed successfully for user with distinct_id: %s for key: %s and value: %s ", distinct_id, key, value)
 	case "add_slack", "remove_slack":
 		payload, slackOut, err := prepareSlackPayload(slack_details)
 		if err != nil {
@@ -385,8 +475,29 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 			userInstance.RemoveSlack(payload)
 		}
 		out = fmt.Sprintf(slackOut, distinct_id, value)
+	case "add_ms_teams", "remove_ms_teams":
+		payload, msTeamsOut, err := prepareMSTeamsPayload(ms_teams_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_ms_teams" {
+			userInstance.AddMSTeams(payload)
+		} else {
+			userInstance.RemoveMSTeams(payload)
+		}
+		out = fmt.Sprintf(msTeamsOut, distinct_id, value)
+	case "add_webpush", "remove_webpush":
+		payload, webpushOut, err := prepareWebpushPayload(webpush_details)
+		if err != nil {
+			return "", err
+		}
+		if action == "add_webpush" {
+			userInstance.AddWebpush(payload, "vapid")
+		} else {
+			userInstance.RemoveWebpush(payload, "vapid")
+		}
+		out = fmt.Sprintf(webpushOut, distinct_id, value)
 	}
-
 	return out, err
 }
 
@@ -436,4 +547,130 @@ func prepareSlackPayload(slackDetails map[string]any) (map[string]any, string, e
 	}
 
 	return payload, slackOut, nil
+}
+
+func prepareMSTeamsPayload(msTeamsDetails map[string]any) (map[string]any, string, error) {
+	msteamsType, ok := msTeamsDetails["type"].(string)
+	if !ok || msteamsType == "" {
+		return nil, "", errors.New("type is required for ms_teams_details and must be one of: incoming_webhook, channel, user, user_id")
+	}
+	var payload map[string]any
+	var msTeamsOut string
+	switch msteamsType {
+	case "incoming_webhook":
+		incomingWebhook, ok := msTeamsDetails["incoming_webhook"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("incoming_webhook is required for ms_teams_details when type is incoming_webhook")
+		}
+		url, ok := incomingWebhook["url"].(string)
+		if !ok || url == "" {
+			return nil, "", errors.New("url is required for incoming_webhook")
+		}
+		payload = map[string]any{"incoming_webhook": map[string]any{"url": url}}
+		msTeamsOut = "Incoming webhook added successfully for user with distinct_id: %s and value: %s"
+	case "channel":
+		channel, ok := msTeamsDetails["channel"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("channel is required for ms_teams_details when type is channel")
+		}
+		tenantId, ok := channel["tenant_id"].(string)
+		if !ok || tenantId == "" {
+			return nil, "", errors.New("tenant_id is required for channel")
+		}
+		serviceUrl, ok := channel["service_url"].(string)
+		if !ok || serviceUrl == "" {
+			return nil, "", errors.New("service_url is required for channel")
+		}
+		conversationId, ok := channel["conversation_id"].(string)
+		if !ok || conversationId == "" {
+			return nil, "", errors.New("conversation_id is required for channel")
+		}
+		payload = map[string]any{"tenant_id": tenantId, "service_url": serviceUrl, "conversation_id": conversationId}
+		msTeamsOut = "Channel added successfully for user with distinct_id: %s and value: %s"
+	case "user":
+		user, ok := msTeamsDetails["user"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("user is required for ms_teams_details when type is user")
+		}
+		tenantId, ok := user["tenant_id"].(string)
+		if !ok || tenantId == "" {
+			return nil, "", errors.New("tenant_id is required for user")
+		}
+		serviceUrl, ok := user["service_url"].(string)
+		if !ok || serviceUrl == "" {
+			return nil, "", errors.New("service_url is required for user")
+		}
+		conversationId, ok := user["conversation_id"].(string)
+		if !ok || conversationId == "" {
+			return nil, "", errors.New("conversation_id is required for user")
+		}
+		payload = map[string]any{"tenant_id": tenantId, "service_url": serviceUrl, "conversation_id": conversationId}
+		msTeamsOut = "User added successfully for user with distinct_id: %s and value: %s"
+	case "user_id":
+		userId, ok := msTeamsDetails["user_id"].(map[string]any)
+		if !ok {
+			return nil, "", errors.New("user_id is required for ms_teams_details when type is user_id")
+		}
+		userIdValue, ok := userId["user_id"].(string)
+		if !ok || userIdValue == "" {
+			return nil, "", errors.New("user_id is required for user_id")
+		}
+		tenantId, ok := userId["tenant_id"].(string)
+		if !ok || tenantId == "" {
+			return nil, "", errors.New("tenant_id is required for user_id")
+		}
+		serviceUrl, ok := userId["service_url"].(string)
+		if !ok || serviceUrl == "" {
+			return nil, "", errors.New("service_url is required for user_id")
+		}
+		payload = map[string]any{"user_id": userIdValue, "tenant_id": tenantId, "service_url": serviceUrl}
+	default:
+		return nil, "", errors.New("invalid type for ms_teams_details")
+	}
+	return payload, msTeamsOut, nil
+}
+
+func prepareWebpushPayload(webpushDetails map[string]any) (map[string]any, string, error) {
+	var payload map[string]any
+	var webpushOut string
+
+	keys, ok := webpushDetails["keys"].(map[string]any)
+	if !ok {
+		return nil, "", errors.New("keys is required for webpush_details")
+	}
+	auth, ok := keys["auth"].(string)
+	if !ok {
+		return nil, "", errors.New("auth is required for webpush_details")
+	}
+	p256dh, ok := keys["p256dh"].(string)
+	if !ok {
+		return nil, "", errors.New("p256dh is required for webpush_details")
+	}
+	endpoint, ok := webpushDetails["endpoint"].(string)
+	if !ok || endpoint == "" {
+		return nil, "", errors.New("endpoint is required for webpush_details")
+	}
+	payload = map[string]any{"keys": map[string]any{"auth": auth, "p256dh": p256dh}, "endpoint": endpoint}
+	webpushOut = "Webpush added successfully for user with distinct_id: %s and value: %s"
+	return payload, webpushOut, nil
+}
+
+func ToStringSlice(in []any) ([]string, error) {
+	out := make([]string, len(in))
+	for i, v := range in {
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("element %d is not a string (type %T)", i, v)
+		}
+		out[i] = s
+	}
+	return out, nil
+}
+
+func Remarshal(src any, dst any) error {
+	data, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, dst)
 }

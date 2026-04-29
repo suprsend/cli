@@ -13,21 +13,28 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
   -h, --help                   help for suprsend
-  -n, --no-color               Disable color output (default: $NO_COLOR)
-  -o, --output string          Output Style (pretty, yaml, json) (default "pretty")
+      --no-color               Disable color output (default: $NO_COLOR)
+  -o, --output string          Output format: pretty, json, or yaml (default "pretty")
+  -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to use (default "staging")
+  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### SEE ALSO
 
 * [suprsend category](suprsend_category.md)	 - Manage preference categories
 * [suprsend completion](suprsend_completion.md)	 - Generate the autocompletion script for the specified shell
+* [suprsend env](suprsend_env.md)	 - Show recognized environment variables and their current values
 * [suprsend event](suprsend_event.md)	 - Manage events
+* [suprsend generate-types](suprsend_generate-types.md)	 - Generate type definitions from JSON Schema
+* [suprsend genskills](suprsend_genskills.md)	 - Generate SKILLS.md
 * [suprsend profile](suprsend_profile.md)	 - Manage Profile
 * [suprsend schema](suprsend_schema.md)	 - Manage trigger payload schemas
 * [suprsend start-mcp-server](suprsend_start-mcp-server.md)	 - Start SuprSend MCP server
 * [suprsend sync](suprsend_sync.md)	 - Sync SuprSend assets from one workspace to another
+* [suprsend template](suprsend_template.md)	 - Manage templates
+* [suprsend translation](suprsend_translation.md)	 - Manage Translations
 * [suprsend workflow](suprsend_workflow.md)	 - Manage workflows
+* [suprsend workspace](suprsend_workspace.md)	 - Manage workspaces
 

@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )
@@ -12,6 +14,10 @@ var genDocsCmd = &cobra.Command{
 	Args:   cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := args[0]
+
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
 
 		// Temporarily remove the version command for documentation generation
 		var versionCmd *cobra.Command

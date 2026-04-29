@@ -98,9 +98,13 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 			continue
 		}
 		successCount++
+		// Per-file write line, matching schema/workflow pull's "Wrote ... to ..."
+		// shape so users can see what landed on disk and can grep / diff
+		// against expectations.
+		log.Infof("Wrote translation to %s", filename)
 	}
 
-	spinner.Stop(fmt.Sprintf("Pulled translations from %s", workspace))
+	spinner.Stop(fmt.Sprintf("Pulled %d translation(s) from %s", successCount, workspace))
 
 	log.Info("=== Translation Pull Summary ===")
 	log.Infof("Total locales processed: %d", len(locales.Results))

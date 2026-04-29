@@ -1,6 +1,7 @@
 {
   "name": "suprsend",
   "version": "0.0.0",
+  "mcpName": "io.github.suprsend/cli",
   "description": "SuprSend CLI — manage notification infrastructure from your terminal.",
   "bin": {
     "suprsend": "bin/suprsend.js"

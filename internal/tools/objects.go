@@ -297,6 +297,8 @@ func newObjectTools() []*Tool {
 				mcp.Description("Suprsend workspace to get the object from"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getObjectHandler,
 	}
@@ -409,6 +411,8 @@ func newObjectTools() []*Tool {
 				),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: upsertObjectHandler,
 	}
@@ -435,6 +439,9 @@ func newObjectTools() []*Tool {
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getObjectPreferences,
 	}
@@ -472,6 +479,8 @@ func newObjectTools() []*Tool {
 				mcp.Description("SuprSend workspace to get the user from."),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: updateObjectCategoryPreference,
 	}
@@ -505,6 +514,8 @@ func newObjectTools() []*Tool {
 				mcp.Description("SuprSend workspace to update the channel preference for."),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: updateObjectChannelPreferenceHandler,
 	}
@@ -532,6 +543,8 @@ func newObjectTools() []*Tool {
 				mcp.Description("Number of subscriptions to get for an object."),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getObjectSubscriptionsHandler,
 	}
@@ -560,6 +573,8 @@ func newObjectTools() []*Tool {
 				mcp.Description("Properties of an user/object"),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: addObjectSubscriptionsHandler,
 	}

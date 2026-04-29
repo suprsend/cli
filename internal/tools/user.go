@@ -292,6 +292,8 @@ func newUserTools() []*Tool {
 				mcp.Description(`SuprSend workspace to get the user from.`),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getUserHandler,
 	}
@@ -394,6 +396,8 @@ func newUserTools() []*Tool {
 				),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: upsertUserHandler,
 	}
@@ -419,6 +423,8 @@ func newUserTools() []*Tool {
 				mcp.Description(`SuprSend workspace to get the user from.`),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getUserPreferencesHandler,
 	}
@@ -469,6 +475,8 @@ func newUserTools() []*Tool {
 				mcp.Description("SuprSend workspace to run the query from."),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: updateUserPreference,
 	}
@@ -498,6 +506,8 @@ func newUserTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: updateUserChannelPreferenceHandler,
 	}
@@ -518,6 +528,8 @@ func newUserTools() []*Tool {
 				mcp.Description("Number of list subscriptions to get for a user."),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getUserListSubscriptionsHandler,
 	}
@@ -538,6 +550,8 @@ func newUserTools() []*Tool {
 				mcp.Description("Number of object subscriptions to get for a user."),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getUserObjectsSubscriptionsHandler,
 	}

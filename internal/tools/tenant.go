@@ -248,6 +248,8 @@ func newTenantTools() []*Tool {
 				mcp.Description(`SuprSend workspace to get the tenant from.`),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getTenantHandler,
 	}
@@ -264,6 +266,8 @@ func newTenantTools() []*Tool {
 				mcp.Description(`SuprSend workspace to get the tenants from.`),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getAllTenantsHandler,
 	}
@@ -285,6 +289,8 @@ func newTenantTools() []*Tool {
 				mcp.Properties(tenantPropertiesSchema),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: upsertTenantHandler,
 	}
@@ -330,6 +336,8 @@ func newTenantTools() []*Tool {
 				mcp.Description(`SuprSend workspace to update the tenant from.`),
 			),
 			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: updateCategoryPreferenceTenant,
 	}
@@ -346,7 +354,9 @@ func newTenantTools() []*Tool {
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to get the tenant from.`),
 			),
-			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: getDefaultPreferenceTenant,
 	}

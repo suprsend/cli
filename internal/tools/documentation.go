@@ -92,6 +92,8 @@ func newDocumentationTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: searchDocsHandler,
 	}
@@ -106,6 +108,8 @@ func newDocumentationTools() []*Tool {
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: fetchDocsHandler,
 	}

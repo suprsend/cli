@@ -202,6 +202,8 @@ func newWorkflowTools() []*Tool {
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		Handler: listWorkflowsHandler,
 	}

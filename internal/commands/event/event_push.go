@@ -107,9 +107,9 @@ var eventPushCmd = &cobra.Command{
 			err := mgmntClient.PushEventsFromPayload(workspace, map[string]any{"events": []any{obj}})
 			if err != nil {
 				spinner.Stop("")
-				log.WithError(err).Errorf("Failed to push event %s", name)
+				log.WithError(err).Errorf("events/%s: failed to push", name)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push event %s: %v", name, err))
+				stats.Errors = append(stats.Errors, fmt.Sprintf("events/%s: failed to push: %v", name, err))
 				continue
 			}
 			stats.Success++

@@ -71,12 +71,12 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	var pushErrs []string
 	for _, variant := range variants {
 		if err := mgmntClient.PushTemplateVariant(workspace, slug, variant); err != nil {
-			log.WithError(err).Errorf("Failed to push variant for template %s", slug)
+			log.WithError(err).Errorf("templates/%s: failed to push variant", slug)
 			pushErrs = append(pushErrs, err.Error())
 		}
 	}
 	if len(pushErrs) > 0 {
-		return clierr.New(fmt.Sprintf("failed to push %d variant(s) for template %s: %s", len(pushErrs), slug, strings.Join(pushErrs, "; ")), clierr.CodeAPIInternal)
+		return clierr.New(fmt.Sprintf("templates/%s: failed to push %d variant(s): %s", slug, len(pushErrs), strings.Join(pushErrs, "; ")), clierr.CodeAPIInternal)
 	}
 
 	// Push mock_data.json if it exists
@@ -257,9 +257,9 @@ var templatePushCmd = &cobra.Command{
 			if err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun); err != nil {
 				spinner.Stop("")
 				hasError = true
-				log.WithError(err).Errorf("Failed to push template %s", templateSlug)
+				log.WithError(err).Errorf("templates/%s: failed to push", templateSlug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, err.Error())
+				stats.Errors = append(stats.Errors, fmt.Sprintf("templates/%s: failed to push: %v", templateSlug, err))
 				continue
 			}
 

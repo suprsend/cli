@@ -152,9 +152,9 @@ func PushTranslations(workspace, locale, dir string, dryRun bool) error {
 		}
 
 		if err := mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation); err != nil {
-			log.WithError(err).Errorf("Couldn't push translations for locale %s", fileLocale)
+			log.WithError(err).Errorf("preference_categories/translations/%s: failed to push", fileName)
 			failedCount++
-			errors = append(errors, fmt.Sprintf("Failed to push %s: %v", fileName, err))
+			errors = append(errors, fmt.Sprintf("preference_categories/translations/%s: failed to push: %v", fileName, err))
 			continue
 		}
 

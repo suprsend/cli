@@ -170,9 +170,9 @@ var workflowPushCmd = &cobra.Command{
 			if err != nil {
 				spinner.Stop("")
 				hasError = true
-				log.WithError(err).Errorf("Failed to push workflow %s", slug)
+				log.WithError(err).Errorf("workflows/%s: failed to push", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push workflow %s: %v", slug, err))
+				stats.Errors = append(stats.Errors, fmt.Sprintf("workflows/%s: failed to push: %v", slug, err))
 				continue
 			}
 

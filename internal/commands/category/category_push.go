@@ -78,7 +78,7 @@ var categoryPushCmd = &cobra.Command{
 					continue
 				}
 				if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
-					log.WithError(err).Errorf("Failed to push translation for locale %s", locale)
+					log.WithError(err).Errorf("preference_categories/translations/%s.json: failed to push: %v", locale, err)
 				}
 			}
 

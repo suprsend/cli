@@ -67,9 +67,9 @@ var translationPushCmd = &cobra.Command{
 				if err != nil {
 					spinner.Stop("")
 					hasError = true
-					log.Errorf("Failed to push translation %s: %v", filename, err)
+					log.Errorf("translations/%s.json: failed to push: %v", filename, err)
 					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push translation %s.json: %v", filename, err))
+					stats.Errors = append(stats.Errors, fmt.Sprintf("translations/%s.json: failed to push: %v", filename, err))
 					continue
 				}
 
@@ -133,9 +133,9 @@ var translationPushCmd = &cobra.Command{
 				if err != nil {
 					spinner.Stop("")
 					hasError = true
-					log.Errorf("Failed to push translation %s: %v", file.Name(), err)
+					log.Errorf("translations/%s: failed to push: %v", file.Name(), err)
 					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push translation %s: %v", file.Name(), err))
+					stats.Errors = append(stats.Errors, fmt.Sprintf("translations/%s: failed to push: %v", file.Name(), err))
 					continue
 				}
 

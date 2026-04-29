@@ -148,9 +148,9 @@ var schemaPushCmd = &cobra.Command{
 			if err != nil {
 				spinner.Stop("")
 				hasError = true
-				log.WithError(err).Errorf("Failed to push schema %s", slug)
+				log.WithError(err).Errorf("schemas/%s: failed to push", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push schema %s: %v", slug, err))
+				stats.Errors = append(stats.Errors, fmt.Sprintf("schemas/%s: failed to push: %v", slug, err))
 				continue
 			}
 

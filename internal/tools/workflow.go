@@ -180,7 +180,11 @@ func newWorkflowTools() []*Tool {
 		Name:        "workflows.list",
 		Description: "Enables listing workflows from a workspace",
 		MCPTool: mcp.NewTool("list_workflows",
-			mcp.WithDescription("Use this tool to list workflows from a workspace."),
+			mcp.WithDescription(`List notification workflows in a workspace, in either draft or live mode.
+
+mode=live returns the currently-active version of each workflow; mode=draft returns the staged-but-not-yet-promoted version. The two can differ — workflows often have a draft change in flight.
+
+Returns: workflow slug, name, status, category, enabled state, and tags.`),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to list workflows from."),
 				mcp.Required(),

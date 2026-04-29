@@ -284,7 +284,16 @@ func newObjectTools() []*Tool {
 		Name:        "objects.get",
 		Description: "Enables querying object information",
 		MCPTool: mcp.NewTool("get_suprsend_object",
-			mcp.WithDescription("Use this tool to get all details about an object"),
+			mcp.WithDescription(`Get a SuprSend object's full state by object_type + object_id. Objects are non-user entities — organizations, projects, vehicles, devices — namespaced by object_type.
+
+When to use: the user references an object by id and you need its stored properties or channel identifiers.
+
+When NOT to use:
+- For users — use get_suprsend_user.
+- For preferences only — use get_suprsend_object_preferences.
+- For followers / members — use get_suprsend_object_subscriptions.
+
+Returns: YAML mirroring get_suprsend_user's shape — object_type, object_id, properties (custom fields), created_at, updated_at, and a channels array (each entry has channel value, status, perma_status).`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object to get."),
 				mcp.Required(),
@@ -307,7 +316,27 @@ func newObjectTools() []*Tool {
 		Name:        "objects.upsert",
 		Description: "Enables upserting object information",
 		MCPTool: mcp.NewTool("upsert_suprsend_object",
-			mcp.WithDescription("Use this tool to upsert an object"),
+			mcp.WithDescription(`Modify properties or channel identifiers on a SuprSend object — a non-user entity like an organization, project, or vehicle. One call performs ONE action; for multiple changes, call this tool multiple times.
+
+Actions:
+- set, set_once, unset, remove — modify a scalar property by key/value. remove permanently deletes the key.
+- append, increment — modify array / numeric values.
+- add_email / remove_email, add_sms / remove_sms, add_whatsapp / remove_whatsapp, add_androidpush / remove_androidpush, add_iospush / remove_iospush, add_slack / remove_slack, add_ms_teams / remove_ms_teams, add_webpush / remove_webpush — register or deregister a delivery channel.
+
+Channel registration is special. For channel identifiers ALWAYS use the dedicated add_<channel> / remove_<channel> actions — generic set / unset will not register the channel correctly with the delivery router. Slack and MS Teams additionally require the corresponding slack_details / ms_teams_details payload alongside the action; channel id alone is not enough.
+
+When to use: creating an object or modifying its stored state — properties, channels, identifiers.
+
+When NOT to use:
+- For users — use upsert_suprsend_user instead.
+- For preferences — use update_suprsend_category_preference_object (per category) or update_suprsend_object_channel_preference (across categories).
+- For followers / members — use add_suprsend_object_subscriptions.
+
+Side effects: remove and unset permanently delete data. add_<channel> makes the object reachable on that channel for any future workflow run; remove_<channel> stops delivery immediately.
+
+object_type namespaces the object (e.g., "organization", "project") and is required.
+
+Returns: the updated object on success; structured error with field reasons on failure.`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object to get."),
 				mcp.Required(),
@@ -421,7 +450,17 @@ func newObjectTools() []*Tool {
 		Name:        "objects.get_preferences",
 		Description: "Enables querying object preferences(also within a specific category)",
 		MCPTool: mcp.NewTool("get_suprsend_object_preferences",
-			mcp.WithDescription("Use this tool to get the preferences(also within a specific category) for an object."),
+			mcp.WithDescription(`Read an object's category-level notification preferences and (optionally) per-channel overrides.
+
+When to use:
+- Before update_suprsend_category_preference_object, to read current state.
+- Before sending to an object, to check delivery permission.
+
+When NOT to use:
+- For the object's identity or channels — use get_suprsend_object.
+- For users — use get_suprsend_user_preferences.
+
+Returns: the object's preference tree. Pass category to scope to one preference; omit for the full tree. Set channel_preferences=true to include per-channel overrides.`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object to get preferences from."),
 				mcp.Required(),
@@ -450,7 +489,20 @@ func newObjectTools() []*Tool {
 		Name:        "objects.update_preferences",
 		Description: "Enables updating a specific category preference for an object, controlling notification preferences and channel opt-outs.",
 		MCPTool: mcp.NewTool("update_suprsend_category_preference_object",
-			mcp.WithDescription("Use this tool to update a specific category preference for an object, controlling notification preferences and channel opt-outs."),
+			mcp.WithDescription(`Set ONE category's preference for ONE object — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
+
+Replaces, does not merge. This call overwrites the existing preference for the named category. Previous opt-outs within the same category are lost; pass them again in opt_out_channels if you want to keep them.
+
+When to use: changing a single category on a single object.
+
+When NOT to use:
+- For object-wide channel toggles ("block all SMS") — use update_suprsend_object_channel_preference.
+- For users — use update_suprsend_users_preferences.
+- For tenant defaults — use update_suprsend_tenant_default_preference.
+
+Preference values: opt_in enables; opt_out disables; cant_unsubscribe locks the object from toggling this category.
+
+Returns: updated preference state on success; structured error on failure.`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object to get preferences from."),
 				mcp.Required(),
@@ -489,7 +541,17 @@ func newObjectTools() []*Tool {
 		Name:        "objects.update_channel_preference",
 		Description: "Enables updating channel preference for an object",
 		MCPTool: mcp.NewTool("update_suprsend_object_channel_preference",
-			mcp.WithDescription("Use this tool to update channel preference for an object."),
+			mcp.WithDescription(`Block or allow specific delivery channels for ONE object, applied across ALL categories.
+
+is_restricted semantics: true blocks delivery on that channel; false re-enables it. Each entry in channel_preferences is a {channel, is_restricted} pair.
+
+When NOT to use:
+- For per-category control — use update_suprsend_category_preference_object.
+- For users — use update_suprsend_user_channel_preference.
+
+Side effects: takes effect on the next workflow run; in-flight notifications may still send.
+
+Returns: updated channel-preference state on success.`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object to update the channel preference for."),
 				mcp.Required(),
@@ -524,7 +586,15 @@ func newObjectTools() []*Tool {
 		Name:        "object.get_subscriptions",
 		Description: "Enables querying subscriptions of an object",
 		MCPTool: mcp.NewTool("get_suprsend_object_subscriptions",
-			mcp.WithDescription("Use this tool to get all details about the subscriptions of an object"),
+			mcp.WithDescription(`List users / objects subscribed TO this object (its followers / members). Subscriptions are stored on the followed object.
+
+When to use: the user asks "who follows project X?", "who's a member of organization Y?", or you need to enumerate an object's inbound subscribers.
+
+When NOT to use:
+- For the inverse direction (what a user follows) — use get_suprsend_user_objects_subscriptions.
+- For mailing-list members — use get_suprsend_user_list_subscriptions on each user.
+
+Returns: a paginated list of subscriber {type, id} entries. Set channel_preferences=true to also include each subscriber's channel preferences for this object. Default limit is 20.`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object's subscriptions to get."),
 				mcp.Required(),
@@ -553,7 +623,18 @@ func newObjectTools() []*Tool {
 		Name:        "object.upsert_subscriptions",
 		Description: "Enables upserting subscription to an object. Allows users or other objects to subscribe to an object.",
 		MCPTool: mcp.NewTool("add_suprsend_object_subscriptions",
-			mcp.WithDescription("Use this tool to add subscriptions to an object. Allows users or other objects to subscribe to an object."),
+			mcp.WithDescription(`Subscribe one or more users or other objects TO this object. The recipient list can mix users and objects in a single call.
+
+Recipients: users by distinct_id, objects by object_type + id. Each entry's shape follows the SuprSend recipient format. Optional properties attach metadata to each subscription (role, joined_at, etc.).
+
+When NOT to use:
+- To remove subscribers — there is no remove tool; use the SuprSend API directly.
+- For mailing-list / segment membership — those are managed via the Lists API.
+- For preference changes on existing subscribers — use the per-user / per-object preference tools.
+
+Side effects: each successful subscription is a separate row. Calling this twice with the same recipient creates duplicate-looking entries; check existing state with get_suprsend_object_subscriptions first if duplicates would be a problem.
+
+Returns: the created subscription records on success.`),
 			mcp.WithString("object_id",
 				mcp.Description("The object_id of the object's subscriptions to get."),
 				mcp.Required(),

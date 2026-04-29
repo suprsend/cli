@@ -283,7 +283,16 @@ func newUserTools() []*Tool {
 		Name:        "users.get",
 		Description: "Enables querying user information",
 		MCPTool: mcp.NewTool("get_suprsend_user",
-			mcp.WithDescription(`Use this tool to get all properties for a user in SuprSend. This tool will return a YAML string with all the properties of the user. At top level, it will return the distinct_id, properties (all the custom properties of the user), created_at, updated_at and an array of user channels ($email, push, $sms, $whatsapp, $slack etc.). Eeach object inside will have channel value, status and perma_status (permanent status of the identity). If the workspace is not specified. ask the user to provide it before using this tool.`),
+			mcp.WithDescription(`Get a SuprSend user's full state by distinct_id. Users are end recipients of notifications, identified by your application's user id.
+
+When to use: the user references a recipient by id and you need their stored properties or channel identifiers.
+
+When NOT to use:
+- For non-user entities (organizations, projects, vehicles) — use get_suprsend_object.
+- For preferences only — use get_suprsend_user_preferences.
+- For mailing-list / object subscriptions — use get_suprsend_user_list_subscriptions or get_suprsend_user_objects_subscriptions.
+
+Returns: YAML with distinct_id, properties (custom fields like name, plan, lang), created_at, updated_at, and a channels array — each entry has the channel value, status, and perma_status (e.g., bounced, blocked, soft-bounced).`),
 			mcp.WithString("distinct_id",
 				mcp.Description(`The distinct_id of the user to get.`),
 				mcp.Required(),
@@ -302,7 +311,26 @@ func newUserTools() []*Tool {
 		Name:        "users.upsert",
 		Description: "Enables upserting user information",
 		MCPTool: mcp.NewTool("upsert_suprsend_user",
-			mcp.WithDescription(`Use this tool to upsert a new user or update an existing user's properties.`),
+			mcp.WithDescription(`Modify properties or channel identifiers on a SuprSend user. One call performs ONE action; for multiple changes, call this tool multiple times.
+
+Actions:
+- set, set_once, unset, remove — modify a scalar property by key/value. remove permanently deletes the key.
+- append, increment — modify array / numeric values.
+- set_preferred_language, set_timezone — locale and timezone on the user.
+- add_email / remove_email, add_sms / remove_sms, add_whatsapp / remove_whatsapp, add_androidpush / remove_androidpush, add_iospush / remove_iospush, add_slack / remove_slack — register or deregister a delivery channel.
+
+Channel registration is special. For channel identifiers ALWAYS use the dedicated add_<channel> / remove_<channel> actions — generic set / unset will not register the channel correctly with the delivery router. Slack additionally requires the slack_details payload alongside the action.
+
+When to use: creating a new user or modifying an existing user's stored state.
+
+When NOT to use:
+- For non-user entities — use upsert_suprsend_object.
+- For preferences — use update_suprsend_users_preferences (per category) or update_suprsend_user_channel_preference (across categories).
+- For tenant settings — use upsert_suprsend_tenant.
+
+Side effects: remove and unset permanently delete data. add_<channel> makes the user reachable on that channel for any future workflow run; remove_<channel> stops delivery immediately.
+
+Returns: the updated user on success; structured error with field reasons on failure.`),
 			mcp.WithString("distinct_id",
 				mcp.Description(`The distinct_id of the user to get.`),
 				mcp.Required(),
@@ -405,7 +433,19 @@ func newUserTools() []*Tool {
 		Name:        "users.get_preferences",
 		Description: "Enables querying user preferences(also within a category)",
 		MCPTool: mcp.NewTool("get_suprsend_user_preferences",
-			mcp.WithDescription(`Use this tool to get the preferences(also within a category) for a user in SuprSend.`),
+			mcp.WithDescription(`Read a user's category-level notification preferences and (optionally) per-channel overrides.
+
+When to use:
+- Before update_suprsend_users_preferences, to read current state.
+- The user asks what categories a recipient is opted in/out of.
+- Before sending, to check delivery permission for a category or channel.
+
+When NOT to use:
+- For the user's identity or channel identifiers — use get_suprsend_user.
+- For tenant-level defaults — use get_tenant_default_preference.
+- For object preferences — use get_suprsend_object_preferences.
+
+Returns: the user's preference tree. Pass category to scope to one preference; omit for the full tree. Set channel_preferences=true to include per-channel overrides.`),
 			mcp.WithString("distinct_id",
 				mcp.Description(`The distinct_id of the user to get the preferences for.`),
 				mcp.Required(),
@@ -433,7 +473,20 @@ func newUserTools() []*Tool {
 		Name:        "user.update_preferences",
 		Description: "Enables updating preferences for users, controlling notification preferences and channel opt-outs.",
 		MCPTool: mcp.NewTool("update_suprsend_users_preferences",
-			mcp.WithDescription("Use this tool to update preferences for users, controlling notification preferences and channel opt-outs."),
+			mcp.WithDescription(`Set ONE category's preference for ONE user — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
+
+Replaces, does not merge. This call overwrites the existing preference for the named category. Previous opt-outs within the same category are lost; pass them again in opt_out_channels if you want to keep them.
+
+When to use: changing a single category for a single user.
+
+When NOT to use:
+- For tenant-wide defaults — use update_suprsend_tenant_default_preference.
+- For cross-category channel toggles ("block all SMS") — use update_suprsend_user_channel_preference.
+- For the same flow on objects — use update_suprsend_category_preference_object.
+
+Preference values: opt_in enables; opt_out disables; cant_unsubscribe locks the user from toggling this category in their preference UI.
+
+Returns: updated preference state on success; structured error on failure (e.g., unknown category slug).`),
 			mcp.WithArray("distinct_ids",
 				mcp.Description("The distinct_ids of the users to update the preferences for."),
 				mcp.WithStringItems(),
@@ -485,7 +538,18 @@ func newUserTools() []*Tool {
 		Name:        "users.update_channel_preference",
 		Description: "Enables updating channel preference for a user",
 		MCPTool: mcp.NewTool("update_suprsend_user_channel_preference",
-			mcp.WithDescription("Use this tool to update channel preference for a user."),
+			mcp.WithDescription(`Block or allow specific delivery channels for ONE user, applied across ALL categories. Use this for "block all SMS to this user" or "allow only email" patterns.
+
+is_restricted semantics: true blocks delivery on that channel; false re-enables it. Each entry in channel_preferences is a {channel, is_restricted} pair.
+
+When NOT to use:
+- For per-category control — use update_suprsend_users_preferences.
+- For permanent invalidation (e.g., a bounced email) — that's set by SuprSend automatically as perma_status; don't try to override it here.
+- For objects — use update_suprsend_object_channel_preference.
+
+Side effects: takes effect on the next workflow run; in-flight notifications already in the queue may still send.
+
+Returns: updated channel-preference state on success.`),
 			mcp.WithString("distinct_id",
 				mcp.Description("The distinct_id of the user to update the channel preference for."),
 				mcp.Required(),
@@ -516,7 +580,15 @@ func newUserTools() []*Tool {
 		Name:        "users.get_list_subscriptions",
 		Description: "Enables querying list subscriptions for a user",
 		MCPTool: mcp.NewTool("get_suprsend_user_list_subscriptions",
-			mcp.WithDescription("Use this tool to query list subscriptions for a user."),
+			mcp.WithDescription(`List the SuprSend Lists this user belongs to. Lists are workspace-level recipient groups (segments / mailing lists), distinct from object follows.
+
+When to use: the user asks "what mailing lists is X on?" or "what segments include X?".
+
+When NOT to use:
+- For object follows (X follows project Y) — use get_suprsend_user_objects_subscriptions.
+- For followers OF an object — use get_suprsend_object_subscriptions.
+
+Returns: a paginated list of List metadata. Default limit is 20; raise it for larger results.`),
 			mcp.WithString("distinct_id",
 				mcp.Description("The distinct_id of the user to get the list subscriptions for."),
 				mcp.Required(),
@@ -538,7 +610,15 @@ func newUserTools() []*Tool {
 		Name:        "users.get_objects_subscriptions",
 		Description: "Enables querying object subscriptions for a user",
 		MCPTool: mcp.NewTool("get_suprsend_user_objects_subscriptions",
-			mcp.WithDescription("Use this tool to query object subscriptions for a user."),
+			mcp.WithDescription(`List the objects this user is subscribed TO — what the user follows.
+
+When to use: the user asks "what does X follow?", "what projects is X in?", or you need to enumerate a user's outbound subscriptions.
+
+When NOT to use:
+- For followers OF an object (inverse direction) — use get_suprsend_object_subscriptions.
+- For mailing-list / segment membership — use get_suprsend_user_list_subscriptions.
+
+Returns: a paginated list of {object_type, object_id} entries. Default limit is 20.`),
 			mcp.WithString("distinct_id",
 				mcp.Description("The distinct_id of the user to get the object subscriptions for."),
 				mcp.Required(),

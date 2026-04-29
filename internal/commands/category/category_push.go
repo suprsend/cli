@@ -2,6 +2,7 @@ package category
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,21 +53,32 @@ var categoryPushCmd = &cobra.Command{
 			}
 
 			mgmntClient := utils.GetSuprSendMgmntClient()
+
+			// Count pushable (non-English) translations up-front for the
+			// dry-run summary; the API rejects English-locale pushes so
+			// they're skipped on the real path too.
+			pushableLocales := 0
+			for locale := range input.Translations {
+				if locale != "en" {
+					pushableLocales++
+				}
+			}
+
 			spinner := utils.NewSpinner("Pushing categories...")
 
 			if dryRun {
-				spinner.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
+				spinner.Stop(fmt.Sprintf("DRY RUN: would push categories and %d translation(s) to %s", pushableLocales, workspace))
 				return nil
 			}
 
-			if commit {
-				for locale, t := range input.Translations {
-					if locale == "en" {
-						continue
-					}
-					if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
-						log.WithError(err).Errorf("Failed to push translation for locale %s", locale)
-					}
+			// Translations don't have a draft/live distinction — push them
+			// regardless of --commit so they always reflect the local state.
+			for locale, t := range input.Translations {
+				if locale == "en" {
+					continue
+				}
+				if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
+					log.WithError(err).Errorf("Failed to push translation for locale %s", locale)
 				}
 			}
 
@@ -101,15 +113,28 @@ var categoryPushCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
+		// Push translations first, regardless of --commit. They don't have a
+		// draft/live model, so any local change should land immediately —
+		// this also matches the docstring ("Upload local preference
+		// categories and translations to a workspace"). Errors only when no
+		// pushable locales exist (English-only) are downgraded to a debug
+		// log so a translation-less workspace doesn't fail the category push.
+		if err := translation.PushTranslations(workspace, "", translationDir, dryRun); err != nil {
+			var ce *clierr.CLIError
+			if errors.As(err, &ce) && ce.Code == clierr.CodeInvalidUsage {
+				log.Debugf("No translations to push: %v", err)
+			} else if errors.As(err, &ce) && ce.Code == clierr.CodeFileNotFound {
+				log.Debugf("No translation files found: %v", err)
+			} else {
+				log.WithError(err).Warn("Translation push had errors; continuing with categories")
+			}
+		}
+
 		spinner2 := utils.NewSpinner("Pushing categories...")
 
 		if dryRun {
 			spinner2.Stop(fmt.Sprintf("DRY RUN: would push categories to %s", workspace))
 			return nil
-		}
-
-		if commit {
-			translation.PushTranslations(workspace, "", translationDir, false)
 		}
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()

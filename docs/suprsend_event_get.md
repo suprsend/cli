@@ -1,23 +1,23 @@
 ## suprsend event get
 
-Get events
+Get event details
 
 ### Synopsis
 
-Retrieve all events and their schema mappings from a workspace. Returns event definitions including names, descriptions, and payload schemas.
+Retrieve a specific event by its slug. Returns the event definition including name, description, and payload schema.
 
 ```
-suprsend event get [flags]
+suprsend event get [<slug>] [flags]
 ```
 
 ### Examples
 
 ```
-  # Get all events (JSON output recommended for event details)
-  suprsend event get
+  # Get a specific event by slug
+  suprsend event get ORDER_RECEIVED
 
-  # Get with JSON output
-  suprsend event get --output json
+  # Get using the flag form
+  suprsend event get --slug ORDER_RECEIVED
 
   # Get from a specific workspace
   suprsend event get --workspace production
@@ -28,6 +28,7 @@ suprsend event get [flags]
 ```
   -h, --help            help for get
   -o, --output string   Output format: json or yaml (default "json")
+  -g, --slug string     Event slug
 ```
 
 ### Options inherited from parent commands

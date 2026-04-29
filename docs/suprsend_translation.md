@@ -22,26 +22,26 @@ suprsend translation [flags]
 ### Options
 
 ```
-  -h, --help                   help for translation
-  -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -h, --help               help for translation
+  -w, --workspace string   Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --config string      config file (default: $HOME/.suprsend.yaml)
-      --no-color           Disable color output (default: $NO_COLOR)
-  -o, --output string      Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet              Suppress info/warn output (errors are still shown)
-  -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
+      --config string          config file (default: $HOME/.suprsend.yaml)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -o, --output string          Output format: pretty, json, or yaml (default "pretty")
+  -q, --quiet                  Suppress info/warn output (errors are still shown)
+  -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
+  -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 
 ### SEE ALSO
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend translation commit](suprsend_translation_commit.md)	 - Commit translation
-* [suprsend translation get](suprsend_translation_get.md)	 - Get translations
+* [suprsend translation get](suprsend_translation_get.md)	 - Get a single translation file
 * [suprsend translation list](suprsend_translation_list.md)	 - List translations
 * [suprsend translation pull](suprsend_translation_pull.md)	 - Pull translation files
 * [suprsend translation push](suprsend_translation_push.md)	 - Push translation files to a workspace

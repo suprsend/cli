@@ -33,7 +33,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend completion zsh`](references/suprsend_completion_zsh.md) - Generate the autocompletion script for zsh
 - [`suprsend env`](references/suprsend_env.md) - Show recognized environment variables and their current values
 - [`suprsend event`](references/suprsend_event.md) - Manage events
-- [`suprsend event get`](references/suprsend_event_get.md) - Get events
+- [`suprsend event get`](references/suprsend_event_get.md) - Get event details
 - [`suprsend event list`](references/suprsend_event_list.md) - List events
 - [`suprsend event pull`](references/suprsend_event_pull.md) - Pull events from workspace to local directory
 - [`suprsend event push`](references/suprsend_event_push.md) - Push linked events
@@ -69,7 +69,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend template push`](references/suprsend_template_push.md) - Push templates and their variants from local to SuprSend workspace
 - [`suprsend translation`](references/suprsend_translation.md) - Manage Translations
 - [`suprsend translation commit`](references/suprsend_translation_commit.md) - Commit translation
-- [`suprsend translation get`](references/suprsend_translation_get.md) - Get translations
+- [`suprsend translation get`](references/suprsend_translation_get.md) - Get a single translation file
 - [`suprsend translation list`](references/suprsend_translation_list.md) - List translations
 - [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull translation files
 - [`suprsend translation push`](references/suprsend_translation_push.md) - Push translation files to a workspace

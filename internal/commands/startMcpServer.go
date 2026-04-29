@@ -181,4 +181,6 @@ func init() {
 	startMcpServerCmd.PersistentFlags().StringVarP(&tools, "tools", "T", "all", "Tools to expose: all, none, or comma-separated tool names")
 	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "Event tools to register: all, none, or comma-separated event slugs")
 	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, or comma-separated workflow slugs")
+
+	listToolsCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 }

@@ -104,6 +104,14 @@ func (s *Spinner) Stop(msg string) {
 	}
 }
 
+// UpdateMessage replaces the spinner's text in place. No-op when the spinner
+// is suppressed (quiet, piped output).
+func (s *Spinner) UpdateMessage(msg string) {
+	if s.p != nil {
+		s.p.UpdateMessage(msg)
+	}
+}
+
 // WriteError writes err to stderr as a structured JSON CLIError when in JSON errors mode.
 func WriteError(err error) {
 	if err == nil || !config.ShouldJSONErrors() {

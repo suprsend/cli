@@ -8,6 +8,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -31,12 +33,31 @@ type TemplateResult struct {
 	VariantOrder    *mgmnt.VariantOrderResponse `json:"variant_order,omitempty"`
 }
 
+// FetchOptions configures optional callbacks for FetchTemplates. Both fields
+// are safe to leave nil — sync.go does — in which case FetchTemplates buffers
+// every template into the returned slice with no incremental signal.
+//
+// OnListed fires exactly once after the workspace listing completes,
+// before any per-template fetch starts. The argument is the total template
+// count and lets streaming consumers prepare progress UI.
+//
+// OnResult fires once per successfully-fetched template, from the
+// concurrent fetch goroutines. Implementations must be goroutine-safe —
+// guard any shared state (file writes are typically safe per-template,
+// shared counters need an atomic).
+type FetchOptions struct {
+	OnListed func(total int)
+	OnResult func(TemplateResult)
+}
+
 // FetchTemplates fetches either one template (when slug != "") or all templates
 // from the workspace, returning the assembled results ready to hand to
 // WriteTemplatesToFiles. Per-template fetch errors when slug == "" are logged
 // and the offending template is skipped; only failures while listing templates
 // or fetching a specifically requested slug are returned.
-func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) ([]TemplateResult, error) {
+//
+// opts is optional; pass FetchOptions{} when no streaming signal is needed.
+func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, opts FetchOptions) ([]TemplateResult, error) {
 	var results []TemplateResult
 
 	if slug != "" {
@@ -56,20 +77,30 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) 
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", slug)
 		}
-		results = append(results, TemplateResult{
+		r := TemplateResult{
 			Slug:            slug,
 			Name:            tmpl.Name,
 			EnabledChannels: tmpl.EnabledChannels,
 			Variants:        variants,
 			MockData:        mockData,
 			VariantOrder:    variantOrder,
-		})
+		}
+		if opts.OnListed != nil {
+			opts.OnListed(1)
+		}
+		if opts.OnResult != nil {
+			opts.OnResult(r)
+		}
+		results = append(results, r)
 		return results, nil
 	}
 
 	templates, err := client.ListTemplates(workspace, math.MaxInt32, 0, mode)
 	if err != nil {
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
+	}
+	if opts.OnListed != nil {
+		opts.OnListed(len(templates.Results))
 	}
 
 	// Per-template fetch is three sequential GETs; for workspaces with many
@@ -95,13 +126,17 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) 
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
 			}
-			slots[i] = &TemplateResult{
+			r := TemplateResult{
 				Slug:            t.Slug,
 				Name:            t.Name,
 				EnabledChannels: t.EnabledChannels,
 				Variants:        variants,
 				MockData:        mockData,
 				VariantOrder:    variantOrder,
+			}
+			slots[i] = &r
+			if opts.OnResult != nil {
+				opts.OnResult(r)
 			}
 			return nil
 		})
@@ -158,28 +193,44 @@ var templatePullCmd = &cobra.Command{
 		if err := ensureOutputDirectory(outputDir); err != nil {
 			return err
 		}
-
-		spinner := utils.NewSpinner("Loading...")
-
-		mgmntClient := utils.GetSuprSendMgmntClient()
-
-		results, err := FetchTemplates(mgmntClient, workspace, mode, slug)
-		if err != nil {
-			spinner.Stop("Failed")
+		if err := EnsureTemplatesOutputDir(outputDir); err != nil {
 			return err
 		}
 
-		totalVariants := 0
-		for _, r := range results {
-			totalVariants += len(r.Variants)
+		spinner := utils.NewSpinner("Listing templates...")
+
+		mgmntClient := utils.GetSuprSendMgmntClient()
+
+		// Stream each template to disk as it finishes fetching, with a live
+		// progress counter on the spinner. statsMu guards stats since the
+		// fetch goroutines all share it.
+		stats := &TemplateWriteStats{Errors: []string{}}
+		var statsMu sync.Mutex
+		var done atomic.Int32
+		var total atomic.Int32
+		var totalVariants atomic.Int32
+
+		results, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
+			OnListed: func(n int) {
+				total.Store(int32(n))
+				stats.Total = n
+				spinner.UpdateMessage(fmt.Sprintf("Pulled 0/%d templates", n))
+			},
+			OnResult: func(t TemplateResult) {
+				statsMu.Lock()
+				_ = WriteOneTemplate(t, outputDir, stats)
+				statsMu.Unlock()
+				totalVariants.Add(int32(len(t.Variants)))
+				n := done.Add(1)
+				spinner.UpdateMessage(fmt.Sprintf("Pulled %d/%d templates", n, total.Load()))
+			},
+		})
+		if fetchErr != nil {
+			spinner.Stop("Failed")
+			return fetchErr
 		}
 
-		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants, workspace))
-
-		stats, err := WriteTemplatesToFiles(results, outputDir)
-		if err != nil {
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "failed to save templates")
-		}
+		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants.Load(), workspace))
 
 		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
 		if len(stats.Errors) > 0 {

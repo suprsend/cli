@@ -486,7 +486,7 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	}
 
 	log.Infof("Pulling templates from %s ...", fromWorkspace)
-	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "")
+	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{})
 	if err != nil {
 		return fmt.Errorf("error getting templates: %w", err)
 	}

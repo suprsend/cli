@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -172,18 +173,20 @@ func writeVariantFiles(variantDir string, variant Variant, channel, variantName,
 	// Marshal variant JSON and include it alongside the extracted content files
 	variantJSON, err := json.MarshalIndent(variantCopy, "", "  ")
 	if err != nil {
-		log.Errorf("Failed to marshal variant '%s/%s' for '%s': %v", channel, variantName, slug, err)
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal variant '%s/%s' for '%s': %v", channel, variantName, slug, err))
-		return err
+		msg := fmt.Sprintf("failed to marshal variant '%s/%s' for '%s'", channel, variantName, slug)
+		log.Errorf("%s: %v", msg, err)
+		stats.Errors = append(stats.Errors, fmt.Sprintf("%s: %v", msg, err))
+		return clierr.Wrap(err, clierr.CodeFileParseFailed, msg)
 	}
 	filesToWrite["variant.json"] = string(variantJSON)
 
 	for filename, content := range filesToWrite {
 		filePath := filepath.Join(variantDir, filename)
 		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
-			log.Errorf("Failed to write '%s': %v", filePath, err)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write '%s': %v", filePath, err))
-			return err
+			msg := fmt.Sprintf("failed to write '%s'", filePath)
+			log.Errorf("%s: %v", msg, err)
+			stats.Errors = append(stats.Errors, fmt.Sprintf("%s: %v", msg, err))
+			return clierr.Wrap(err, clierr.CodeFileNotFound, msg)
 		}
 		log.Debugf("Wrote: %s", filePath)
 	}
@@ -197,12 +200,12 @@ func readAndAssembleVariant(variantDir string) (Variant, error) {
 	variantFile := filepath.Join(variantDir, "variant.json")
 	data, err := os.ReadFile(variantFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read variant.json: %w", err)
+		return nil, clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to read %s", variantFile))
 	}
 
 	var variant Variant
 	if err := json.Unmarshal(data, &variant); err != nil {
-		return nil, fmt.Errorf("failed to parse variant.json: %w", err)
+		return nil, clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse %s", variantFile))
 	}
 
 	// Process paths shallowest-first so parent keys exist when we set nested values

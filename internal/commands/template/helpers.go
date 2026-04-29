@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -54,15 +55,18 @@ func ensureOutputDirectory(dirPath string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Infof("Creating directory: %s", dirPath)
-			return os.MkdirAll(dirPath, 0o755)
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+				return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to create directory '%s'", dirPath))
+			}
+			return nil
 		}
-		return fmt.Errorf("error checking directory: %w", err)
+		return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("error checking directory '%s'", dirPath))
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("path '%s' exists but is not a directory", dirPath)
+		return clierr.New(fmt.Sprintf("path '%s' exists but is not a directory", dirPath), clierr.CodeInvalidUsage)
 	}
 	if info.Mode().Perm()&0o200 == 0 {
-		return fmt.Errorf("directory '%s' is not writable", dirPath)
+		return clierr.New(fmt.Sprintf("directory '%s' is not writable", dirPath), clierr.CodeInvalidUsage)
 	}
 	return nil
 }
@@ -77,19 +81,19 @@ func WriteTemplatesToFiles(results []TemplateResult, outputDir string) (*Templat
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(outputDir, 0o755); err != nil {
-				return stats, err
+				return stats, clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to create output directory '%s'", outputDir))
 			}
 		} else {
-			return stats, fmt.Errorf("error accessing '%s': %v", outputDir, err)
+			return stats, clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("error accessing '%s'", outputDir))
 		}
 	} else if !info.IsDir() {
-		return stats, fmt.Errorf("path '%s' exists but is not a directory", outputDir)
+		return stats, clierr.New(fmt.Sprintf("path '%s' exists but is not a directory", outputDir), clierr.CodeInvalidUsage)
 	}
 
 	for _, tmpl := range results {
 		templateDir := filepath.Join(outputDir, tmpl.Slug)
 		if err := os.RemoveAll(templateDir); err != nil {
-			return stats, fmt.Errorf("failed to remove existing directory for template '%s': %w", tmpl.Slug, err)
+			return stats, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to remove existing directory for template '%s'", tmpl.Slug))
 		}
 	}
 

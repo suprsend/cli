@@ -11,6 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -35,11 +36,11 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) 
 	if slug != "" {
 		tmpl, err := client.GetTemplate(workspace, slug, mode)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't fetch template %s: %w", slug, err)
+			return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch template %s", slug))
 		}
 		variants, err := client.GetTemplateVariants(workspace, slug, mode)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't fetch variants for template %s: %w", slug, err)
+			return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variants for template %s", slug))
 		}
 		mockData, err := client.GetTemplateMockData(workspace, slug)
 		if err != nil {
@@ -62,7 +63,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string) 
 
 	templates, err := client.ListTemplates(workspace, math.MaxInt32, 0, mode)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't fetch templates: %w", err)
+		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
 	}
 
 	for _, t := range templates.Results {
@@ -104,7 +105,7 @@ var templatePullCmd = &cobra.Command{
   # Pull to a custom directory using the flag form
   suprsend template pull --slug welcome-email --dir ./my-templates`,
 	Args:  cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		slug := utils.ResolveSlug(cmd, args)
@@ -120,20 +121,18 @@ var templatePullCmd = &cobra.Command{
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
-						return
+						return clierr.New("output directory is required; use --dir to specify one", clierr.CodeInvalidUsage)
 					}
 					outputDir = od
 				}
 			}
 			if outputDir == "" {
-				log.Info("No output directory specified. Exiting.")
-				return
+				return clierr.New("no output directory specified; use --dir to set one", clierr.CodeInvalidUsage)
 			}
 		}
 
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			log.Errorf("Error with output directory: %v", err)
-			return
+			return err
 		}
 
 		spinner := utils.NewSpinner("Loading...")
@@ -143,8 +142,7 @@ var templatePullCmd = &cobra.Command{
 		results, err := FetchTemplates(mgmntClient, workspace, mode, slug)
 		if err != nil {
 			spinner.Stop("Failed")
-			log.WithError(err).Error(err.Error())
-			return
+			return err
 		}
 
 		totalVariants := 0
@@ -156,8 +154,7 @@ var templatePullCmd = &cobra.Command{
 
 		stats, err := WriteTemplatesToFiles(results, outputDir)
 		if err != nil {
-			log.Errorf("Failed to save templates: %v", err)
-			return
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "failed to save templates")
 		}
 
 		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
@@ -167,6 +164,7 @@ var templatePullCmd = &cobra.Command{
 				log.Infof("  - %s", e)
 			}
 		}
+		return nil
 	},
 }
 

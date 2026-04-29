@@ -28,10 +28,17 @@ import (
 	"go.szostok.io/version/extension"
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
+//
+// SilenceUsage suppresses cobra's "Usage: ..." dump when a subcommand's RunE
+// returns an error. That dump is useful for argument-shape errors but pure
+// noise on API / file / validation failures, which is what most of our
+// errors are. cobra inherits this to every subcommand (see command.go:
+// `if !cmd.SilenceUsage && !c.SilenceUsage` — root suppression wins).
 var rootCmd = &cobra.Command{
-	Use:   "suprsend",
-	Short: "CLI to interact with SuprSend, a Notification Infrastructure",
+	Use:          "suprsend",
+	Short:        "CLI to interact with SuprSend, a Notification Infrastructure",
+	SilenceUsage: true,
 	Long: heredoc.Doc(`SuprSend is a robust notification infrastructure that helps you deploy multi-channel product notifications effortlessly and take care of user experience.
 
 	This CLI lets you interact with your SuprSend workspace and do actions like fetching/modifying template, workflows etc.`),

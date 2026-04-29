@@ -136,20 +136,22 @@ func runModifyInteractive(cfg *Config, path string) {
 		})
 	}
 
-	// URL prompts. Show the current profile value (or public default if
-	// the profile doesn't have one yet) in brackets. Empty input keeps
-	// that value; typed input is validated.
+	// URL prompts. Pre-fill modifyBaseUrl / modifyMgmntUrl with the
+	// current profile value (or public default if unset) BEFORE building
+	// the question, so that an interrupted prompt (Ctrl+C) doesn't leave
+	// the field empty and clobber the stored URL on save. The handler
+	// overwrites the value when the user types a new URL.
 	if modifyBaseUrl == "" {
 		current := selectedProfile.BaseUrl
 		if current == "" {
 			current = DefaultBaseUrl
 		}
+		modifyBaseUrl = current
 		questions = append(questions, cobra_ui.Question{
 			Text: fmt.Sprintf("Base URL [%s]: ", current),
 			Handler: func(s string) error {
 				s = cleanInput(s)
 				if s == "" {
-					modifyBaseUrl = current
 					return nil
 				}
 				normalized, err := validateAndNormalizeUrl(s)
@@ -166,12 +168,12 @@ func runModifyInteractive(cfg *Config, path string) {
 		if current == "" {
 			current = DefaultMgmntUrl
 		}
+		modifyMgmntUrl = current
 		questions = append(questions, cobra_ui.Question{
 			Text: fmt.Sprintf("Management URL [%s]: ", current),
 			Handler: func(s string) error {
 				s = cleanInput(s)
 				if s == "" {
-					modifyMgmntUrl = current
 					return nil
 				}
 				normalized, err := validateAndNormalizeUrl(s)

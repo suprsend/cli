@@ -81,6 +81,8 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend workflow list`](references/suprsend_workflow_list.md) - List workflows for a workspace
 - [`suprsend workflow pull`](references/suprsend_workflow_pull.md) - Pull workflows from SuprSend workspace to local
 - [`suprsend workflow push`](references/suprsend_workflow_push.md) - Push workflows from local to SuprSend workspace
+- [`suprsend workspace`](references/suprsend_workspace.md) - Manage workspaces
+- [`suprsend workspace list`](references/suprsend_workspace_list.md) - List workspaces
 
 See [references/suprsend.md](references/suprsend.md) for root command flags.
 

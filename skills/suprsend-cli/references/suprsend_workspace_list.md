@@ -1,24 +1,24 @@
-# suprsend category translation list
+# suprsend workspace list
 
-List preference translations
+List workspaces
 
-List available translation locales for preference categories in a workspace. Returns the locale codes that have translations configured.
+List all SuprSend workspaces accessible with the current service token. Returns workspace name, slug, mode, and description.
 
 ```
-suprsend category translation list [flags]
+suprsend workspace list [flags]
 ```
 
 ## Examples
 
 ```
-  # List available translation locales
-  suprsend category translation list
+  # List workspaces
+  suprsend workspace list
 
-  # List with JSON output
-  suprsend category translation list --output json
+  # Paginate results
+  suprsend workspace list --limit 5 --offset 0
 
-  # List in the production workspace
-  suprsend category translation list --workspace production
+  # JSON output
+  suprsend workspace list --output json
 ```
 
 ### Tips
@@ -28,7 +28,9 @@ suprsend category translation list [flags]
 ### Options
 
 ```
-  -h, --help   help for list
+  -h, --help         help for list
+  -l, --limit int    Maximum number of workspaces to return (default 20)
+      --offset int   Number of workspaces to skip for pagination
 ```
 
 ### Options inherited from parent commands
@@ -40,6 +42,5 @@ suprsend category translation list [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 

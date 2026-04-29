@@ -1,15 +1,26 @@
-# suprsend genskills
+# suprsend workspace
 
-Generate SKILLS.md
+Manage workspaces
+
+Manage SuprSend workspaces. Workspaces isolate notification resources (templates, workflows, categories) and can run in sandbox or live mode.
 
 ```
-suprsend genskills [dir] [flags]
+suprsend workspace [flags]
+```
+
+## Examples
+
+```
+  suprsend workspace list
+  suprsend workspace list --limit 5
+  suprsend workspace list --output json
 ```
 
 ### Options
 
 ```
-  -h, --help   help for genskills
+  -h, --help                   help for workspace
+  -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
 ```
 
 ### Options inherited from parent commands

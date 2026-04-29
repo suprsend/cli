@@ -13,8 +13,7 @@ suprsend profile list [flags]
 ### Options
 
 ```
-  -h, --help            help for list
-  -o, --output string   Output format: pretty, json, or yaml (default "pretty")
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -22,7 +21,8 @@ suprsend profile list [flags]
 ```
       --config string      config file (default: $HOME/.suprsend.yaml)
       --no-color           Disable color output (default: $NO_COLOR)
-  -q, --quiet              Suppress all log output (only fatal errors are shown)
+  -o, --output string      Output format: pretty, json, or yaml (default "pretty")
+  -q, --quiet              Suppress info/warn output (errors are still shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 

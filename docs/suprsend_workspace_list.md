@@ -1,32 +1,34 @@
-## suprsend event get
+## suprsend workspace list
 
-Get events
+List workspaces
 
 ### Synopsis
 
-Retrieve all events and their schema mappings from a workspace. Returns event definitions including names, descriptions, and payload schemas.
+List all SuprSend workspaces accessible with the current service token. Returns workspace name, slug, mode, and description.
 
 ```
-suprsend event get [flags]
+suprsend workspace list [flags]
 ```
 
 ### Examples
 
 ```
-  # Get all events (JSON output recommended for event details)
-  suprsend event get
+  # List workspaces
+  suprsend workspace list
 
-  # Get with JSON output
-  suprsend event get --output json
+  # Paginate results
+  suprsend workspace list --limit 5 --offset 0
 
-  # Get from a specific workspace
-  suprsend event get --workspace production
+  # JSON output
+  suprsend workspace list --output json
 ```
 
 ### Options
 
 ```
-  -h, --help   help for get
+  -h, --help         help for list
+  -l, --limit int    Maximum number of workspaces to return (default 20)
+      --offset int   Number of workspaces to skip for pagination
 ```
 
 ### Options inherited from parent commands
@@ -38,10 +40,9 @@ suprsend event get [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
 ```
 
 ### SEE ALSO
 
-* [suprsend event](suprsend_event.md)	 - Manage events
+* [suprsend workspace](suprsend_workspace.md)	 - Manage workspaces
 

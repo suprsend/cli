@@ -15,7 +15,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
   -h, --help                   help for suprsend
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress all log output (only fatal errors are shown)
+  -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
@@ -36,4 +36,5 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 * [suprsend template](suprsend_template.md)	 - Manage templates
 * [suprsend translation](suprsend_translation.md)	 - Manage Translations
 * [suprsend workflow](suprsend_workflow.md)	 - Manage workflows
+* [suprsend workspace](suprsend_workspace.md)	 - Manage workspaces
 

@@ -21,7 +21,7 @@ var (
 var profilesAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a new profile",
-	Long:  "Add a new profile to the configs",
+	Long:  "Add a new profile to the configs. Pass --base-url / --mgmnt-url to point the profile at non-default URLs (BYOC, staging, pre-prod, dev, ...); omit them to use the public SuprSend Cloud defaults.",
 	Run: func(cmd *cobra.Command, args []string) {
 		path, _ := cmd.Flags().GetString("config")
 
@@ -32,11 +32,27 @@ var profilesAddCmd = &cobra.Command{
 		}
 
 		if addName != "" && addServiceToken != "" {
-			if addBaseUrl == "" {
-				addBaseUrl = "https://hub.suprsend.com/"
+			// Scripted path: no prompts. Validate URLs if provided, fall
+			// back to public defaults if not.
+			if addBaseUrl != "" {
+				normalized, err := validateAndNormalizeUrl(addBaseUrl)
+				if err != nil {
+					log.WithError(err).Error("Invalid --base-url")
+					return
+				}
+				addBaseUrl = normalized
+			} else {
+				addBaseUrl = DefaultBaseUrl
 			}
-			if addMgmntUrl == "" {
-				addMgmntUrl = "https://management-api.suprsend.com/"
+			if addMgmntUrl != "" {
+				normalized, err := validateAndNormalizeUrl(addMgmntUrl)
+				if err != nil {
+					log.WithError(err).Error("Invalid --mgmnt-url")
+					return
+				}
+				addMgmntUrl = normalized
+			} else {
+				addMgmntUrl = DefaultMgmntUrl
 			}
 
 			cfg.Profiles[addName] = Profile{
@@ -60,38 +76,13 @@ var profilesAddCmd = &cobra.Command{
 
 func init() {
 	profilesAddCmd.Flags().StringVar(&addName, "name", "", "Name of the profile (required)")
-	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: https://hub.suprsend.com/)")
-	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: https://management-api.suprsend.com/)")
+	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: "+DefaultBaseUrl+")")
+	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: "+DefaultMgmntUrl+")")
 	profilesAddCmd.Flags().StringVar(&addServiceToken, "service-token", "", "Service token (required)")
 	ProfileCmd.AddCommand(profilesAddCmd)
 }
 
 func runAddInteractive(cfg *Config, path string) {
-	shUI := cobra_ui.New()
-	var isSelfHosted, shPromptComplete bool
-	shUI.SetQuestions([]cobra_ui.Question{
-		{
-			CursorStr: "=>",
-			Text:      "is this a self hosted profile?",
-			Options:   []string{"Yes", "No"},
-			Handler: func(input string) error {
-				isSelfHosted = input == "Yes"
-				shPromptComplete = true
-				return nil
-			},
-		},
-	})
-	if addBaseUrl != "" && addMgmntUrl != "" {
-		// if both base url and mgmnt url are provided, then we could assume that the profile is self hosted
-		isSelfHosted = true
-	} else {
-		shUI.RunInteractiveUI()
-		if !shPromptComplete {
-			log.Infof("Profile creation cancelled. Please run 'suprsend profile add' again to add a profile")
-			return
-		}
-	}
-
 	ui := cobra_ui.New()
 	var questions []cobra_ui.Question
 
@@ -126,45 +117,46 @@ func runAddInteractive(cfg *Config, path string) {
 		})
 	}
 
+	// URL prompts. cobra_ui has no native "default value" support, so we
+	// embed the default in the prompt text and let the handler treat
+	// empty input as "accept the default". Typed URL is validated and
+	// stored. The same flow covers BYOC, staging / pre-prod / dev — any
+	// non-default endpoint works the same way.
 	if addBaseUrl == "" {
-		if isSelfHosted {
-			questions = append(questions, cobra_ui.Question{
-				Text: "Base URL: ",
-				Handler: func(s string) error {
-					s = cleanInput(s)
-					if s == "" {
-						return fmt.Errorf("base url cannot be empty")
-					}
-					if err := validateUrl(s); err != nil {
-						return err
-					}
-					addBaseUrl = s
+		questions = append(questions, cobra_ui.Question{
+			Text: fmt.Sprintf("Base URL [%s]: ", DefaultBaseUrl),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				if s == "" {
+					addBaseUrl = DefaultBaseUrl
 					return nil
-				},
-			})
-		} else {
-			addBaseUrl = "https://hub.suprsend.com/"
-		}
+				}
+				normalized, err := validateAndNormalizeUrl(s)
+				if err != nil {
+					return err
+				}
+				addBaseUrl = normalized
+				return nil
+			},
+		})
 	}
 	if addMgmntUrl == "" {
-		if isSelfHosted {
-			questions = append(questions, cobra_ui.Question{
-				Text: "Management URL: ",
-				Handler: func(s string) error {
-					s = cleanInput(s)
-					if s == "" {
-						return fmt.Errorf("management url cannot be empty")
-					}
-					if err := validateUrl(s); err != nil {
-						return err
-					}
-					addMgmntUrl = s
+		questions = append(questions, cobra_ui.Question{
+			Text: fmt.Sprintf("Management URL [%s]: ", DefaultMgmntUrl),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				if s == "" {
+					addMgmntUrl = DefaultMgmntUrl
 					return nil
-				},
-			})
-		} else {
-			addMgmntUrl = "https://management-api.suprsend.com/"
-		}
+				}
+				normalized, err := validateAndNormalizeUrl(s)
+				if err != nil {
+					return err
+				}
+				addMgmntUrl = normalized
+				return nil
+			},
+		})
 	}
 
 	if len(questions) > 0 {

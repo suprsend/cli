@@ -1,0 +1,55 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.suprsend/cli",
+  "title": "SuprSend",
+  "description": "Manage SuprSend entities — workflows, templates, users, objects, tenants — from your AI assistant.",
+  "repository": {
+    "url": "https://github.com/suprsend/cli",
+    "source": "github"
+  },
+  "websiteUrl": "https://www.suprsend.com",
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "suprsend",
+      "version": "0.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "start-mcp-server",
+          "valueHint": "subcommand"
+        },
+        {
+          "type": "named",
+          "name": "--workflows",
+          "value": "all"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "SUPRSEND_SERVICE_TOKEN",
+          "description": "SuprSend service token. Create one in the SuprSend dashboard under Developers → API Keys.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SUPRSEND_BASE_URL",
+          "description": "Base API URL. Only set for BYOC / self-hosted SuprSend instances.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SUPRSEND_MGMNT_URL",
+          "description": "Management API URL. Only set for BYOC / self-hosted SuprSend instances.",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

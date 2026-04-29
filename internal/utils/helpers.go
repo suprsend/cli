@@ -31,7 +31,47 @@ type WorkflowInfo struct {
 	Slug          string
 	Name          string
 	Description   string
+	Tags          []string
 	PayloadSchema WorkflowPayloadSchema
+}
+
+// parseSelector splits a comma-separated --workflows / --events flag value into
+// plain slugs/names and tag selectors. Entries prefixed with `tag:` are tag
+// selectors; everything else is matched against the resource's slug or name.
+//
+// Examples:
+//
+//	"all"                            → all=true
+//	"none" | ""                      → none=true
+//	"welcome,order-placed"           → slugs=[welcome, order-placed]
+//	"tag:onboarding,tag:transac"     → tags=[onboarding, transac]
+//	"welcome,tag:onboarding"         → slugs=[welcome], tags=[onboarding]
+func parseSelector(flag string) (all bool, none bool, slugs []string, tags []string) {
+	flag = strings.TrimSpace(flag)
+	if flag == "" || flag == "none" {
+		return false, true, nil, nil
+	}
+	if flag == "all" {
+		return true, false, nil, nil
+	}
+	for _, raw := range strings.Split(flag, ",") {
+		entry := strings.TrimSpace(raw)
+		if entry == "" {
+			continue
+		}
+		if tag, ok := strings.CutPrefix(entry, "tag:"); ok {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tags = append(tags, tag)
+			}
+			continue
+		}
+		slugs = append(slugs, entry)
+	}
+	if len(slugs) == 0 && len(tags) == 0 {
+		return false, true, nil, nil
+	}
+	return false, false, slugs, tags
 }
 
 func GenerateUUID() string {
@@ -39,20 +79,11 @@ func GenerateUUID() string {
 }
 
 func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
-	if workflowsFlag == "none" {
+	all, none, slugs, tags := parseSelector(workflowsFlag)
+	if none {
 		return nil
-	}
-	var workflowsToBeFetched []string
-	if workflowsFlag != "all" {
-		workflowsToBeFetched = strings.Split(workflowsFlag, ",")
-		for i, workflow := range workflowsToBeFetched {
-			workflowsToBeFetched[i] = strings.TrimSpace(workflow)
-		}
 	}
 
-	if len(workflowsToBeFetched) == 0 && workflowsFlag != "all" {
-		return nil
-	}
 	mgmntClient := GetSuprSendMgmntClient()
 	if mgmntClient == nil {
 		return nil
@@ -68,34 +99,55 @@ func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
 		if !ok {
 			continue
 		}
-		workflowInfo := WorkflowInfo{}
+		info := WorkflowInfo{}
 		if slug, ok := workflowMap["slug"].(string); ok {
-			workflowInfo.Slug = slug
+			info.Slug = slug
 		}
 		if name, ok := workflowMap["name"].(string); ok {
-			workflowInfo.Name = name
-		} else {
-			workflowInfo.Name = ""
+			info.Name = name
 		}
 		if description, ok := workflowMap["description"].(string); ok {
-			workflowInfo.Description = description
-		} else {
-			workflowInfo.Description = ""
+			info.Description = description
+		}
+		if rawTags, ok := workflowMap["tags"].([]any); ok {
+			for _, t := range rawTags {
+				if s, ok := t.(string); ok {
+					info.Tags = append(info.Tags, s)
+				}
+			}
 		}
 		if payloadSchema, ok := workflowMap["payload_schema"].(map[string]any); ok {
-			workflowInfo.PayloadSchema.Schema = payloadSchema["schema"].(string)
+			info.PayloadSchema.Schema, _ = payloadSchema["schema"].(string)
 			if versionNo, ok := payloadSchema["version_no"].(string); ok {
-				workflowInfo.PayloadSchema.Version = versionNo
-			} else {
-				workflowInfo.PayloadSchema.Version = ""
+				info.PayloadSchema.Version = versionNo
 			}
 		}
 
-		if workflowsFlag == "all" || slices.Contains(workflowsToBeFetched, workflowInfo.Name) {
-			result = append(result, workflowInfo)
+		if matchesSelector(info.Slug, info.Name, info.Tags, all, slugs, tags) {
+			result = append(result, info)
 		}
 	}
 	return result
+}
+
+// matchesSelector returns true when a resource's slug, name, or any of its
+// tags matches the parsed selector. `all` short-circuits to true.
+func matchesSelector(slug, name string, resourceTags []string, all bool, slugs, tags []string) bool {
+	if all {
+		return true
+	}
+	if slug != "" && slices.Contains(slugs, slug) {
+		return true
+	}
+	if name != "" && slices.Contains(slugs, name) {
+		return true
+	}
+	for _, t := range resourceTags {
+		if slices.Contains(tags, t) {
+			return true
+		}
+	}
+	return false
 }
 
 type EventPayloadSchema struct {
@@ -111,20 +163,11 @@ type EventInfo struct {
 }
 
 func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
-	// eventFlag can be `none` or `all` or a comma separated list of event slugs
-	if eventsFlag == "none" {
-		return nil
-	}
-	var eventsToBeFetched []string
-	if eventsFlag != "all" {
-		eventsToBeFetched = strings.Split(eventsFlag, ",")
-		// trim the events
-		for i, event := range eventsToBeFetched {
-			eventsToBeFetched[i] = strings.TrimSpace(event)
-		}
-	}
-
-	if len(eventsToBeFetched) == 0 && eventsFlag != "all" {
+	// Selector accepts `none`, `all`, comma-separated names, and (for forward
+	// compatibility) `tag:<tag>` entries — events don't yet expose tags from
+	// the API, so tag selectors will simply match nothing today.
+	all, none, names, tags := parseSelector(eventsFlag)
+	if none {
 		return nil
 	}
 
@@ -142,30 +185,22 @@ func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
 		if !ok {
 			continue
 		}
-		eventInfo := EventInfo{}
+		info := EventInfo{}
 		if name, ok := eventMap["name"].(string); ok {
-			eventInfo.Name = name
-		} else {
-			eventInfo.Name = ""
+			info.Name = name
 		}
 		if description, ok := eventMap["description"].(string); ok {
-			eventInfo.Description = description
-		} else {
-			eventInfo.Description = ""
+			info.Description = description
 		}
 		if payloadSchema, ok := eventMap["payload_schema"].(map[string]any); ok {
-			eventInfo.PayloadSchema.Schema = payloadSchema["schema"].(string)
-			// check if version_no is nil
+			info.PayloadSchema.Schema, _ = payloadSchema["schema"].(string)
 			if versionNo, ok := payloadSchema["version_no"].(string); ok {
-				eventInfo.PayloadSchema.Version = versionNo
-			} else {
-				eventInfo.PayloadSchema.Version = ""
+				info.PayloadSchema.Version = versionNo
 			}
 		}
 
-		// add th event to the result only if either eventsFlag is "all" or the event is in the eventsToBeFetched list
-		if eventsFlag == "all" || slices.Contains(eventsToBeFetched, eventInfo.Name) {
-			result = append(result, eventInfo)
+		if matchesSelector(info.Name, info.Name, nil, all, names, tags) {
+			result = append(result, info)
 		}
 	}
 	return result

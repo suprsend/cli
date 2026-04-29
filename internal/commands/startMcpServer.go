@@ -70,9 +70,6 @@ Use --events and --workflows to dynamically register tools that trigger specific
 
 Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse), http (listens on :8080/).`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if cmd.Name() == "list-tools" {
-			return
-		}
 		conf := config.Cfg
 		workspace := conf.Workspace
 		serviceToken := getServiceTokenWithPriority()
@@ -83,6 +80,10 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 			profiles.GetResolvedMgmntUrl(),
 			viper.GetBool("debug"),
 		)
+		// Dynamic registration runs for both `start-mcp-server` and
+		// `start-mcp-server list-tools` so the listing reflects what the
+		// real server would expose. Selectors default to "none", so users
+		// who don't pass --workflows / --events pay no API cost.
 		if err := toolset.RegisterDynamicEventsTools(workspace, events); err != nil {
 			log.Warnf("Failed to register event tools in mcp: %v", err)
 		}
@@ -160,13 +161,13 @@ var listToolsCmd = &cobra.Command{
 		}
 		var resp []toolListResponse
 		for _, t := range toolset.GetAllTools() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description})
+			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
 		}
 		for _, t := range toolset.GetAllEvents() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description})
+			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
 		}
 		for _, t := range toolset.GetAllWorkflows() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description})
+			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
 		}
 		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(resp, outputType)
@@ -179,6 +180,8 @@ func init() {
 
 	startMcpServerCmd.PersistentFlags().StringVarP(&transport, "transport", "t", "stdio", "Server transport: stdio, sse, or http")
 	startMcpServerCmd.PersistentFlags().StringVarP(&tools, "tools", "T", "all", "Tools to expose: all, none, or comma-separated tool names")
-	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "Event tools to register: all, none, or comma-separated event slugs")
-	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, or comma-separated workflow slugs")
+	startMcpServerCmd.PersistentFlags().StringVarP(&events, "events", "e", "none", "Event tools to register: all, none, or comma-separated event names (tag: prefix reserved for future use)")
+	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, comma-separated slugs, or tag:<tag> entries (e.g. tag:onboarding,tag:transactional)")
+
+	listToolsCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 }

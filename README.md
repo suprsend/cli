@@ -1,5 +1,7 @@
 # SuprSend CLI
 
+[![cli MCP server](https://glama.ai/mcp/servers/suprsend/cli/badges/score.svg)](https://glama.ai/mcp/servers/suprsend/cli)
+
 SuprSend CLI is a command-line interface tool for interacting with the SuprSend API, written in Go.
 
 ## Installation

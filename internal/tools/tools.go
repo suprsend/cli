@@ -7,11 +7,10 @@ import (
 )
 
 type Tool struct {
-	Type        string
-	Name        string
-	Description string
-	MCPTool     mcp.Tool
-	Handler     func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error)
+	Type    string
+	Name    string
+	MCPTool mcp.Tool
+	Handler func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error)
 }
 
 var (

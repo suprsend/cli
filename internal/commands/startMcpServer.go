@@ -70,9 +70,6 @@ Use --events and --workflows to dynamically register tools that trigger specific
 
 Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse), http (listens on :8080/).`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if cmd.Name() == "list-tools" {
-			return
-		}
 		conf := config.Cfg
 		workspace := conf.Workspace
 		serviceToken := getServiceTokenWithPriority()
@@ -83,6 +80,10 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 			profiles.GetResolvedMgmntUrl(),
 			viper.GetBool("debug"),
 		)
+		// Dynamic registration runs for both `start-mcp-server` and
+		// `start-mcp-server list-tools` so the listing reflects what the
+		// real server would expose. Selectors default to "none", so users
+		// who don't pass --workflows / --events pay no API cost.
 		if err := toolset.RegisterDynamicEventsTools(workspace, events); err != nil {
 			log.Warnf("Failed to register event tools in mcp: %v", err)
 		}

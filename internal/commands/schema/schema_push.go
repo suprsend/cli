@@ -41,16 +41,10 @@ var schemaPushCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
-		stats := &SchemaPushStats{
-			Errors: []string{},
-		}
-
 		hasError := false
 		var spinner *utils.Spinner
 
 		if slug != "" {
-			stats.Total = 1
-
 			var schema map[string]any
 			if jsonPayload != "" {
 				if err := json.Unmarshal([]byte(jsonPayload), &schema); err != nil {
@@ -61,63 +55,40 @@ var schemaPushCmd = &cobra.Command{
 					path = filepath.Join(".", "suprsend", "schemas")
 				}
 				if _, err := os.Stat(path); os.IsNotExist(err) {
-					log.Errorf("Directory %s does not exist", path)
-					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+					return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("directory %s does not exist", path))
 				}
 				if err := validateInputDirectory(path); err != nil {
-					log.Errorf("Error with input directory: %v\n", err)
-					return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "error with input directory")
 				}
 
 				merged, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
 				if err != nil {
-					log.WithError(err).Errorf("Failed to read schema files for %s", slug)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, err.Error())
-				} else {
-					schema = merged
+					return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to read schema files for %s", slug))
 				}
+				schema = merged
 			}
 
-			if schema != nil {
-				if dryRun {
-					action := "push"
-					if commit {
-						action = "push and commit"
-					}
-					log.Infof("DRY RUN: would %s schema '%s' to %s", action, slug, workspace)
-					stats.Success++
-				} else {
-					spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-					err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
-					if err == nil {
-						spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-					} else {
-						spinner.Stop("")
-					}
-					if err != nil {
-						log.WithError(err).Errorf("Failed to push schema %s", slug)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push schema %s: %v", slug, err))
-					} else {
-						stats.Success++
-					}
+			if dryRun {
+				action := "push"
+				if commit {
+					action = "push and commit"
 				}
+				log.Infof("DRY RUN: would %s schema '%s' to %s", action, slug, workspace)
+				return nil
 			}
 
-			log.Info("=== Schema Push Summary ===")
-			log.Infof("Total schemas processed: %d", stats.Total)
-			log.Infof("Successfully pushed: %d", stats.Success)
-			log.Infof("Failed to push: %d", stats.Failed)
-
-			if stats.Failed > 0 {
-				log.Info("Failed schemas:")
-				for _, errorMsg := range stats.Errors {
-					log.Infof("  - %s", errorMsg)
-				}
-				return clierr.New(fmt.Sprintf("%d schema(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			if err != nil {
+				spinner.Stop("")
+				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
 			}
+			spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
 			return nil
+		}
+
+		stats := &SchemaPushStats{
+			Errors: []string{},
 		}
 
 		if path == "" {

@@ -31,21 +31,15 @@ func readTemplateJSON(templateDir string) (map[string]any, error) {
 }
 
 
-func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, dryRun bool, stats *TemplatePushStats) {
+func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, dryRun bool) error {
 	templateData, err := readTemplateJSON(templateDir)
 	if err != nil {
-		log.WithError(err).Errorf("Failed to read template.json for template %s", slug)
-		stats.Failed++
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template.json for template %s: %v", slug, err))
-		return
+		return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template.json for template %s", slug))
 	}
 
 	variants, err := readTemplateVariants(templateDir)
 	if err != nil {
-		log.WithError(err).Errorf("Failed to read template %s", slug)
-		stats.Failed++
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read template %s: %v", slug, err))
-		return
+		return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template %s", slug))
 	}
 
 	if dryRun {
@@ -59,8 +53,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 			}
 		}
 		log.Infof("DRY RUN: would push template '%s' — %d variant(s), channels: %v", slug, len(variants), channels)
-		stats.Success++
-		return
+		return nil
 	}
 
 	var enabledChannels []string
@@ -72,24 +65,18 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		}
 	}
 	if err := mgmntClient.CreateTemplate(workspace, slug, enabledChannels); err != nil {
-		log.WithError(err).Errorf("Failed to create template %s", slug)
-		stats.Failed++
-		stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to create template %s: %v", slug, err))
-		return
+		return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to create template %s", slug))
 	}
 
-	var pushFailed bool
+	var pushErrs []string
 	for _, variant := range variants {
 		if err := mgmntClient.PushTemplateVariant(workspace, slug, variant); err != nil {
 			log.WithError(err).Errorf("Failed to push variant for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant for template %s: %v", slug, err))
-			pushFailed = true
+			pushErrs = append(pushErrs, err.Error())
 		}
 	}
-
-	if pushFailed {
-		stats.Failed++
-		return
+	if len(pushErrs) > 0 {
+		return clierr.New(fmt.Sprintf("failed to push %d variant(s) for template %s: %s", len(pushErrs), slug, strings.Join(pushErrs, "; ")), clierr.CodeAPIInternal)
 	}
 
 	// Push mock_data.json if it exists
@@ -97,16 +84,10 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	if mockDataBytes, err := os.ReadFile(mockDataFile); err == nil {
 		var mockData map[string]any
 		if err := json.Unmarshal(mockDataBytes, &mockData); err != nil {
-			log.WithError(err).Errorf("Failed to parse mock_data.json for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse mock_data.json for template %s: %v", slug, err))
-			stats.Failed++
-			return
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse mock_data.json for template %s", slug))
 		}
 		if err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData); err != nil {
-			log.WithError(err).Errorf("Failed to push mock data for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push mock data for template %s: %v", slug, err))
-			stats.Failed++
-			return
+			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push mock data for template %s", slug))
 		}
 	}
 
@@ -114,10 +95,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	if variantOrderRaw, ok := templateData["variant_order"]; ok && variantOrderRaw != nil {
 		flatOrder, ok := variantOrderRaw.(map[string]any)
 		if !ok {
-			log.Errorf("Invalid variant_order format for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Invalid variant_order format for template %s", slug))
-			stats.Failed++
-			return
+			return clierr.New(fmt.Sprintf("invalid variant_order format for template %s", slug), clierr.CodeFileParseFailed)
 		}
 		channelMap := map[string]*mgmnt.VariantOrderChannel{}
 		for key, variantsRaw := range flatOrder {
@@ -149,10 +127,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 			variantOrder.Channels = append(variantOrder.Channels, *ch)
 		}
 		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", &variantOrder); err != nil {
-			log.WithError(err).Errorf("Failed to push variant order for template %s", slug)
-			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push variant order for template %s: %v", slug, err))
-			stats.Failed++
-			return
+			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push variant order for template %s", slug))
 		}
 	}
 
@@ -160,17 +135,13 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		if force {
 			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
 			if err != nil {
-				log.WithError(err).Errorf("Failed to pre-commit validate template %s", slug)
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to pre-commit validate template %s: %v", slug, err))
-				stats.Failed++
-				return
+				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to pre-commit validate template %s", slug))
 			}
 
 			var validVariants []map[string]any
 			for _, v := range validateResp.Variants {
 				if len(v.Errors) > 0 {
 					log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Skipped variant %s/%s for template %s (has errors)", v.Channel, v.ID, slug))
 					continue
 				}
 				validVariants = append(validVariants, map[string]any{
@@ -181,26 +152,20 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 
 			if len(validVariants) == 0 {
 				log.Warnf("No valid variants to commit for template %s", slug)
-				return
+				return nil
 			}
 
 			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, validVariants); err != nil {
-				log.WithError(err).Errorf("Failed to commit template %s", slug)
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to commit template %s: %v", slug, err))
-				stats.Failed++
-				return
+				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit template %s", slug))
 			}
 		} else {
 			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, nil); err != nil {
-				log.WithError(err).Errorf("Failed to commit template %s", slug)
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to commit template %s: %v", slug, err))
-				stats.Failed++
-				return
+				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit template %s", slug))
 			}
 		}
 	}
 
-	stats.Success++
+	return nil
 }
 
 var templatePushCmd = &cobra.Command{
@@ -237,83 +202,75 @@ var templatePushCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
-		stats := &TemplatePushStats{
-			Errors: []string{},
-		}
-
 		hasError := false
 		var spinner *utils.Spinner
 
 		if slug != "" {
-			// Push a single template by slug
-			stats.Total = 1
 			templateDir := filepath.Join(path, slug)
-
 			if _, err := os.Stat(templateDir); os.IsNotExist(err) {
-				log.Errorf("Template directory %s does not exist", templateDir)
-				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Template directory %s does not exist", templateDir))
-			} else {
-				spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
-
-				PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun, stats)
-
-				if dryRun && stats.Success > 0 {
-					dryRunSlugs = append(dryRunSlugs, slug)
-				}
-				if stats.Success > 0 {
-					if dryRun {
-						spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
-					} else {
-						spinner.Stop(fmt.Sprintf("Pushed template: %s", slug))
-					}
-				} else {
-					spinner.Stop("")
-				}
+				return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("template directory %s does not exist", templateDir))
 			}
-		} else {
-			// Push all templates
-			entries, err := os.ReadDir(path)
+
+			spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
+			err := PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun)
 			if err != nil {
-				log.WithError(err).Errorf("Failed to read templates directory")
-				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+				spinner.Stop("")
+				return err
+			}
+			if dryRun {
+				spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
+			} else {
+				spinner.Stop(fmt.Sprintf("Pushed template: %s", slug))
+			}
+			return nil
+		}
+
+		stats := &TemplatePushStats{
+			Errors: []string{},
+		}
+
+		// Push all templates
+		entries, err2 := os.ReadDir(path)
+		if err2 != nil {
+			log.WithError(err2).Errorf("Failed to read templates directory")
+			return clierr.Wrap(err2, clierr.CodeFileNotFound, "")
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				stats.Total++
+			}
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
 			}
 
-			for _, entry := range entries {
-				if entry.IsDir() {
-					stats.Total++
-				}
+			templateSlug := entry.Name()
+			templateDir := filepath.Join(path, templateSlug)
+
+			if !hasError {
+				spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
 			}
 
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					continue
-				}
-
-				templateSlug := entry.Name()
-				templateDir := filepath.Join(path, templateSlug)
-
-				if !hasError {
-					spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
-				}
-
-				prevFailed := stats.Failed
-				PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun, stats)
-
-				if stats.Failed > prevFailed {
-					spinner.Stop("")
-					hasError = true
-					continue
-				}
-
-				if dryRun {
-					dryRunSlugs = append(dryRunSlugs, templateSlug)
-					spinner.Stop(fmt.Sprintf("(dry run) %s", templateSlug))
-				} else {
-					spinner.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
-				}
-				hasError = false
+			if err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun); err != nil {
+				spinner.Stop("")
+				hasError = true
+				log.WithError(err).Errorf("Failed to push template %s", templateSlug)
+				stats.Failed++
+				stats.Errors = append(stats.Errors, err.Error())
+				continue
 			}
+
+			stats.Success++
+			if dryRun {
+				dryRunSlugs = append(dryRunSlugs, templateSlug)
+				spinner.Stop(fmt.Sprintf("(dry run) %s", templateSlug))
+			} else {
+				spinner.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
+			}
+			hasError = false
 		}
 
 		if dryRun {

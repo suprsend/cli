@@ -510,7 +510,13 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		pushStats.Total++
 		slug := entry.Name()
 		templateDir := filepath.Join(dirPath, slug)
-		template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun, pushStats)
+		if err := template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun); err != nil {
+			log.WithError(err).Errorf("Failed to push template %s", slug)
+			pushStats.Failed++
+			pushStats.Errors = append(pushStats.Errors, err.Error())
+		} else {
+			pushStats.Success++
+		}
 	}
 
 	if pushStats.Success > 0 && !dryRun {

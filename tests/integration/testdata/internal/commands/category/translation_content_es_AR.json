@@ -1,0 +1,198 @@
+{
+    "sections": {
+        "new-5": {
+            "name": "\u65b0\u3057\u3044 5",
+            "description": null
+        },
+        "new2": {
+            "name": "\u65b0\u3057\u30442",
+            "description": null
+        },
+        "nik-section": {
+            "name": "Nik \u30bb\u30af\u30b7\u30e7\u30f3",
+            "description": "Nik \u30bb\u30af\u30b7\u30e7\u30f3\u306e\u8aac\u660e"
+        },
+        "nik-section-for-transactional": {
+            "name": "\u30c8\u30e9\u30f3\u30b6\u30af\u30b7\u30e7\u30f3\u7528 Nik \u30bb\u30af\u30b7\u30e7\u30f3",
+            "description": "\u30c8\u30e9\u30f3\u30b6\u30af\u30b7\u30e7\u30f3\u7528 Nik \u30bb\u30af\u30b7\u30e7\u30f3\u306e\u8aac\u660e"
+        },
+        "return4": {
+            "name": "\u8fd4\u54c14",
+            "description": null
+        },
+        "sanjeev-section-promotional-1": {
+            "name": "Sanjeev \u30d7\u30ed\u30e2\u30fc\u30b7\u30e7\u30f3 \u30bb\u30af\u30b7\u30e7\u30f3 1",
+            "description": null
+        },
+        "sanjeev-system-2": {
+            "name": "Sanjeev \u30b7\u30b9\u30c6\u30e0 2",
+            "description": null
+        },
+        "system-section": {
+            "name": "\u30b7\u30b9\u30c6\u30e0 \u30bb\u30af\u30b7\u30e7\u30f3",
+            "description": "\u30b7\u30b9\u30c6\u30e0 \u30bb\u30af\u30b7\u30e7\u30f3"
+        },
+        "test": {
+            "name": "\u30c6\u30b9\u30c8",
+            "description": null
+        },
+        "test_section": {
+            "name": "\u30c6\u30b9\u30c8_\u30bb\u30af\u30b7\u30e7\u30f3",
+            "description": null
+        },
+        "transactional-karthick1": {
+            "name": "\u30c8\u30e9\u30f3\u30b6\u30af\u30b7\u30e7\u30f3 karthick1",
+            "description": "\u30c8\u30e9\u30f3\u30b6\u30af\u30b7\u30e7\u30f3 karthick1"
+        }
+    },
+    "categories": {
+        "akhil-system": {
+            "name": "akhil-\u30b7\u30b9\u30c6\u30e0",
+            "description": "akhil-\u30b7\u30b9\u30c6\u30e0"
+        },
+        "amount-refunded": {
+            "name": "\u8fd4\u91d1\u984d",
+            "description": null
+        },
+        "brand-preference": {
+            "name": "\u30d6\u30e9\u30f3\u30c9\u306e\u597d\u307f",
+            "description": "karthick_qa_new \u306e\u30d6\u30e9\u30f3\u30c9\u306e\u597d\u307f\u3092\u78ba\u8a8d\u3059\u308b\u305f\u3081"
+        },
+        "brand_null_user": {
+            "name": "\u30d6\u30e9\u30f3\u30c9\u306a\u3057\u30e6\u30fc\u30b6\u30fc",
+            "description": null
+        },
+        "bug-retest-blocked": {
+            "name": "\u30d0\u30b0\u518d\u30c6\u30b9\u30c8\u30d6\u30ed\u30c3\u30af",
+            "description": "\u30d0\u30b0\u518d\u30c6\u30b9\u30c8\u30d6\u30ed\u30c3\u30af"
+        },
+        "business-opt-out": {
+            "name": "\u30d3\u30b8\u30cd\u30b9\u30aa\u30d7\u30c8\u30a2\u30a6\u30c8",
+            "description": null
+        },
+        "cat1": {
+            "name": "cat1",
+            "description": null
+        },
+        "check-bug-4": {
+            "name": "\u30d0\u30b04\u3092\u30c1\u30a7\u30c3\u30af",
+            "description": null
+        },
+        "check-bug1": {
+            "name": "\u30d0\u30b01\u3092\u30c1\u30a7\u30c3\u30af",
+            "description": null
+        },
+        "check-bug2": {
+            "name": "\u30d0\u30b02\u3092\u30c1\u30a7\u30c3\u30af",
+            "description": "\u30e9\u30f3\u30c0\u30e0\u306a\u8aac\u660e"
+        },
+        "daily": {
+            "name": "\u6bce\u65e5",
+            "description": "1\u65e5\u306b1\u56de\u30a8\u30e9\u30fc\u6982\u8981\u3092\u9001\u4fe1"
+        },
+        "infra-incident": {
+            "name": "\u30a4\u30f3\u30d5\u30e9\u4e8b\u6545",
+            "description": null
+        },
+        "mghjg-ljilhlih-lhkh-and": {
+            "name": "mghjg ljilhlih lhkh%^&*^%^",
+            "description": null
+        },
+        "nik-sub-category": {
+            "name": "Nik \u30b5\u30d6\u30ab\u30c6\u30b4\u30ea\u30fc",
+            "description": "Nik \u30b5\u30d6\u30ab\u30c6\u30b4\u30ea\u30fc 1"
+        },
+        "opt-out-case": {
+            "name": "\u30aa\u30d7\u30c8\u30a2\u30a6\u30c8\u30b1\u30fc\u30b9",
+            "description": null
+        },
+        "promo-blocked": {
+            "name": "\u30d7\u30ed\u30e2\u30fc\u30b7\u30e7\u30f3\u30d6\u30ed\u30c3\u30af",
+            "description": "\u30d7\u30ed\u30e2\u30fc\u30b7\u30e7\u30f3\u30d6\u30ed\u30c3\u30af"
+        },
+        "recheck-system": {
+            "name": "\u30b7\u30b9\u30c6\u30e0\u518d\u78ba\u8a8d",
+            "description": "\u30b7\u30b9\u30c6\u30e0\u518d\u78ba\u8a8d"
+        },
+        "refund-promotion": {
+            "name": "\u8fd4\u91d1\u30d7\u30ed\u30e2\u30fc\u30b7\u30e7\u30f3",
+            "description": "\u66f4\u65b0"
+        },
+        "return": {
+            "name": "\u8fd4\u54c1",
+            "description": null
+        },
+        "return78": {
+            "name": "\u8fd4\u54c178",
+            "description": null
+        },
+        "sanjeev-cat-in-sanjeev-promo-1": {
+            "name": "Sanjeev \u30d7\u30ed\u30e2\u30fc\u30b7\u30e7\u30f31\u306e\u30ab\u30c6\u30b4\u30ea",
+            "description": null
+        },
+        "sanjeev-section-2-category-1": {
+            "name": "Sanjeev \u30bb\u30af\u30b7\u30e7\u30f32 \u30ab\u30c6\u30b4\u30ea1",
+            "description": null
+        },
+        "sanjeev-system": {
+            "name": "Sanjeev \u30b7\u30b9\u30c6\u30e0",
+            "description": "Sanjeev \u30b7\u30b9\u30c6\u30e0 \u30ab\u30c6\u30b4\u30ea"
+        },
+        "sreehari_test": {
+            "name": null,
+            "description": null
+        },
+        "sub-category": {
+            "name": "\u30b5\u30d6\u30ab\u30c6\u30b4\u30ea\u30fc",
+            "description": "\u30b5\u30d6\u30ab\u30c6\u30b4\u30ea\u30fc\u306e\u8aac\u660e"
+        },
+        "sub-category-1": {
+            "name": "\u30b5\u30d6\u30ab\u30c6\u30b4\u30ea\u30fc1",
+            "description": "\u30b5\u30d6\u30ab\u30c6\u30b4\u30ea\u30fc1\u306e\u8aac\u660e"
+        },
+        "system-android": {
+            "name": "\u30b7\u30b9\u30c6\u30e0 Android",
+            "description": null
+        },
+        "system-retest-category": {
+            "name": "\u30b7\u30b9\u30c6\u30e0\u518d\u30c6\u30b9\u30c8\u30ab\u30c6\u30b4\u30ea",
+            "description": "\u518d\u30c6\u30b9\u30c8"
+        },
+        "tag": {
+            "name": "\u30bf\u30b0$",
+            "description": null
+        },
+        "test": {
+            "name": "\u30c6\u30b9\u30c8",
+            "description": "\u3053\u306e\u30e6\u30fc\u30b6\u30fc\u3092\u30c6\u30b9\u30c8"
+        },
+        "test4": {
+            "name": "\u30c6\u30b9\u30c84",
+            "description": "\u30c6\u30b9\u30c84 \u30c1\u30a7\u30c3\u30af"
+        },
+        "testing-testing-testing-testing-testing": {
+            "name": "\u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8",
+            "description": "\u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8 \u30c6\u30b9\u30c8"
+        },
+        "tests": {
+            "name": "\u30c6\u30b9\u30c8\u7fa4",
+            "description": "asdf"
+        },
+        "trans-blocked": {
+            "name": "\u30c8\u30e9\u30f3\u30b9\u30d6\u30ed\u30c3\u30af",
+            "description": "\u30c8\u30e9\u30f3\u30b9\u30d6\u30ed\u30c3\u30af"
+        },
+        "trans2": {
+            "name": "trans2",
+            "description": null
+        },
+        "user-android-preference": {
+            "name": "\u30e6\u30fc\u30b6\u30fcAndroid\u8a2d\u5b9a",
+            "description": null
+        },
+        "weekly-product-updates": {
+            "name": "\u9031\u6b21\u30d7\u30ed\u30c0\u30af\u30c8\u30a2\u30c3\u30d7\u30c7\u30fc\u30c8",
+            "description": "test1 \u518d\u78ba\u8a8d mbsdmhfbdhfbhfb"
+        }
+    }
+}

@@ -1,4 +1,4 @@
-.PHONY: build clean
+.PHONY: build clean test-integration build-cov coverage
 
 OUT_DIR=./internal/utils/embedded-binaries
 SRC=type-morph/main.ts
@@ -31,5 +31,19 @@ build:
 	go run ./cmd/suprsend/main.go gendocs docs/
 	go run ./cmd/suprsend/main.go genskills skills/
 
+build-cov:
+	go build -cover -o suprsend-cov ./cmd/suprsend/
+
+test-integration: build-cov
+	go test ./tests/integration/... -v -count=1
+
+coverage: build-cov
+	@mkdir -p /tmp/covdata
+	@rm -f /tmp/covdata/*
+	GOCOVERDIR=/tmp/covdata go test ./tests/integration/... -count=1
+	go tool covdata textfmt -i=/tmp/covdata -o coverage.out
+	go tool cover -html=coverage.out
+
 clean:
 	rm -f $(OUT_DIR)/type-morph-*
+	rm -f suprsend-cov

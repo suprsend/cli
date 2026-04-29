@@ -1,0 +1,198 @@
+{
+    "sections": {
+        "new-5": {
+            "name": "nouveau 5",
+            "description": null
+        },
+        "new2": {
+            "name": "nouveau2",
+            "description": null
+        },
+        "nik-section": {
+            "name": "Section Nik",
+            "description": "Description de la section Nik"
+        },
+        "nik-section-for-transactional": {
+            "name": "Section Nik pour transactionnel",
+            "description": "Description de la section Nik pour transactionnel"
+        },
+        "return4": {
+            "name": "retour4",
+            "description": null
+        },
+        "sanjeev-section-promotional-1": {
+            "name": "Section promotionnelle 1 de Sanjeev",
+            "description": null
+        },
+        "sanjeev-system-2": {
+            "name": "Syst\u00e8me Sanjeev 2",
+            "description": null
+        },
+        "system-section": {
+            "name": "section syst\u00e8me",
+            "description": "section syst\u00e8me"
+        },
+        "test": {
+            "name": "test",
+            "description": null
+        },
+        "test_section": {
+            "name": "section_test",
+            "description": null
+        },
+        "transactional-karthick1": {
+            "name": "Transactionnel karthick1",
+            "description": "Transactionnel karthick1"
+        }
+    },
+    "categories": {
+        "akhil-system": {
+            "name": "akhil-syst\u00e8me",
+            "description": "akhil-syst\u00e8me"
+        },
+        "amount-refunded": {
+            "name": "Montant rembours\u00e9",
+            "description": null
+        },
+        "brand-preference": {
+            "name": "pr\u00e9f\u00e9rence de marque",
+            "description": "Pour v\u00e9rifier la pr\u00e9f\u00e9rence de marque pour karthick_qa_new"
+        },
+        "brand_null_user": {
+            "name": "utilisateur_sans_marque",
+            "description": null
+        },
+        "bug-retest-blocked": {
+            "name": "retest de bug bloqu\u00e9",
+            "description": "retest de bug bloqu\u00e9"
+        },
+        "business-opt-out": {
+            "name": "d\u00e9sinscription commerciale",
+            "description": null
+        },
+        "cat1": {
+            "name": "cat1",
+            "description": null
+        },
+        "check-bug-4": {
+            "name": "v\u00e9rifier bug 4",
+            "description": null
+        },
+        "check-bug1": {
+            "name": "v\u00e9rifier bug1",
+            "description": null
+        },
+        "check-bug2": {
+            "name": "v\u00e9rifier bug2",
+            "description": "description al\u00e9atoire"
+        },
+        "daily": {
+            "name": "quotidien",
+            "description": "Envoyer un r\u00e9sum\u00e9 des erreurs une fois par jour"
+        },
+        "infra-incident": {
+            "name": "Incident d\u2019infrastructure",
+            "description": null
+        },
+        "mghjg-ljilhlih-lhkh-and": {
+            "name": "mghjg ljilhlih lhkh%^&*^%^",
+            "description": null
+        },
+        "nik-sub-category": {
+            "name": "Sous-cat\u00e9gorie Nik",
+            "description": "Sous-cat\u00e9gorie Nik 1"
+        },
+        "opt-out-case": {
+            "name": "cas de d\u00e9sinscription",
+            "description": null
+        },
+        "promo-blocked": {
+            "name": "promo bloqu\u00e9e",
+            "description": "promo bloqu\u00e9e"
+        },
+        "recheck-system": {
+            "name": "rev\u00e9rifier syst\u00e8me",
+            "description": "rev\u00e9rifier syst\u00e8me"
+        },
+        "refund-promotion": {
+            "name": "Promotion de remboursement",
+            "description": "mises \u00e0 jour"
+        },
+        "return": {
+            "name": "retour",
+            "description": null
+        },
+        "return78": {
+            "name": "retour78",
+            "description": null
+        },
+        "sanjeev-cat-in-sanjeev-promo-1": {
+            "name": "Cat\u00e9gorie Sanjeev dans Sanjeev promo 1",
+            "description": null
+        },
+        "sanjeev-section-2-category-1": {
+            "name": "Cat\u00e9gorie 1 de la section 2 de Sanjeev",
+            "description": null
+        },
+        "sanjeev-system": {
+            "name": "Syst\u00e8me Sanjeev",
+            "description": "Cat\u00e9gorie du syst\u00e8me Sanjeev"
+        },
+        "sreehari_test": {
+            "name": null,
+            "description": null
+        },
+        "sub-category": {
+            "name": "Sous-cat\u00e9gorie",
+            "description": "Description de la sous-cat\u00e9gorie"
+        },
+        "sub-category-1": {
+            "name": "Sous-cat\u00e9gorie 1",
+            "description": "Description de la sous-cat\u00e9gorie 1"
+        },
+        "system-android": {
+            "name": "syst\u00e8me android",
+            "description": null
+        },
+        "system-retest-category": {
+            "name": "cat\u00e9gorie de retest syst\u00e8me",
+            "description": "retest"
+        },
+        "tag": {
+            "name": "tag$",
+            "description": null
+        },
+        "test": {
+            "name": "test",
+            "description": "tester cet utilisateur"
+        },
+        "test4": {
+            "name": "test4",
+            "description": "v\u00e9rification test4"
+        },
+        "testing-testing-testing-testing-testing": {
+            "name": "Test test test test test",
+            "description": "Test test test test test"
+        },
+        "tests": {
+            "name": "tests",
+            "description": "asdf"
+        },
+        "trans-blocked": {
+            "name": "trans bloqu\u00e9",
+            "description": "trans bloqu\u00e9"
+        },
+        "trans2": {
+            "name": "trans2",
+            "description": null
+        },
+        "user-android-preference": {
+            "name": "pr\u00e9f\u00e9rence utilisateur android",
+            "description": null
+        },
+        "weekly-product-updates": {
+            "name": "mises \u00e0 jour produit hebdomadaires",
+            "description": "test1 rev\u00e9rifier mbsdmhfbdhfbhfb"
+        }
+    }
+}

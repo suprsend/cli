@@ -13,6 +13,24 @@ set -euo pipefail
 VERSION="${1:?usage: $0 <version>}"
 VERSION="${VERSION#v}"
 
+# Pick the npm dist-tag based on the version's pre-release suffix.
+#
+#   0.2.24            → publish under "latest" (default — what `npm i suprsend` resolves to)
+#   0.2.24-beta.1     → publish under "beta"   (`npm i suprsend@beta`)
+#   0.3.0-rc.2        → publish under "rc"     (`npm i suprsend@rc`)
+#   0.4.0-canary.5    → publish under "canary"
+#
+# Pre-release publishes deliberately do NOT touch the "latest" tag, so a
+# user running `npm i suprsend` after a beta release still gets the
+# previous stable. The semver suffix is whatever follows the first `-`,
+# trimmed at the first `.` so `beta.1` → `beta`.
+NPM_TAG="latest"
+SUFFIX="$(printf '%s' "$VERSION" | sed -n 's/^[0-9.]*-\([a-zA-Z][a-zA-Z0-9]*\).*/\1/p')"
+if [[ -n "$SUFFIX" ]]; then
+  NPM_TAG="$SUFFIX"
+  echo "==> Pre-release detected: '$VERSION' will publish under npm dist-tag '$NPM_TAG' (NOT 'latest')"
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$ROOT/dist"
 NPM_SRC="$ROOT/npm"
@@ -85,11 +103,11 @@ for entry in "${PLATFORMS[@]}"; do
 
   stamp_version "$PKG_STAGE/package.json" "$VERSION" platform
 
-  echo "==> Publishing $NPM_PKG@$VERSION"
+  echo "==> Publishing $NPM_PKG@$VERSION (tag: $NPM_TAG)"
   if [[ "${DRY_RUN:-}" == "1" ]]; then
-    (cd "$PKG_STAGE" && npm publish --access public --dry-run)
+    (cd "$PKG_STAGE" && npm publish --access public --tag "$NPM_TAG" --dry-run)
   else
-    if ! (cd "$PKG_STAGE" && npm publish --access public --provenance); then
+    if ! (cd "$PKG_STAGE" && npm publish --access public --tag "$NPM_TAG" --provenance); then
       # Retry-friendly: if this exact version already exists, continue.
       if npm view "$NPM_PKG@$VERSION" version >/dev/null 2>&1; then
         echo "    $NPM_PKG@$VERSION already published, continuing."
@@ -112,11 +130,11 @@ chmod 0755 "$ROOT_STAGE/bin/suprsend.js"
 
 stamp_version "$ROOT_STAGE/package.json" "$VERSION" root
 
-echo "==> Publishing suprsend@$VERSION"
+echo "==> Publishing suprsend@$VERSION (tag: $NPM_TAG)"
 if [[ "${DRY_RUN:-}" == "1" ]]; then
-  (cd "$ROOT_STAGE" && npm publish --access public --dry-run)
+  (cd "$ROOT_STAGE" && npm publish --access public --tag "$NPM_TAG" --dry-run)
 else
-  if ! (cd "$ROOT_STAGE" && npm publish --access public --provenance); then
+  if ! (cd "$ROOT_STAGE" && npm publish --access public --tag "$NPM_TAG" --provenance); then
     # If the exact version is already on the registry, this is a harmless retry
     # (e.g. CI re-run after a successful publish); proceed as success.
     if npm view "suprsend@$VERSION" version >/dev/null 2>&1; then
@@ -129,7 +147,7 @@ else
 fi
 
 if [[ "${DRY_RUN:-}" == "1" ]]; then
-  echo "Done. Dry-run complete (nothing published) at $VERSION."
+  echo "Done. Dry-run complete (nothing published) at $VERSION (would have used tag '$NPM_TAG')."
 else
-  echo "Done. Published suprsend + 6 platform packages at $VERSION."
+  echo "Done. Published suprsend + 6 platform packages at $VERSION under npm tag '$NPM_TAG'."
 fi

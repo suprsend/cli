@@ -28,6 +28,9 @@ var categoryGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "json", "yaml"); err != nil {
+			return err
+		}
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting categories...")
 
@@ -73,5 +76,6 @@ var categoryGetCmd = &cobra.Command{
 
 func init() {
 	categoryGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	categoryGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	CategoryCmd.AddCommand(categoryGetCmd)
 }

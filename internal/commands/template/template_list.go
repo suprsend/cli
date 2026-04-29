@@ -38,6 +38,9 @@ var templateListCmd = &cobra.Command{
 
 		spinner.Stop(fmt.Sprintf("Listed %d templates from %s with offset %d", len(templates.Results), workspace, offset))
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			return err
+		}
 
 		if len(templates.Results) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)
@@ -52,6 +55,7 @@ func init() {
 	templateListCmd.PersistentFlags().IntP("limit", "l", 20, "Limit the number of templates to list")
 	templateListCmd.PersistentFlags().Int("offset", 0, "Offset the number of templates to list (default: 0)")
 	templateListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	templateListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output Style (pretty, yaml, json)")
 	templateListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})

@@ -130,6 +130,19 @@ func supportsColor() bool {
 	return true
 }
 
+// ValidateOutputType returns a clierr if format is not one of the allowed values.
+func ValidateOutputType(format string, allowed ...string) error {
+	for _, a := range allowed {
+		if format == a {
+			return nil
+		}
+	}
+	return clierr.New(
+		fmt.Sprintf("invalid output format %q: must be one of %v", format, allowed),
+		clierr.CodeInvalidUsage,
+	)
+}
+
 // OutputData chooses the output format based on the flag
 func OutputData(data any, format string) {
 	switch format {

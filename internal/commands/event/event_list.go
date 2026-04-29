@@ -30,6 +30,9 @@ var eventListCmd = &cobra.Command{
 
 		spinner.Stop(fmt.Sprintf("Showing %d events out of %d from workspace %s\n", len(events.Results), events.Meta.Count, workspace))
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			return err
+		}
 		utils.OutputData(events.Results, outputType)
 		return nil
 	},
@@ -38,6 +41,7 @@ var eventListCmd = &cobra.Command{
 func init() {
 	eventListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of events to return")
 	eventListCmd.PersistentFlags().Int("offset", 0, "Number of events to skip for pagination")
+	eventListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	EventCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	EventCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	EventCmd.AddCommand(eventListCmd)

@@ -36,6 +36,9 @@ var templateGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "json", "yaml", "pretty"); err != nil {
+			return err
+		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -77,5 +80,6 @@ var templateGetCmd = &cobra.Command{
 func init() {
 	templateGetCmd.PersistentFlags().StringP("slug", "g", "", "Template slug")
 	templateGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	templateGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json, yaml, or pretty")
 	TemplateCmd.AddCommand(templateGetCmd)
 }

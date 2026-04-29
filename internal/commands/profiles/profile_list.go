@@ -41,6 +41,9 @@ var listProfilesCmd = &cobra.Command{
 		}
 
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			return err
+		}
 		hasBaseUrl := false
 		hasMgmntUrl := false
 		hasServiceToken := false
@@ -109,5 +112,6 @@ var listProfilesCmd = &cobra.Command{
 }
 
 func init() {
+	listProfilesCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	ProfileCmd.AddCommand(listProfilesCmd)
 }

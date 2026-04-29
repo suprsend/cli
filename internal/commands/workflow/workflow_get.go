@@ -33,6 +33,9 @@ var workflowGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "json", "yaml"); err != nil {
+			return err
+		}
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting details...")
 
@@ -53,5 +56,6 @@ var workflowGetCmd = &cobra.Command{
 func init() {
 	workflowGetCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug")
 	workflowGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	workflowGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	WorkflowCmd.AddCommand(workflowGetCmd)
 }

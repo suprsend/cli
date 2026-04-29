@@ -44,6 +44,9 @@ var workflowListCmd = &cobra.Command{
 
 		spinner.Stop(fmt.Sprintf("Listed %d workflows from %s with offset %d", len(workflows.Results), workspace, offset))
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			return err
+		}
 
 		if len(workflows.Results) == 0 && utils.IsOutputPiped() {
 			utils.OutputData([]interface{}{}, outputType)
@@ -58,6 +61,7 @@ func init() {
 	workflowListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of workflows to return")
 	workflowListCmd.PersistentFlags().Int("offset", 0, "Number of workflows to skip for pagination")
 	workflowListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	workflowListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	workflowListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})

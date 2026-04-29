@@ -46,6 +46,9 @@ var categoryListCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			return err
+		}
 
 		// Create flattened table rows
 		var tableRows []CategoryTableRow
@@ -76,6 +79,7 @@ var categoryListCmd = &cobra.Command{
 
 func init() {
 	categoryListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	categoryListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	CategoryCmd.PersistentFlags().StringP("service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
 	CategoryCmd.AddCommand(categoryListCmd)
 }

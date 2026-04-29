@@ -29,6 +29,9 @@ var translationGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "json", "yaml"); err != nil {
+			return err
+		}
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting translations...")
 
@@ -59,5 +62,6 @@ var translationGetCmd = &cobra.Command{
 
 func init() {
 	translationGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	translationGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	TranslationCmd.AddCommand(translationGetCmd)
 }

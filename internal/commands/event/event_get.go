@@ -27,6 +27,9 @@ var eventGetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "json", "yaml"); err != nil {
+			return err
+		}
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting events...")
 
@@ -46,5 +49,6 @@ var eventGetCmd = &cobra.Command{
 }
 
 func init() {
+	eventGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	EventCmd.AddCommand(eventGetCmd)
 }

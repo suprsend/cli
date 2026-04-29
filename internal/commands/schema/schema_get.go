@@ -33,6 +33,9 @@ var schemaGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "json", "yaml"); err != nil {
+			return err
+		}
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting details...")
 
@@ -53,5 +56,6 @@ var schemaGetCmd = &cobra.Command{
 func init() {
 	schemaGetCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug")
 	schemaGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
+	schemaGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	SchemaCmd.AddCommand(schemaGetCmd)
 }

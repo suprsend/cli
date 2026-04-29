@@ -32,7 +32,7 @@ type SchemaPushStats struct {
 
 type FilteredSchema struct {
 	Slug        string `json:"slug"`
-	Title       string `json:"title"`
+	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
@@ -97,9 +97,12 @@ func validateInputDirectory(dirPath string) error {
 func filterSchemaData(schemas []mgmnt.SchemaResponse) []FilteredSchema {
 	filtered := make([]FilteredSchema, len(schemas))
 	for i, schema := range schemas {
+		// The API returns both `title` and `name`; `title` has historically
+		// been empty in production data, while `name` is the populated
+		// human-readable label. Use `name` for the listing column.
 		filtered[i] = FilteredSchema{
 			Slug:        schema.Slug,
-			Title:       schema.Title,
+			Name:        schema.Name,
 			Description: schema.Description,
 		}
 	}

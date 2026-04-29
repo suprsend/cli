@@ -1,74 +1,76 @@
 package category
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var categoryPullCmd = &cobra.Command{
 	Use:   "pull",
-	Long:  "Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.",
 	Short: "Pull categories from a workspace",
+	Long:  "Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.",
+	Example: `  # Pull categories to default directory (suprsend/categories/)
+  suprsend category pull
+
+  # Pull to a custom directory
+  suprsend category pull --dir ./my-categories
+
+  # Pull draft categories
+  suprsend category pull --mode draft`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 		if outputDir == "" {
-			outputDir = filepath.Join(".", "suprsend", "category")
+			outputDir = filepath.Join(".", defaultCategoryDir)
 			if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 				if force {
-					fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+					log.Infof("Using default directory: %s", outputDir)
 				} else {
-					outputDir = promptForOutputDirectory()
+					od, success := promptForOutputDirectory()
+					if !success {
+						log.Info("No output directory specified. Exiting.")
+						return nil
+					}
+					outputDir = od
 				}
 			}
 			if outputDir == "" {
-				fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+				log.Info("No output directory specified. Exiting.")
 				return nil
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			fmt.Fprintf(os.Stdout, "Error with output directory: %v\n", err)
-			return err
+			log.Errorf("Error with output directory: %v", err)
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Loading...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
-		}
+		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		categories, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
-		filePath := filepath.Join(outputDir, "categories_preferences.json")
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
-		}
-		err = WriteToFileWithPath(categories, filePath)
+		filePath := filepath.Join(outputDir, "categories.json")
+		spinner.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
+		err = writeCategoriesFile(categories, filePath)
 		if err != nil {
 			log.WithError(err).Error("Couldn't write categories to file")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
-		translationDir := filepath.Join(outputDir, "translation")
+		translationDir := filepath.Join(outputDir, "translations")
 		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		return nil
@@ -77,7 +79,7 @@ var categoryPullCmd = &cobra.Command{
 
 func init() {
 	categoryPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
-	categoryPullCmd.Flags().StringP("dir", "d", "", "Directory to save category files to (default: ./suprsend/category)")
-	categoryPullCmd.PersistentFlags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	categoryPullCmd.Flags().StringP("dir", "d", "", "Directory to save category files to (default: ./"+defaultCategoryDir+")")
+	categoryPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	CategoryCmd.AddCommand(categoryPullCmd)
 }

@@ -31,8 +31,9 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend completion fish`](references/suprsend_completion_fish.md) - Generate the autocompletion script for fish
 - [`suprsend completion powershell`](references/suprsend_completion_powershell.md) - Generate the autocompletion script for powershell
 - [`suprsend completion zsh`](references/suprsend_completion_zsh.md) - Generate the autocompletion script for zsh
+- [`suprsend env`](references/suprsend_env.md) - Show recognized environment variables and their current values
 - [`suprsend event`](references/suprsend_event.md) - Manage events
-- [`suprsend event get`](references/suprsend_event_get.md) - Get events
+- [`suprsend event get`](references/suprsend_event_get.md) - Get event details
 - [`suprsend event list`](references/suprsend_event_list.md) - List events
 - [`suprsend event pull`](references/suprsend_event_pull.md) - Pull events from workspace to local directory
 - [`suprsend event push`](references/suprsend_event_push.md) - Push linked events
@@ -60,19 +61,28 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend start-mcp-server`](references/suprsend_start-mcp-server.md) - Start SuprSend MCP server
 - [`suprsend start-mcp-server list-tools`](references/suprsend_start-mcp-server_list-tools.md) - List all the tools supported by the server
 - [`suprsend sync`](references/suprsend_sync.md) - Sync SuprSend assets from one workspace to another
+- [`suprsend template`](references/suprsend_template.md) - Manage templates
+- [`suprsend template commit`](references/suprsend_template_commit.md) - Commit a template from draft to live
+- [`suprsend template get`](references/suprsend_template_get.md) - Get template details including variants
+- [`suprsend template list`](references/suprsend_template_list.md) - List templates for a workspace
+- [`suprsend template pull`](references/suprsend_template_pull.md) - Pull templates and their variants from SuprSend workspace
+- [`suprsend template push`](references/suprsend_template_push.md) - Push templates and their variants from local to SuprSend workspace
 - [`suprsend translation`](references/suprsend_translation.md) - Manage Translations
 - [`suprsend translation commit`](references/suprsend_translation_commit.md) - Commit translation
-- [`suprsend translation get`](references/suprsend_translation_get.md) - Get translations
-- [`suprsend translation list`](references/suprsend_translation_list.md) - List Translations
-- [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull Translation files
+- [`suprsend translation get`](references/suprsend_translation_get.md) - Get a single translation file
+- [`suprsend translation list`](references/suprsend_translation_list.md) - List translations
+- [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull translation files
 - [`suprsend translation push`](references/suprsend_translation_push.md) - Push translation files to a workspace
 - [`suprsend workflow`](references/suprsend_workflow.md) - Manage workflows
+- [`suprsend workflow commit`](references/suprsend_workflow_commit.md) - Commit workflow from draft to live
 - [`suprsend workflow disable`](references/suprsend_workflow_disable.md) - Disable a workflow
-- [`suprsend workflow enable`](references/suprsend_workflow_enable.md) - Enables a workflow.
+- [`suprsend workflow enable`](references/suprsend_workflow_enable.md) - Enable a workflow
 - [`suprsend workflow get`](references/suprsend_workflow_get.md) - Get workflow details
 - [`suprsend workflow list`](references/suprsend_workflow_list.md) - List workflows for a workspace
 - [`suprsend workflow pull`](references/suprsend_workflow_pull.md) - Pull workflows from SuprSend workspace to local
 - [`suprsend workflow push`](references/suprsend_workflow_push.md) - Push workflows from local to SuprSend workspace
+- [`suprsend workspace`](references/suprsend_workspace.md) - Manage workspaces
+- [`suprsend workspace list`](references/suprsend_workspace_list.md) - List workspaces
 
 See [references/suprsend.md](references/suprsend.md) for root command flags.
 

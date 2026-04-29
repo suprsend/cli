@@ -1,7 +1,6 @@
 package translation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,156 +9,199 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 )
+
+// PushTranslationStats summarises a translation push so callers (notably
+// category push) can fold the numbers into their own end-of-run summary.
+type PushTranslationStats struct {
+	Total          int      // locales attempted (excluding English)
+	Success        int      // locales successfully pushed
+	Failed         int      // locales that errored
+	SkippedEnglish int      // english files skipped (informational)
+	Errors         []string // human-readable failure descriptions
+}
 
 var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push preference translations",
-	Long:  "Upload local preference category translation files to a workspace. Reads {locale}.json files from the input directory. English translations cannot be pushed. Use --locale to push a single locale, or omit to push all.",
+	Long:  "Upload local preference category translation files to a workspace. Reads {locale}.json files from the input directory. English (en.json) is skipped — the API rejects pushes to the source-of-truth locale. Use --locale to push a single locale, or omit to push all.",
+	Example: `  # Push all locale translations from default directory
+  suprsend category translation push
+
+  # Push a specific locale only
+  suprsend category translation push --locale es
+
+  # Push from a custom directory
+  suprsend category translation push --dir ./my-categories
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend category translation push --dry-run`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		locale, _ := cmd.Flags().GetString("locale")
 		dir, _ := cmd.Flags().GetString("dir")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-		return PushTranslations(workspace, locale, dir)
+		stats, err := PushTranslations(workspace, locale, dir, dryRun)
+		if !dryRun && stats != nil {
+			log.Info("=== Translation Push Summary ===")
+			log.Infof("Total locales processed: %d", stats.Total)
+			log.Infof("Successfully pushed: %d", stats.Success)
+			log.Infof("Failed to push: %d", stats.Failed)
+			if len(stats.Errors) > 0 {
+				log.Info("Errors:")
+				for _, e := range stats.Errors {
+					log.Infof("  - %s", e)
+				}
+			}
+		}
+		return err
 	},
 }
 
-func PushTranslations(workspace, locale, dir string) error {
+// englishLocaleFilename is the on-disk filename for the source-of-truth
+// English translation that the management API refuses to accept on push.
+const englishLocaleFilename = "en.json"
+
+// PushTranslations uploads non-English locale translation files from dir to
+// the workspace. Returns stats so the caller can render its own end-of-run
+// summary; the helper itself only emits per-locale success/failure logs.
+func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslationStats, error) {
 	if workspace == "" {
-		return fmt.Errorf("workspace flag is required")
+		return nil, clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
+	}
+	if locale == "en" {
+		return nil, clierr.New("cannot push English translations — the API treats en.json as the source of truth", clierr.CodeInvalidUsage)
 	}
 
 	// Determine the translations directory
 	translationsDir := defaultDir
 	if dir != "" {
-		// If a directory is provided, use it
 		translationsDir = dir
 	}
 
-	// Check if directory exists
 	if _, err := os.Stat(translationsDir); os.IsNotExist(err) {
-		return fmt.Errorf("directory %s does not exist", translationsDir)
+		return nil, clierr.New(fmt.Sprintf("directory %s does not exist", translationsDir), clierr.CodeFileNotFound)
 	}
 
-	// Read all files in the translations directory
 	files, err := os.ReadDir(translationsDir)
 	if err != nil {
-		return fmt.Errorf("couldn't read directory %s: %w", translationsDir, err)
+		return nil, clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("couldn't read directory %s", translationsDir))
 	}
 
-	if locale == "en" {
-		return fmt.Errorf("cannot push English translations")
-	}
-
-	// Filter for locale JSON files (e.g., en.json, es.json)
-	var localeFiles []string
+	// Filter for locale JSON files (e.g., en.json, es.json) and split into
+	// pushable and skipped buckets so we can be explicit about both.
+	var pushable []string
+	var skippedEnglish []string
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 		name := file.Name()
-		// Check if file matches pattern {locale}.json
-		if strings.HasSuffix(name, ".json") {
-			// Extract locale from filename (remove .json extension)
-			fileLocale := strings.TrimSuffix(name, ".json")
-			// If a specific locale is requested, filter for it
-			if locale != "" && fileLocale != locale {
-				continue
-			}
-			// Skip categories_preferences.json file
-			if fileLocale == "categories_preferences" {
-				continue
-			}
-			localeFiles = append(localeFiles, name)
+		if !strings.HasSuffix(name, ".json") {
+			continue
 		}
+		fileLocale := strings.TrimSuffix(name, ".json")
+		if fileLocale == "categories" {
+			continue
+		}
+		if locale != "" && fileLocale != locale {
+			continue
+		}
+		if name == englishLocaleFilename {
+			skippedEnglish = append(skippedEnglish, name)
+			continue
+		}
+		pushable = append(pushable, name)
 	}
 
-	if len(localeFiles) == 0 {
-		return fmt.Errorf("no locale JSON files found in %s", translationsDir)
+	stats := &PushTranslationStats{
+		Total:          len(pushable),
+		SkippedEnglish: len(skippedEnglish),
 	}
 
-	var p *pin.Pin
-	if !utils.IsOutputPiped() {
-		p = pin.New("Pushing translations...",
-			pin.WithSpinnerColor(pin.ColorCyan),
-			pin.WithTextColor(pin.ColorYellow),
-		)
-		cancel := p.Start(context.Background())
-		defer cancel()
+	if len(pushable) == 0 {
+		// Distinguish "directory has nothing JSON-like" from "directory has
+		// only English". The latter is the common foot-gun: the user pulled
+		// from a workspace whose only locale is the source of truth, then
+		// expected push to do something.
+		if len(skippedEnglish) > 0 {
+			return stats, clierr.New(
+				fmt.Sprintf("nothing to push from %s — only English translations found, which the API rejects. Pull from a workspace with non-English locales, or add e.g. es.json / fr.json to the directory.", translationsDir),
+				clierr.CodeInvalidUsage,
+			)
+		}
+		if locale != "" {
+			return stats, clierr.New(fmt.Sprintf("no %s.json found in %s", locale, translationsDir), clierr.CodeFileNotFound)
+		}
+		return stats, clierr.New(fmt.Sprintf("no locale JSON files found in %s", translationsDir), clierr.CodeFileNotFound)
+	}
+
+	if dryRun {
+		log.Infof("DRY RUN: would push %d translation file(s) to %s", len(pushable), workspace)
+		for _, fileName := range pushable {
+			log.Infof("  - %s", strings.TrimSuffix(fileName, ".json"))
+		}
+		for _, fileName := range skippedEnglish {
+			log.Infof("  - %s (skipped: English source of truth)", strings.TrimSuffix(fileName, ".json"))
+		}
+		return stats, nil
+	}
+
+	for _, fileName := range skippedEnglish {
+		log.Infof("Skipping %s — English translations are the source of truth and cannot be pushed.", fileName)
 	}
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
+	var spinner *utils.Spinner
 
-	// Track success/failure stats
-	successCount := 0
-	failedCount := 0
-	var errors []string
-
-	// Iterate through each locale file and push translations
-	for _, fileName := range localeFiles {
-		// Skip English translations
-		if fileName == "en.json" {
-			continue
-		}
+	for _, fileName := range pushable {
 		filePath := filepath.Join(translationsDir, fileName)
 		fileLocale := strings.TrimSuffix(fileName, ".json")
+		spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", fileName))
 
-		// Read the translation file
 		data, err := os.ReadFile(filePath)
 		if err != nil {
+			spinner.Stop("")
 			log.WithError(err).Debugf("Couldn't read translations from file %s", filePath)
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Failed to read %s: %v", fileName, err))
+			stats.Failed++
+			stats.Errors = append(stats.Errors, fmt.Sprintf("preference_categories/translations/%s: failed to read: %v", fileName, err))
 			continue
 		}
 
-		// Parse the JSON
 		var translation mgmnt.PreferenceTranslationContent
 		if err := json.Unmarshal(data, &translation); err != nil {
-			log.WithError(err).Errorf("Couldn't parse translations JSON from %s", filePath)
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Failed to parse JSON from %s: %v", fileName, err))
+			spinner.Stop("")
+			log.WithError(err).Errorf("preference_categories/translations/%s: failed to parse: %v", fileName, err)
+			stats.Failed++
+			stats.Errors = append(stats.Errors, fmt.Sprintf("preference_categories/translations/%s: failed to parse: %v", fileName, err))
 			continue
 		}
 
-		// Push translations for this locale
-		err = mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation)
-		if err != nil {
-			log.WithError(err).Errorf("Couldn't push translations for locale %s", fileLocale)
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Failed to push %s: %v", fileName, err))
+		if err := mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation); err != nil {
+			spinner.Stop("")
+			log.WithError(err).Errorf("preference_categories/translations/%s: failed to push", fileName)
+			stats.Failed++
+			stats.Errors = append(stats.Errors, fmt.Sprintf("preference_categories/translations/%s: failed to push: %v", fileName, err))
 			continue
 		}
 
-		successCount++
-		log.Infof("Successfully pushed translations for locale: %s", fileLocale)
+		stats.Success++
+		spinner.Stop(fmt.Sprintf("Pushed translation: %s", fileName))
 	}
 
-	if p != nil {
-		msg := fmt.Sprintf("Pushed %d translation file(s) to %s", successCount, workspace)
-		if failedCount > 0 {
-			msg += fmt.Sprintf(" (%d failed)", failedCount)
-		}
-		p.Stop(msg)
+	if stats.Failed > 0 {
+		return stats, clierr.New(fmt.Sprintf("%d locale(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
 	}
-
-	// Print errors if any
-	if len(errors) > 0 {
-		fmt.Fprintf(os.Stdout, "\nErrors:\n")
-		for _, errMsg := range errors {
-			fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
-		}
-		return fmt.Errorf("%d locale(s) failed to push", failedCount)
-	}
-	return nil
+	return stats, nil
 }
 
 func init() {
-	translationPushCmd.Flags().StringP("locale", "l", "", "Locale code to push, e.g., es, fr (omit to push all)")
+	translationPushCmd.Flags().String("locale", "", "Locale code to push, e.g., es, fr (omit to push all)")
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: "+defaultDir+")")
+	translationPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

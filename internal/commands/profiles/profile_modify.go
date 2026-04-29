@@ -6,6 +6,8 @@ import (
 	"github.com/sabouaram/cobra_ui"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var (
@@ -25,11 +27,11 @@ var profilesModifyCmd = &cobra.Command{
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load or create config")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 		if modifyName != "" {
 			if _, exists := cfg.Profiles[modifyName]; !exists {
-				return fmt.Errorf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName)
+				return clierr.New(fmt.Sprintf("profile %q does not exist. Use the command 'suprsend profile list' to see all profiles", modifyName), clierr.CodeInvalidUsage)
 			}
 		}
 
@@ -49,11 +51,14 @@ var profilesModifyCmd = &cobra.Command{
 			err := SaveConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
-				return err
+				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 			}
 
 			log.Infof("Profile %s modified successfully", modifyName)
 		} else {
+			if !utils.IsInputInteractive() {
+				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+			}
 			runModifyInteractive(cfg, path)
 		}
 		return nil

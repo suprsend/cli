@@ -1,11 +1,24 @@
 # suprsend event get
 
-Get events
+Get event details
 
-Retrieve all events and their schema mappings from a workspace. Returns event definitions including names, descriptions, and payload schemas.
+Retrieve a specific event by its slug. Returns the event definition including name, description, and payload schema.
 
 ```
-suprsend event get [flags]
+suprsend event get [<slug>] [flags]
+```
+
+## Examples
+
+```
+  # Get a specific event by slug
+  suprsend event get ORDER_RECEIVED
+
+  # Get using the flag form
+  suprsend event get --slug ORDER_RECEIVED
+
+  # Get from a specific workspace
+  suprsend event get --workspace production
 ```
 
 ### Tips
@@ -17,13 +30,15 @@ suprsend event get [flags]
 ```
   -h, --help            help for get
   -o, --output string   Output format: json or yaml (default "json")
+  -g, --slug string     Event slug
 ```
 
 ### Options inherited from parent commands
 
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color               Disable color output (default: $NO_COLOR)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")

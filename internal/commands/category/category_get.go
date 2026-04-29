@@ -1,19 +1,26 @@
 package category
 
 import (
-	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var categoryGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get categories and translations",
 	Long:  "Retrieve preference categories and their translations from a workspace. Returns the full category structure along with translations for all non-English locales. Use --mode to switch between draft and live versions.",
+	Example: `  # Get all categories and translations
+  suprsend category get
+
+  # Get draft categories
+  suprsend category get --mode draft
+
+  # Get with JSON output
+  suprsend category get --output json`,
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
 	},
@@ -21,35 +28,24 @@ var categoryGetCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputType, _ := cmd.Flags().GetString("output")
-		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		var cancel context.CancelFunc
-		if !utils.IsOutputPiped() {
-			p = pin.New("Getting categories...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel = p.Start(context.Background())
+		if err := utils.ValidateOutputType(outputType, "json", "yaml"); err != nil {
+			return err
 		}
+		mgmntClient := utils.GetSuprSendMgmntClient()
+		spinner := utils.NewSpinner("Getting categories...")
 
 		categoriesResp, err := mgmntClient.ListCategories(workspace, mode)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting categories")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		localesResp, err := mgmntClient.ListPreferenceTranslations(workspace)
 		if err != nil {
-			if p != nil {
-				p.Stop("")
-				cancel()
-			}
+			spinner.Stop("")
 			log.WithError(err).Errorf("Error listing preference translations")
-			return err
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
 		translations := map[string]any{}
@@ -60,20 +56,14 @@ var categoryGetCmd = &cobra.Command{
 			}
 			content, err := mgmntClient.GetPreferenceTranslationsForLocale(workspace, locale)
 			if err != nil {
-				if p != nil {
-					p.Stop("")
-					cancel()
-				}
+				spinner.Stop("")
 				log.WithError(err).Errorf("Error getting translations for locale %s", locale)
-				return err
+				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}
 			translations[locale] = content
 		}
 
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully got categories for '%s'", workspace))
-			cancel()
-		}
+		spinner.Stop(fmt.Sprintf("Successfully got categories for '%s'", workspace))
 
 		output := map[string]any{
 			"categories":   categoriesResp,
@@ -85,7 +75,7 @@ var categoryGetCmd = &cobra.Command{
 }
 
 func init() {
-	categoryGetCmd.PersistentFlags().String("mode", "live", "Version mode: draft or live")
+	categoryGetCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	categoryGetCmd.PersistentFlags().StringP("output", "o", "json", "Output format: json or yaml")
 	CategoryCmd.AddCommand(categoryGetCmd)
 }

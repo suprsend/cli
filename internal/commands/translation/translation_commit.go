@@ -1,47 +1,61 @@
 package translation
 
 import (
-	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit translation",
 	Long:  "Promote template translation changes from draft to live mode. Finalizes all pending translation changes in the workspace.",
-	Run: func(cmd *cobra.Command, args []string) {
+	Example: `  # Commit all pending translation changes to live
+  suprsend translation commit
+
+  # Commit in the production workspace
+  suprsend translation commit --workspace production
+
+  # Dry run: see what would be committed without making changes
+  suprsend translation commit --dry-run`,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
-		mgmntClient := utils.GetSuprSendMgmntClient()
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Committing translation...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			log.Infof("DRY RUN: would commit translations in %s", workspace)
+			return nil
 		}
+
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			msg := fmt.Sprintf("This will promote translations to live in workspace \"%s\". Continue?", workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
+		}
+
+		mgmntClient := utils.GetSuprSendMgmntClient()
+		spinner := utils.NewSpinner("Committing translation...")
 		err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
 		if err != nil {
 			log.Errorf("%s", err)
-			return
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
-		} else {
-			fmt.Fprintf(os.Stdout, "Successfully committed translation '%s'\n", commitMessage)
-		}
+		spinner.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
+		return nil
 	},
 }
 
 func init() {
-	translationCommitCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	translationCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
+	translationCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	translationCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	TranslationCmd.AddCommand(translationCommitCmd)
 }

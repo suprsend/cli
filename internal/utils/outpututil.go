@@ -4,6 +4,8 @@ Copyright © 2025 SuprSend
 package utils
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,15 +13,47 @@ import (
 	"strconv"
 	"strings"
 
+	"errors"
+
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/tidwall/pretty"
+	"github.com/yarlson/pin"
 	"gopkg.in/yaml.v3"
 )
+
+// ConfirmDestructiveAction prints prompt + "[y/N]" on stderr and reads the answer from stdin.
+// Returns true if the user confirmed. Skips the prompt and returns true when stdin is not a TTY.
+func ConfirmDestructiveAction(prompt string) (bool, error) {
+	fi, err := os.Stdin.Stat()
+	if err != nil || (fi.Mode()&os.ModeCharDevice) == 0 {
+		return true, nil
+	}
+	fmt.Fprintf(os.Stderr, "%s [y/N] ", prompt)
+	reader := bufio.NewReader(os.Stdin)
+	answer, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes", nil
+}
+
+// IsInputInteractive returns true when stdin is a TTY — i.e. a human can respond to prompts.
+// Use this to gate any interactive prompt; IsOutputPiped is for color/spinner decisions only.
+func IsInputInteractive() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
 
 // IsOutputPiped checks if os.Stdout is connected to a pipe or redirected.
 func IsOutputPiped() bool {
@@ -37,6 +71,59 @@ func IsOutputPiped() bool {
 	return (fi.Mode() & os.ModeCharDevice) == 0
 }
 
+// ShowSpinner returns true when a spinner should be displayed — i.e. output is not piped, quiet mode is off, and output format is not JSON.
+func ShowSpinner() bool {
+	return !IsOutputPiped() && !config.Cfg.Quiet && config.Cfg.OutputType != "json"
+}
+
+// Spinner is a thin wrapper around pin.Pin that is nil-safe and no-ops when quiet/piped.
+type Spinner struct {
+	p      *pin.Pin
+	cancel context.CancelFunc
+}
+
+// NewSpinner creates and starts a spinner with the given text. Returns a no-op Spinner when output is piped or quiet mode is on.
+func NewSpinner(text string) *Spinner {
+	s := &Spinner{}
+	if ShowSpinner() {
+		s.p = pin.New(text,
+			pin.WithSpinnerColor(pin.ColorCyan),
+			pin.WithTextColor(pin.ColorYellow),
+		)
+		s.cancel = s.p.Start(context.Background())
+	}
+	return s
+}
+
+// Stop stops the spinner with the given message. Safe to call multiple times or on a no-op Spinner.
+func (s *Spinner) Stop(msg string) {
+	if s.p != nil {
+		s.p.Stop(msg)
+		s.cancel()
+		s.p = nil
+	}
+}
+
+// UpdateMessage replaces the spinner's text in place. No-op when the spinner
+// is suppressed (quiet, piped output).
+func (s *Spinner) UpdateMessage(msg string) {
+	if s.p != nil {
+		s.p.UpdateMessage(msg)
+	}
+}
+
+// WriteError writes err to stderr as a structured JSON CLIError when in JSON errors mode.
+func WriteError(err error) {
+	if err == nil || !config.ShouldJSONErrors() {
+		return
+	}
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) {
+		ce = clierr.Wrap(err, clierr.CodeUnknown, "")
+	}
+	fmt.Fprintln(os.Stderr, string(ce.JSON()))
+}
+
 func supportsColor() bool {
 	// check if output is redirected to a file
 	fileInfo, _ := os.Stdout.Stat()
@@ -49,6 +136,19 @@ func supportsColor() bool {
 	}
 
 	return true
+}
+
+// ValidateOutputType returns a clierr if format is not one of the allowed values.
+func ValidateOutputType(format string, allowed ...string) error {
+	for _, a := range allowed {
+		if format == a {
+			return nil
+		}
+	}
+	return clierr.New(
+		fmt.Sprintf("invalid output format %q: must be one of %v", format, allowed),
+		clierr.CodeInvalidUsage,
+	)
 }
 
 // OutputData chooses the output format based on the flag
@@ -145,7 +245,7 @@ func outputTable(data any) {
 	// Handle slice of structs
 	if val.Kind() == reflect.Slice {
 		if val.Len() == 0 {
-			fmt.Println("No data to display")
+			log.Info("No data to display")
 			return
 		}
 		elemType := val.Index(0).Type()
@@ -166,7 +266,7 @@ func outputTable(data any) {
 
 func printStructAsTable(values []reflect.Value) {
 	if len(values) == 0 {
-		fmt.Println("No data to display")
+		log.Info("No data to display")
 		return
 	}
 

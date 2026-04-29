@@ -1,16 +1,17 @@
 package mgmnt
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
+	"strconv"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
 )
 
 type PreferenceCategoryResponse struct {
+	Schema         string         `json:"$schema,omitempty"`
 	RootCategories []RootCategory `json:"root_categories"`
 	Hash           string         `json:"hash"`
 	VersionNo      *int           `json:"version_no"`
@@ -84,18 +85,14 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	}
 
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed with status: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 
 	result := resp.Result().(*PreferenceCategoryResponse)
 	return result, nil
 }
 
-func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit, commitMessage string) error {
+func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
@@ -107,7 +104,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
-	q.Add("commit", commit)
+	q.Add("commit", strconv.FormatBool(commit))
 	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
@@ -122,16 +119,12 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed with status: %s", resp.Status())
+		return apiError(resp)
 	}
-	if commit == "true" {
+	if commit {
 		result := resp.Result().(*CategoryPushResponse)
 		if !result.ValidationResult.IsValid {
-			fmt.Fprintf(os.Stdout, "Warning: validation failed: %v\n", result.ValidationResult.Errors)
+			log.Warnf("validation failed: %v", result.ValidationResult.Errors)
 		}
 	}
 	return nil
@@ -161,10 +154,7 @@ func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage stri
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
+		return apiError(resp)
 	}
 	return nil
 }

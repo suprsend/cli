@@ -1,18 +1,18 @@
 package category
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category/translation"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
-	"github.com/yarlson/pin"
 )
 
 type jsonCategoryInput struct {
@@ -22,124 +22,200 @@ type jsonCategoryInput struct {
 
 var categoryPushCmd = &cobra.Command{
 	Use:   "push",
-	Long: `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are committed immediately (--commit=true).
-
-Examples:
-  # Push from local files (default)
-  suprsend category --workspace <workspace> push
+	Short: "Push categories to a workspace",
+	Long:  `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are staged as drafts. Use --commit to also promote to live.`,
+	Example: `  # Push from local files (default directory)
+  suprsend category push
 
   # Push from a custom directory
-  suprsend category --workspace <workspace> push --dir ./my-dir
+  suprsend category push --dir ./my-categories
+
+  # Push and commit to live immediately
+  suprsend category push --commit
 
   # Push categories inline via JSON
-  suprsend category --workspace <workspace> push --json '{"categories": {...}}'
-
-  # Push categories + translations inline via JSON
-  suprsend category --workspace <workspace> push --json '{"categories": {...}, "translations": {"es": {...}}}'`,
-	Short: "Push categories to a workspace",
+  suprsend category push --json '{"categories": {...}}'`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
-		commit, _ := cmd.Flags().GetString("commit")
+		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		// Aggregate stats across translations + categories so the run finishes
+		// with a single "=== Category Push Summary ===" block matching the
+		// shape used by schema push. Translations contribute one item per
+		// locale; the categories tree contributes exactly one item.
+		translationStats := &translation.PushTranslationStats{}
+		categorySuccess := false
+		categoryFailErr := ""
 
 		if jsonPayload != "" {
 			var input jsonCategoryInput
 			if err := json.Unmarshal([]byte(jsonPayload), &input); err != nil {
-				return fmt.Errorf("failed to parse --json payload: %w", err)
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			if input.Categories == nil {
-				return fmt.Errorf("--json payload missing required \"categories\" field")
+				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeUnknown)
 			}
 
 			mgmntClient := utils.GetSuprSendMgmntClient()
 
-			var p *pin.Pin
-			if !utils.IsOutputPiped() {
-				p = pin.New("Pushing categories...",
-					pin.WithSpinnerColor(pin.ColorCyan),
-					pin.WithTextColor(pin.ColorYellow),
-				)
-				cancel := p.Start(context.Background())
-				defer cancel()
-			}
-
-			if commit == "true" {
-				for locale, t := range input.Translations {
-					if locale == "en" {
-						continue
-					}
-					if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
-						log.WithError(err).Errorf("Failed to push translation for locale %s", locale)
-					}
+			pushableLocales := 0
+			for locale := range input.Translations {
+				if locale != "en" {
+					pushableLocales++
 				}
 			}
 
-			if err := mgmntClient.PushCategories(workspace, input.Categories, commit, commitMessage); err != nil {
-				log.WithError(err).Error("Couldn't push categories")
-				return err
+			if dryRun {
+				log.Infof("DRY RUN: would push categories and %d translation(s) to %s", pushableLocales, workspace)
+				return nil
 			}
-			if p != nil {
-				p.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
+
+			// Translations don't have a draft/live distinction — push them
+			// regardless of --commit so they always reflect the local state.
+			translationStats.Total = pushableLocales
+			for locale, t := range input.Translations {
+				if locale == "en" {
+					translationStats.SkippedEnglish++
+					continue
+				}
+				spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s.json...", locale))
+				if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
+					spinner.Stop("")
+					log.WithError(err).Errorf("preference_categories/translations/%s.json: failed to push", locale)
+					translationStats.Failed++
+					translationStats.Errors = append(translationStats.Errors, fmt.Sprintf("preference_categories/translations/%s.json: failed to push: %v", locale, err))
+					continue
+				}
+				translationStats.Success++
+				spinner.Stop(fmt.Sprintf("Pushed translation: %s.json", locale))
+			}
+
+			catSpinner := utils.NewSpinner("Pushing categories...")
+			if err := mgmntClient.PushCategories(workspace, input.Categories, commit, commitMessage); err != nil {
+				catSpinner.Stop("")
+				log.WithError(err).Error("preference_categories/categories.json: failed to push")
+				categoryFailErr = err.Error()
+			} else {
+				categorySuccess = true
+				catSpinner.Stop("Pushed categories")
+			}
+
+			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr)
+			if !categorySuccess || translationStats.Failed > 0 {
+				return clierr.New("category push had errors", clierr.CodeAPIInternal)
 			}
 			return nil
 		}
 
 		translationDir := path
 		if translationDir == "" {
-			translationDir = filepath.Join(".", "suprsend", "category")
+			translationDir = filepath.Join(".", defaultCategoryDir)
 		}
-		translationDir = filepath.Join(translationDir, "translation")
+		translationDir = filepath.Join(translationDir, "translations")
 
 		if path == "" {
-			path = filepath.Join(".", "suprsend", "category", "categories_preferences.json")
+			path = filepath.Join(".", defaultCategoryDir, "categories.json")
 		} else {
-			path = filepath.Join(path, "categories_preferences.json")
+			path = filepath.Join(path, "categories.json")
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		categories, err := ReadFromFile(path)
 		if err != nil {
 			log.WithError(err).Error("Couldn't read categories from file")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
-		var p *pin.Pin
-		if !utils.IsOutputPiped() {
-			p = pin.New("Pushing categories...",
-				pin.WithSpinnerColor(pin.ColorCyan),
-				pin.WithTextColor(pin.ColorYellow),
-			)
-			cancel := p.Start(context.Background())
-			defer cancel()
+		// Push translations first, regardless of --commit. They don't have a
+		// draft/live model, so any local change should land immediately.
+		// English-only / no-files cases get demoted from error to debug log so
+		// they don't fail the broader category push.
+		ts, terr := translation.PushTranslations(workspace, "", translationDir, dryRun)
+		if ts != nil {
+			translationStats = ts
+		}
+		if terr != nil {
+			var ce *clierr.CLIError
+			if errors.As(terr, &ce) && ce.Code == clierr.CodeInvalidUsage {
+				log.Debugf("No translations to push: %v", terr)
+			} else if errors.As(terr, &ce) && ce.Code == clierr.CodeFileNotFound {
+				log.Debugf("No translation files found: %v", terr)
+			} else {
+				log.WithError(terr).Warn("Translation push had errors; continuing with categories")
+			}
 		}
 
-		if commit == "true" {
-			translation.PushTranslations(workspace, "", translationDir)
+		if dryRun {
+			log.Infof("DRY RUN: would push categories to %s", workspace)
+			return nil
 		}
 
+		spinner2 := utils.NewSpinner("Pushing categories...")
 		mgmnt_client := utils.GetSuprSendMgmntClient()
 		err = mgmnt_client.PushCategories(workspace, categories, commit, commitMessage)
 		if err != nil {
-			log.WithError(err).Error("Couldn't push categories")
-			return err
+			spinner2.Stop("")
+			log.WithError(err).Error("preference_categories/categories.json: failed to push")
+			categoryFailErr = err.Error()
+		} else {
+			categorySuccess = true
+			spinner2.Stop("Pushed categories")
 		}
-		if p != nil {
-			p.Stop(fmt.Sprintf("Pushed categories to %s", workspace))
+
+		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr)
+		if !categorySuccess || translationStats.Failed > 0 {
+			return clierr.New("category push had errors", clierr.CodeAPIInternal)
 		}
 		return nil
 	},
 }
 
+// emitCategoryPushSummary prints the unified end-of-run block. Categories
+// always contribute exactly one item to the totals; translations contribute
+// one item per non-English locale attempted.
+func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) {
+	if t == nil {
+		t = &translation.PushTranslationStats{}
+	}
+	totalItems := t.Total + 1
+	successItems := t.Success
+	failedItems := t.Failed
+	if categorySuccess {
+		successItems++
+	} else {
+		failedItems++
+	}
+	log.Info("=== Category Push Summary ===")
+	log.Infof("Total items processed: %d", totalItems)
+	log.Infof("Successfully pushed: %d", successItems)
+	log.Infof("Failed to push: %d", failedItems)
+	if t.SkippedEnglish > 0 {
+		log.Infof("Skipped (English source of truth): %d", t.SkippedEnglish)
+	}
+	if failedItems > 0 {
+		log.Info("Failed items:")
+		for _, e := range t.Errors {
+			log.Infof("  - %s", e)
+		}
+		if !categorySuccess {
+			log.Infof("  - preference_categories/categories.json: failed to push: %s", categoryFailErr)
+		}
+	}
+}
+
 func init() {
-	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./suprsend/category/)")
-	categoryPushCmd.PersistentFlags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
-	categoryPushCmd.PersistentFlags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	categoryPushCmd.Flags().StringP("dir", "d", "", "Directory containing category files (default: ./"+defaultCategoryDir+")")
+	categoryPushCmd.PersistentFlags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
+	categoryPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
+	categoryPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

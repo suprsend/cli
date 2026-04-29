@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
 
@@ -25,18 +27,22 @@ type TranslationPushStats struct {
 	Errors  []string
 }
 
-func promptForOutputDirectory() string {
+func promptForOutputDirectory() (string, bool) {
+	if !utils.IsInputInteractive() {
+		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
+		return "", false
+	}
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := filepath.Join(".", "suprsend", "translation")
+	defaultDir := filepath.Join(".", "suprsend", "translations")
 	fmt.Fprintf(os.Stdout, "Where would you like to save the translations?\n")
 	fmt.Fprintf(os.Stdout, "Default: %s\n", defaultDir)
 	fmt.Fprintf(os.Stdout, "Enter directory path (or press Enter for default): ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultDir
+		return defaultDir, true
 	}
-	return input
+	return input, true
 }
 
 func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (*TranslationWriteStats, error) {
@@ -69,25 +75,25 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 		filename := filepath.Join(outputDir, obj["filename"].(string))
 		content, ok := obj["content"]
 		if !ok || content == nil {
-			fmt.Fprintf(os.Stdout, "Warning: No content found for translation '%s', skipping\n", slug)
+			log.Warnf("No content found for translation '%s', skipping", slug)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("No content found for translation '%s'", slug))
 			continue
 		}
 		fileData, err := json.MarshalIndent(content, "", "  ")
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to marshal translation '%s': %v\n", slug, err)
+			log.WithError(err).Errorf("Failed to marshal translation '%s'", slug)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to marshal translation '%s': %v", slug, err))
 			continue
 		}
 		if err := os.WriteFile(filename, fileData, 0644); err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to write file '%s': %v\n", filename, err)
+			log.WithError(err).Errorf("Failed to write file '%s'", filename)
 			stats.Failed++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write file '%s': %v", filename, err))
 			continue
 		}
-		fmt.Fprintf(os.Stdout, "Wrote translation to %s\n", filename)
+		log.Infof("Wrote translation to %s", filename)
 		stats.Success++
 	}
 	return stats, nil

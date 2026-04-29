@@ -64,8 +64,7 @@ func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListE
 		return nil, err
 	}
 	if res.IsError() {
-		log.Errorf("Error getting events: %s", res.Status())
-		return nil, fmt.Errorf("error getting events: %s", res.Status())
+		return nil, apiError(res)
 	}
 	events := res.Result().(*ListEventsResponse)
 	return events, nil
@@ -105,8 +104,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 			return nil, err
 		}
 		if res.IsError() {
-			log.Errorf("Error getting events: %s", res.Status())
-			return nil, fmt.Errorf("error getting events: %s", res.Status())
+			return nil, apiError(res)
 		}
 		events := res.Result().(*EventsResponse)
 		if len(events.Results) == 0 {
@@ -117,6 +115,29 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 		offset += limit
 	}
 	return &EventsResponse{Results: allEvents}, nil
+}
+
+func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, error) {
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", eventName, "/")
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	log.Debugf("Getting event detail for: %s", eventName)
+	res, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		SetResult(&Event{}).
+		Get(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	if res.IsError() {
+		return nil, apiError(res)
+	}
+	return res.Result().(*Event), nil
 }
 
 func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]any) error {
@@ -144,12 +165,7 @@ func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]a
 		return err
 	}
 	if res.IsError() {
-		var errorResponse ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResponse); err != nil {
-			log.Errorf("Error parsing error response: %s", err)
-			return fmt.Errorf("error pushing event: %s", res.Status())
-		}
-		return fmt.Errorf("error pushing event: %s", errorResponse.Message)
+		return apiError(res)
 	}
 	return nil
 }

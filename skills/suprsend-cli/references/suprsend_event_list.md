@@ -17,7 +17,7 @@ suprsend event list [flags]
 ```
   -h, --help            help for list
   -l, --limit int       Maximum number of events to return (default 20)
-  -f, --offset int      Number of events to skip for pagination
+      --offset int      Number of events to skip for pagination
   -o, --output string   Output format: pretty, json, or yaml (default "pretty")
 ```
 
@@ -25,7 +25,8 @@ suprsend event list [flags]
 
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color               Disable color output (default: $NO_COLOR)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")

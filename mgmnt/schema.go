@@ -1,12 +1,11 @@
 package mgmnt
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
 	"resty.dev/v3"
 )
@@ -120,10 +119,7 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 			return nil, fmt.Errorf("request failed: %w", err)
 		}
 		if resp.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
+			return nil, apiError(resp)
 		}
 
 		schemas := resp.Result().(*ListSchemaResponse)
@@ -177,11 +173,7 @@ func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*Sch
 		return nil, fmt.Errorf("request failed: %s", err.Error())
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", res.Status())
+		return nil, apiError(res)
 	}
 	schema := res.Result().(*SchemaResponse)
 	if schema.JSONSchema.Properties == nil {
@@ -217,11 +209,7 @@ func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[str
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return nil, fmt.Errorf("request failed: %s", resp.Status())
+		return nil, apiError(resp)
 	}
 
 	return resp.Result().(*map[string]any), nil
@@ -247,15 +235,11 @@ func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchema
 			SetResult(&LinkedSchemasResponse{}).
 			Get(c.mgmnt_base_URL + "v1/" + workspace + "/schema/all/linked/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
+			log.Errorf("Failed to get schemas: %v", err)
 			return nil, err
 		}
 		if res.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed: %s", res.Status())
+			return nil, apiError(res)
 		}
 
 		schemas := res.Result().(*LinkedSchemasResponse)
@@ -317,15 +301,11 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 			SetResult(&SchemasResponse{}).
 			Get(urlStr)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Error: Failed to get schemas: %v\n", err)
+			log.Errorf("Failed to get schemas: %v", err)
 			return nil, err
 		}
 		if res.IsError() {
-			var errorResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-				return nil, fmt.Errorf("request failed with message: %s", errorResp.Message)
-			}
-			return nil, fmt.Errorf("request failed: %s", res.Status())
+			return nil, apiError(res)
 		}
 
 		schemas := res.Result().(*SchemasResponse)
@@ -353,7 +333,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit, commitMessage string) error {
+func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) error {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", schemaSlug, "/")
@@ -365,7 +345,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 		return fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
-	q.Add("commit", commit)
+	q.Add("commit", strconv.FormatBool(commit))
 	q.Add("commit_message", commitMessage)
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
@@ -380,11 +360,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(resp.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", resp.Status())
+		return apiError(resp)
 	}
 	return nil
 }
@@ -417,11 +393,7 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if res.IsError() {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal([]byte(res.String()), &errorResp); err == nil {
-			return fmt.Errorf("request failed with message: %s", errorResp.Message)
-		}
-		return fmt.Errorf("request failed: %s", res.Status())
+		return apiError(res)
 	}
 	return nil
 }

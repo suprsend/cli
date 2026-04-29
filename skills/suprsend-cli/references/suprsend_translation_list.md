@@ -1,11 +1,24 @@
 # suprsend translation list
 
-List Translations
+List translations
 
 List template translation files in a workspace. Returns translation file names and metadata. Use --mode to switch between draft and live versions.
 
 ```
 suprsend translation list [flags]
+```
+
+## Examples
+
+```
+  # List all translations (live mode)
+  suprsend translation list
+
+  # List draft translations
+  suprsend translation list --mode draft
+
+  # List with JSON output
+  suprsend translation list --output json
 ```
 
 ### Tips
@@ -16,10 +29,10 @@ suprsend translation list [flags]
 
 ```
   -h, --help                     help for list
-  -c, --include-content string   Include translation file content in the response (true/false) (default "false")
+      --include-content string   Include translation file content in the response (true/false) (default "false")
   -l, --limit int                Maximum number of translations to return (default 20)
   -m, --mode string              Version mode: draft or live (default "live")
-  -f, --offset int               Number of translations to skip for pagination
+      --offset int               Number of translations to skip for pagination
   -o, --output string            Output format: pretty, json, or yaml (default "pretty")
 ```
 
@@ -27,7 +40,8 @@ suprsend translation list [flags]
 
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
-  -n, --no-color               Disable color output (default: $NO_COLOR)
+      --no-color               Disable color output (default: $NO_COLOR)
+  -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")

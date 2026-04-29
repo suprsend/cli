@@ -1,235 +1,185 @@
 package schema
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var schemaPushCmd = &cobra.Command{
-	Use:   "push",
+	Use:   "push [<slug>]",
 	Short: "Push schemas",
-	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are committed immediately (--commit=true). Use --slug to push a single schema.",
+	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema.",
+	Example: `  # Push all schemas from default directory
+  suprsend schema push
+
+  # Push a single schema and commit to live immediately
+  suprsend schema push order-placed --commit
+
+  # Dry run: preview what would be pushed without making changes
+  suprsend schema push --dry-run`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
-		slug, _ := cmd.Flags().GetString("slug")
-		commit, _ := cmd.Flags().GetString("commit")
+		slug := utils.ResolveSlug(cmd, args)
+		commit, _ := cmd.Flags().GetBool("commit")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		path, _ := cmd.Flags().GetString("dir")
 		jsonPayload, _ := cmd.Flags().GetString("json")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
-			return fmt.Errorf("--json requires --slug to be specified")
+			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
+
+		hasError := false
+		var spinner *utils.Spinner
+
+		if slug != "" {
+			var schema map[string]any
+			if jsonPayload != "" {
+				if err := json.Unmarshal([]byte(jsonPayload), &schema); err != nil {
+					return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+				}
+			} else {
+				if path == "" {
+					path = filepath.Join(".", "suprsend", "schemas")
+				}
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("directory %s does not exist", path))
+				}
+				if err := validateInputDirectory(path); err != nil {
+					return clierr.Wrap(err, clierr.CodeFileNotFound, "error with input directory")
+				}
+
+				merged, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
+				if err != nil {
+					return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to read schema files for %s", slug))
+				}
+				schema = merged
+			}
+
+			if dryRun {
+				action := "push"
+				if commit {
+					action = "push and commit"
+				}
+				log.Infof("DRY RUN: would %s schema '%s' to %s", action, slug, workspace)
+				return nil
+			}
+
+			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			if err != nil {
+				spinner.Stop("")
+				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
+			}
+			spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
+			return nil
+		}
 
 		stats := &SchemaPushStats{
 			Errors: []string{},
 		}
 
-		hasError := false
-		var p *pin.Pin
-		var cancel context.CancelFunc
-
-		if slug != "" {
-			stats.Total = 1
-
-			var schema map[string]any
-			if jsonPayload != "" {
-				if err := json.Unmarshal([]byte(jsonPayload), &schema); err != nil {
-					return fmt.Errorf("failed to parse --json payload: %w", err)
-				}
-			} else {
-				if path == "" {
-					path = filepath.Join(".", "suprsend", "schema")
-				}
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					log.Errorf("Directory %s does not exist", path)
-					return err
-				}
-				if err := validateInputDirectory(path); err != nil {
-					log.Errorf("Error with input directory: %v\n", err)
-					return err
-				}
-
-				fileName := fmt.Sprintf("%s.json", slug)
-				filePath := filepath.Join(path, fileName)
-
-				if _, err := os.Stat(filePath); err != nil {
-					log.WithError(err).Errorf("Failed to find schema file %s", filePath)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to find schema file %s: %v", filePath, err))
-				} else {
-					data, err := os.ReadFile(filePath)
-					if err != nil {
-						log.WithError(err).Errorf("Failed to read schema file %s", filePath)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read schema file %s: %v", filePath, err))
-					} else if err := json.Unmarshal(data, &schema); err != nil {
-						log.WithError(err).Errorf("Failed to parse JSON for %s", filePath)
-						stats.Failed++
-						stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", filePath, err))
-					}
-				}
-			}
-
-			if schema != nil {
-				if !utils.IsOutputPiped() {
-					p = pin.New(fmt.Sprintf("Pushing %s...", slug),
-						pin.WithSpinnerColor(pin.ColorCyan),
-						pin.WithTextColor(pin.ColorYellow),
-					)
-					cancel = p.Start(context.Background())
-				}
-				err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
-				if p != nil && cancel != nil {
-					if err == nil {
-						p.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-					} else {
-						p.Stop("")
-					}
-					cancel()
-				} else if err == nil {
-					fmt.Fprintf(os.Stdout, "Pushed schema: %s\n", slug)
-				}
-				if err != nil {
-					log.WithError(err).Errorf("Failed to push schema %s", slug)
-					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push schema %s: %v", slug, err))
-				} else {
-					stats.Success++
-				}
-			}
-
-			fmt.Fprintf(os.Stdout, "\n=== Schema Push Summary ===\n")
-			fmt.Fprintf(os.Stdout, "Total schemas processed: %d\n", stats.Total)
-			fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-			fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
-
-			if stats.Failed > 0 {
-				fmt.Fprintf(os.Stdout, "\nFailed schemas:\n")
-				for _, errorMsg := range stats.Errors {
-					fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
-				}
-				return fmt.Errorf("%d schema(s) failed to push", stats.Failed)
-			}
-			return nil
-		}
-
 		if path == "" {
-			path = filepath.Join(".", "suprsend", "schema")
+			path = filepath.Join(".", "suprsend", "schemas")
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Errorf("Directory %s does not exist", path)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		if err := validateInputDirectory(path); err != nil {
 			log.Errorf("Error with input directory: %v\n", err)
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
-		files, err := os.ReadDir(path)
+		entries, err := os.ReadDir(path)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to read local schema directory")
-			return err
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+		for _, entry := range entries {
+			if entry.IsDir() {
 				stats.Total++
 			}
 		}
 
-		for _, file := range files {
-			if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+		for _, entry := range entries {
+			if !entry.IsDir() {
 				continue
 			}
-			slug := strings.TrimSuffix(file.Name(), ".json")
-			if !hasError && !utils.IsOutputPiped() {
-				p = pin.New(fmt.Sprintf("Pushing %s...", slug),
-					pin.WithSpinnerColor(pin.ColorCyan),
-					pin.WithTextColor(pin.ColorYellow),
-				)
-				cancel = p.Start(context.Background())
+			slug := entry.Name()
+			if !hasError {
+				spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
 			}
-			path := filepath.Join(path, file.Name())
-			data, err := os.ReadFile(path)
+
+			schema, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
 			if err != nil {
-				if p != nil && cancel != nil {
-					p.Stop("")
-					cancel()
-					p = nil
-					cancel = nil
-				}
+				spinner.Stop("")
 				hasError = true
-				log.WithError(err).Errorf("Failed to read file %s", file.Name())
+				log.WithError(err).Errorf("Failed to read schema files for %s", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read file %s: %v", file.Name(), err))
+				stats.Errors = append(stats.Errors, err.Error())
 				continue
 			}
 
-			var schema map[string]any
-			if err := json.Unmarshal(data, &schema); err != nil {
-				if p != nil && cancel != nil {
-					p.Stop("")
-					cancel()
-					p = nil
-					cancel = nil
-				}
-				hasError = true
-				log.WithError(err).Errorf("Failed to parse JSON for %s", file.Name())
-				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", file.Name(), err))
+			if dryRun {
+				dryRunSlugs = append(dryRunSlugs, slug)
+				stats.Success++
+				spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
+				hasError = false
 				continue
 			}
 
 			err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
 			if err != nil {
-				if p != nil && cancel != nil {
-					p.Stop("")
-					cancel()
-					p = nil
-					cancel = nil
-				}
+				spinner.Stop("")
 				hasError = true
-				log.WithError(err).Errorf("Failed to push schema %s", slug)
+				log.WithError(err).Errorf("schemas/%s: failed to push", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push schema %s: %v", slug, err))
+				stats.Errors = append(stats.Errors, fmt.Sprintf("schemas/%s: failed to push: %v", slug, err))
 				continue
 			}
 
 			stats.Success++
-			if p != nil && cancel != nil {
-				p.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-				cancel()
-				p = nil
-				cancel = nil
-			} else {
-				fmt.Fprintf(os.Stdout, "Pushed schema: %s\n", slug)
-			}
+			spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
 			hasError = false
 		}
 
-		fmt.Fprintf(os.Stdout, "\n=== Schema Push Summary ===\n")
-		fmt.Fprintf(os.Stdout, "Total schemas processed: %d\n", stats.Total)
-		fmt.Fprintf(os.Stdout, "Successfully pushed: %d\n", stats.Success)
-		fmt.Fprintf(os.Stdout, "Failed to push: %d\n", stats.Failed)
+		if dryRun {
+			action := "push"
+			if commit {
+				action = "push and commit"
+			}
+			log.Infof("DRY RUN: would %s %d schema(s) to %s", action, len(dryRunSlugs), workspace)
+			for _, s := range dryRunSlugs {
+				log.Infof("  - %s", s)
+			}
+			return nil
+		}
+
+		log.Info("=== Schema Push Summary ===")
+		log.Infof("Total schemas processed: %d", stats.Total)
+		log.Infof("Successfully pushed: %d", stats.Success)
+		log.Infof("Failed to push: %d", stats.Failed)
 
 		if stats.Failed > 0 {
-			fmt.Fprintf(os.Stdout, "\nFailed schemas:\n")
+			log.Info("Failed schemas:")
 			for _, errorMsg := range stats.Errors {
-				fmt.Fprintf(os.Stdout, "  - %s\n", errorMsg)
+				log.Infof("  - %s", errorMsg)
 			}
 		}
 		return nil
@@ -237,10 +187,11 @@ var schemaPushCmd = &cobra.Command{
 }
 
 func init() {
-	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory containing schema JSON files (default: ./suprsend/schema)")
-	schemaPushCmd.Flags().StringP("commit", "c", "true", "Promote changes from draft to live after pushing (true/false)")
-	schemaPushCmd.Flags().StringP("commit-message", "m", "", "Message describing the changes being committed")
+	schemaPushCmd.Flags().StringP("dir", "d", "", "Directory containing schema files (default: ./suprsend/schemas)")
+	schemaPushCmd.Flags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
+	schemaPushCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")
 	schemaPushCmd.PersistentFlags().StringP("json", "j", "", `Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'`)
+	schemaPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	SchemaCmd.AddCommand(schemaPushCmd)
 }

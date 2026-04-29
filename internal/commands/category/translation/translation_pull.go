@@ -1,7 +1,6 @@
 package translation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,14 +8,22 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
-	"github.com/yarlson/pin"
 )
 
 var translationPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull preference translations",
 	Long:  "Download preference category translations from a workspace to local JSON files. Creates one file per locale (e.g., es.json, fr.json) in the output directory.",
+	Example: `  # Pull all locale translations to default directory
+  suprsend category translation pull
+
+  # Pull to a custom directory
+  suprsend category translation pull --dir ./my-categories
+
+  # Pull in the production workspace
+  suprsend category translation pull --workspace production`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -28,20 +35,24 @@ var translationPullCmd = &cobra.Command{
 
 func PullTranslations(workspace, outputDir string, force bool) error {
 	if workspace == "" {
-		return fmt.Errorf("workspace flag is required")
+		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
 
 	if outputDir == "" {
 		outputDir = defaultDir
 		if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 			if force {
-				fmt.Fprintf(os.Stdout, "Using default directory: %s\n", outputDir)
+				log.Infof("Using default directory: %s", outputDir)
 			} else {
-				outputDir = promptForOutputDirectory()
+				od, success := promptForOutputDirectory()
+				if !success {
+					return nil
+				}
+				outputDir = od
 			}
 		}
 		if outputDir == "" {
-			fmt.Fprintf(os.Stdout, "No output directory specified. Exiting.\n")
+			log.Info("No output directory specified. Exiting.")
 			return nil
 		}
 	}
@@ -49,15 +60,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		return fmt.Errorf("error with output directory: %w", err)
 	}
 
-	var p *pin.Pin
-	if !utils.IsOutputPiped() {
-		p = pin.New("Loading...",
-			pin.WithSpinnerColor(pin.ColorCyan),
-			pin.WithTextColor(pin.ColorYellow),
-		)
-		cancel := p.Start(context.Background())
-		defer cancel()
-	}
+	spinner := utils.NewSpinner("Loading...")
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
 	locales, err := mgmntClient.ListPreferenceTranslations(workspace)
@@ -95,20 +98,22 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 			continue
 		}
 		successCount++
+		// Per-file write line, matching schema/workflow pull's "Wrote ... to ..."
+		// shape so users can see what landed on disk and can grep / diff
+		// against expectations.
+		log.Infof("Wrote translation to %s", filename)
 	}
 
-	if p != nil {
-		p.Stop(fmt.Sprintf("Pulled translations from %s", workspace))
-	}
+	spinner.Stop(fmt.Sprintf("Pulled %d translation(s) from %s", successCount, workspace))
 
-	fmt.Fprintf(os.Stdout, "\n=== Translation Pull Summary ===\n")
-	fmt.Fprintf(os.Stdout, "Total locales processed: %d\n", len(locales.Results))
-	fmt.Fprintf(os.Stdout, "Successfully written: %d\n", successCount)
+	log.Info("=== Translation Pull Summary ===")
+	log.Infof("Total locales processed: %d", len(locales.Results))
+	log.Infof("Successfully written: %d", successCount)
 	if failedCount > 0 {
-		fmt.Fprintf(os.Stdout, "Failed to write: %d\n", failedCount)
-		fmt.Fprintf(os.Stdout, "\nFailed translations:\n")
+		log.Infof("Failed to write: %d", failedCount)
+		log.Info("Failed translations:")
 		for _, errMsg := range errors {
-			fmt.Fprintf(os.Stdout, "  - %s\n", errMsg)
+			log.Infof("  - %s", errMsg)
 		}
 	}
 	return nil
@@ -116,6 +121,6 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 
 func init() {
 	translationPullCmd.Flags().StringP("dir", "d", "", "Directory to save translation files to (default: "+defaultDir+")")
-	translationPullCmd.Flags().BoolP("force", "f", false, "Skip directory confirmation prompt, use default path")
+	translationPullCmd.Flags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

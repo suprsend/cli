@@ -9,6 +9,8 @@ import (
 	"github.com/sabouaram/cobra_ui"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/utils"
 )
 
 var (
@@ -28,7 +30,7 @@ var profilesAddCmd = &cobra.Command{
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load or create config")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		if addName != "" && addServiceToken != "" {
@@ -48,11 +50,14 @@ var profilesAddCmd = &cobra.Command{
 			err := SaveConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
-				return err
+				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 			}
 
 			log.Infof("Profile %s added successfully", addName)
 		} else {
+			if !utils.IsInputInteractive() {
+				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+			}
 			runAddInteractive(cfg, path)
 		}
 		return nil

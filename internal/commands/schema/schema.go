@@ -6,6 +6,10 @@ var SchemaCmd = &cobra.Command{
 	Use:   "schema",
 	Short: "Manage trigger payload schemas",
 	Long:  `Manage trigger payload schemas. Schemas define the JSON structure for workflow and event trigger payloads. Subcommands let you list, pull, push, and commit schemas.`,
+	Example: `  suprsend schema list
+  suprsend schema get order-placed
+  suprsend schema pull --dir ./suprsend/schemas
+  suprsend schema push order-placed --commit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	},

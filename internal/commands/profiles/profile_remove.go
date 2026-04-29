@@ -3,6 +3,7 @@ package profiles
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 )
 
 var removeName string
@@ -15,21 +16,20 @@ var profileRemoveCmd = &cobra.Command{
 		if removeName == "" {
 			removeName = promptForProfileName()
 			if removeName == "" {
-				log.Error("No profile name provided")
-				return nil
+				return clierr.New("required flag missing (--name), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
 			}
 		}
 
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
-			return err
+			return clierr.Wrap(err, clierr.CodeUnknown, "")
 		}
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 
 		if _, exists := cfg.Profiles[removeName]; !exists {
@@ -52,7 +52,7 @@ var profileRemoveCmd = &cobra.Command{
 
 		if err := SaveConfig(cfg, path); err != nil {
 			log.WithError(err).Error("Failed to save")
-			return err
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
 		return nil
 	},

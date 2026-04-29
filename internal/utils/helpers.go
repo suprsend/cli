@@ -13,6 +13,14 @@ import (
 	suprsend "github.com/suprsend/suprsend-go"
 )
 
+// DeepCopyMap returns a deep copy of a map[string]any via JSON round-trip.
+func DeepCopyMap(m map[string]any) map[string]any {
+	b, _ := json.Marshal(m)
+	var out map[string]any
+	json.Unmarshal(b, &out)
+	return out
+}
+
 type WorkflowPayloadSchema struct {
 	Schema string `json:"schema"`
 	// version_no is optional and can be nil

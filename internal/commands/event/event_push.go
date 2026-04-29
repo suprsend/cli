@@ -12,10 +12,19 @@ import (
 	"github.com/suprsend/cli/internal/utils"
 )
 
+// EventPushStats tracks per-event success/failure for the push summary,
+// mirroring the shape used by schema push so output reads consistently.
+type EventPushStats struct {
+	Total   int
+	Success int
+	Failed  int
+	Errors  []string
+}
+
 var eventPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push linked events",
-	Long:  "Push event definitions from local per-event directories to a workspace. Reads from events/<name>/event.json files in the specified directory.",
+	Long:  "Push event definitions from local per-event directories to a workspace. Reads from events/<name>/event.json files in the specified directory. Each event is pushed independently — a failure on one doesn't abort the rest.",
 	Example: `  # Push all events from default directory
   suprsend event push
 
@@ -69,14 +78,56 @@ var eventPushCmd = &cobra.Command{
 			return nil
 		}
 
-		spinner := utils.NewSpinner("Pushing events...")
+		// Push each event independently, mirroring schema push's pattern:
+		// per-item spinner, log on success/failure, end-of-run summary.
+		// The management API only exposes a bulk endpoint so each iteration
+		// sends a single-element {"events": [...]} payload — N small POSTs
+		// instead of one big POST. Trade-off: ~Nx latency, but per-event
+		// failure visibility, which is what users want when something
+		// goes wrong on push #7 of 12.
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		if err := mgmntClient.PushEventsFromPayload(workspace, payload); err != nil {
-			spinner.Stop("")
-			log.WithError(err).Error("Failed to push events")
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+		stats := &EventPushStats{Total: len(eventsArr), Errors: []string{}}
+		var spinner *utils.Spinner
+
+		for _, ev := range eventsArr {
+			obj, ok := ev.(map[string]any)
+			if !ok {
+				stats.Failed++
+				stats.Errors = append(stats.Errors, "event entry was not an object")
+				continue
+			}
+			name, _ := obj["name"].(string)
+			if name == "" {
+				stats.Failed++
+				stats.Errors = append(stats.Errors, "event entry missing required 'name' field")
+				continue
+			}
+
+			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", name))
+			err := mgmntClient.PushEventsFromPayload(workspace, map[string]any{"events": []any{obj}})
+			if err != nil {
+				spinner.Stop("")
+				log.WithError(err).Errorf("Failed to push event %s", name)
+				stats.Failed++
+				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to push event %s: %v", name, err))
+				continue
+			}
+			stats.Success++
+			spinner.Stop(fmt.Sprintf("Pushed event: %s", name))
 		}
-		spinner.Stop(fmt.Sprintf("Pushed %d event(s) to %s", len(eventsArr), workspace))
+
+		log.Info("=== Event Push Summary ===")
+		log.Infof("Total events processed: %d", stats.Total)
+		log.Infof("Successfully pushed: %d", stats.Success)
+		log.Infof("Failed to push: %d", stats.Failed)
+
+		if stats.Failed > 0 {
+			log.Info("Failed events:")
+			for _, errorMsg := range stats.Errors {
+				log.Infof("  - %s", errorMsg)
+			}
+			return clierr.New(fmt.Sprintf("%d event(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+		}
 		return nil
 	},
 }

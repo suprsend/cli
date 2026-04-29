@@ -27,7 +27,7 @@ func serveFixture(t *testing.T, w http.ResponseWriter, parts ...string) {
 
 func newCategoryGetServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	base := []string{"internal", "commands", "category"}
+	base := []string{"category"}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/v1/test-ws/preference_category/", func(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +93,7 @@ func TestCategoryGet_JSONOutput(t *testing.T) {
 }
 
 func TestCategoryGet_DraftMode(t *testing.T) {
-	base := []string{"internal", "commands", "category"}
+	base := []string{"category"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/test-ws/preference_category/":

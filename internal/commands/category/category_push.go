@@ -109,7 +109,7 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		if commit {
-			translation.PushTranslations(workspace, "", translationDir)
+			translation.PushTranslations(workspace, "", translationDir, false)
 		}
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()

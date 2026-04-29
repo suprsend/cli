@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.suprsend.com/preference_category/v1/schema.json",
+  "root_categories": [
+    {
+      "root_category": "system",
+      "sections": [
+        {
+          "name": "system section",
+          "slug": "system-section",
+          "description": "system section",
+          "tags": ["wwr"],
+          "categories": [
+            {
+              "category": "sreehari_test",
+              "name": "sreehari_test",
+              "description": null,
+              "default_preference": "cant_unsubscribe",
+              "default_mandatory_channels": ["email"],
+              "default_opt_in_channels": null,
+              "tags": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "hash": "e1dd4acd14763907350400e931dfdb3b82f559c6a075a1fdbe12ff5607b99785",
+  "version_no": 296,
+  "status": "draft",
+  "commit_message": null,
+  "committed_at": null,
+  "validation_result": {"is_valid": true}
+}

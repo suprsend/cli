@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "system-section": {"name": "system section", "description": "system section"}
+  },
+  "categories": {
+    "sreehari_test": {"name": "sreehari_test", "description": null},
+    "daily": {"name": "daily", "description": "Send error summary once in a day"}
+  }
+}

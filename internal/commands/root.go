@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -155,57 +154,16 @@ func init() {
 			return nil
 		}
 
-		// env > flag > config file -> profile
-		serviceToken := getServiceTokenWithPriority()
-		if serviceToken == "" {
-			return clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
-				WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
+		if err := conf.Resolve(viper.GetString("service_token")); err != nil {
+			return err
 		}
-		conf.ServiceToken = serviceToken
-
 		utils.InitSDKWithUrls(
 			conf.ServiceToken,
-			profiles.GetResolvedBaseUrl(),
-			profiles.GetResolvedMgmntUrl(),
+			conf.BaseUrl,
+			conf.MgmntUrl,
 			viper.GetBool("debug"),
 		)
 		return nil
 	}
 }
 
-func getServiceTokenWithPriority() string {
-	// ENV Variable
-	if envToken := os.Getenv("SUPRSEND_SERVICE_TOKEN"); envToken != "" {
-		log.Debug("Using service token from environment variable")
-		return envToken
-	}
-
-	var cmdFlagToken string
-	if viper.IsSet("service_token") {
-		cmdFlagToken = viper.GetString("service_token")
-	}
-
-	if cmdFlagToken != "" {
-		log.Debug("Using service token from command line flag")
-		return cmdFlagToken
-	}
-
-	// Config file
-	configPath := profiles.GetConfigFilePath()
-	if configPath == "" {
-		return ""
-	}
-
-	cfg, err := profiles.LoadConfig(configPath)
-	if err != nil {
-		return ""
-	}
-
-	activeProfile := cfg.Profiles[cfg.ActiveProfile]
-	if activeProfile.ServiceToken != "" {
-		log.Debug("Using service token from config file profile")
-		return activeProfile.ServiceToken
-	}
-
-	return ""
-}

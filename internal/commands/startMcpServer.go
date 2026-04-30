@@ -9,8 +9,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"github.com/suprsend/cli/internal/commands/profiles"
 	"github.com/suprsend/cli/internal/config"
 	toolset "github.com/suprsend/cli/internal/tools"
 	"github.com/suprsend/cli/internal/utils"
@@ -69,27 +67,22 @@ Built-in tool categories: users (get, upsert, preferences, subscriptions), objec
 Use --events and --workflows to dynamically register tools that trigger specific events or workflows by slug. Both default to none — pass 'all' to register tools for every event/workflow in the workspace, or a comma-separated list of slugs to register specific ones.
 
 Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse), http (listens on :8080/).`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := rootCmd.PersistentPreRunE(cmd, args); err != nil {
+			return err
+		}
 		conf := config.Cfg
-		workspace := conf.Workspace
-		serviceToken := getServiceTokenWithPriority()
-		conf.ServiceToken = serviceToken
-		utils.InitSDKWithUrls(
-			conf.ServiceToken,
-			profiles.GetResolvedBaseUrl(),
-			profiles.GetResolvedMgmntUrl(),
-			viper.GetBool("debug"),
-		)
 		// Dynamic registration runs for both `start-mcp-server` and
 		// `start-mcp-server list-tools` so the listing reflects what the
 		// real server would expose. Selectors default to "none", so users
 		// who don't pass --workflows / --events pay no API cost.
-		if err := toolset.RegisterDynamicEventsTools(workspace, events); err != nil {
+		if err := toolset.RegisterDynamicEventsTools(conf.Workspace, events); err != nil {
 			log.Warnf("Failed to register event tools in mcp: %v", err)
 		}
-		if err := toolset.RegisterDynamicWorkflowTools(workspace, workflows); err != nil {
+		if err := toolset.RegisterDynamicWorkflowTools(conf.Workspace, workflows); err != nil {
 			log.Warnf("Failed to register workflow tools in mcp: %v", err)
 		}
+		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		selectedTools, err := getSelectedTools(tools)

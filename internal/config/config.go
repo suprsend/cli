@@ -51,6 +51,9 @@ type Config struct {
 	NoColorOutput bool
 	Workspace     string
 	Quiet         bool
+	BaseUrl       string
+	MgmntUrl      string
+	ProxyURL      string
 }
 
 // cfg is the global configuration instance.

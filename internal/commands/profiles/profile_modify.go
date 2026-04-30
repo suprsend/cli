@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -56,7 +57,7 @@ var profilesModifyCmd = &cobra.Command{
 
 			cfg.Profiles[modifyName] = selectedProfile
 
-			err := SaveConfig(cfg, path)
+			err := config.SaveProfileConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
 				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
@@ -75,13 +76,13 @@ var profilesModifyCmd = &cobra.Command{
 
 func init() {
 	profilesModifyCmd.Flags().StringVar(&modifyName, "name", "", "Name of the profile to modify")
-	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: "+DefaultBaseUrl+")")
-	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: "+DefaultMgmntUrl+")")
+	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: "+config.DefaultBaseUrl+")")
+	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: "+config.DefaultMgmntUrl+")")
 	profilesModifyCmd.Flags().StringVar(&modifyServiceToken, "service-token", "", "Service Token")
 	ProfileCmd.AddCommand(profilesModifyCmd)
 }
 
-func runModifyInteractive(cfg *Config, path string) {
+func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	ui := cobra_ui.New()
 
 	var profileNames []string
@@ -144,7 +145,7 @@ func runModifyInteractive(cfg *Config, path string) {
 	if modifyBaseUrl == "" {
 		current := selectedProfile.BaseUrl
 		if current == "" {
-			current = DefaultBaseUrl
+			current = config.DefaultBaseUrl
 		}
 		modifyBaseUrl = current
 		questions = append(questions, cobra_ui.Question{
@@ -166,7 +167,7 @@ func runModifyInteractive(cfg *Config, path string) {
 	if modifyMgmntUrl == "" {
 		current := selectedProfile.MgmntUrl
 		if current == "" {
-			current = DefaultMgmntUrl
+			current = config.DefaultMgmntUrl
 		}
 		modifyMgmntUrl = current
 		questions = append(questions, cobra_ui.Question{
@@ -200,7 +201,7 @@ func runModifyInteractive(cfg *Config, path string) {
 		return
 	}
 
-	updatedProfile := Profile{
+	updatedProfile := config.Profile{
 		BaseUrl:      modifyBaseUrl,
 		MgmntUrl:     modifyMgmntUrl,
 		ServiceToken: modifyServiceToken,
@@ -208,7 +209,7 @@ func runModifyInteractive(cfg *Config, path string) {
 
 	cfg.Profiles[modifyName] = updatedProfile
 
-	err := SaveConfig(cfg, path)
+	err := config.SaveProfileConfig(cfg, path)
 	if err != nil {
 		log.WithError(err).Error("Failed to save config")
 		return

@@ -12,7 +12,7 @@ import (
 func NewHTTPClient() *resty.Client {
 	client := resty.New()
 
-	if proxyURL := config.Cfg.ProxyURL; proxyURL != "" {
+	if proxyURL := config.Cfg.ProxyURL.String(); proxyURL != "" {
 		parsed, err := url.Parse(proxyURL)
 		if err != nil {
 			log.WithError(err).Error("Invalid HTTP_PROXY")

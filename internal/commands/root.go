@@ -159,9 +159,9 @@ func init() {
 		}
 
 		utils.InitSDKWithUrls(
-			config.Cfg.ServiceToken,
-			config.Cfg.BaseUrl,
-			config.Cfg.MgmntUrl,
+			config.Cfg.ServiceToken.String(),
+			config.Cfg.BaseUrl.String(),
+			config.Cfg.MgmntUrl.String(),
 			viper.GetBool("debug"),
 		)
 

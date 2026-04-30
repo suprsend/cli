@@ -143,9 +143,9 @@ func (c *Config) Resolve(flags FlagValues) error {
 	if err != nil {
 		return err
 	}
-	c.ServiceToken = token
-	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
-	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
-	c.ProxyURL = os.Getenv("HTTP_PROXY")
+	c.ServiceToken = ConfigString{Value: token}
+	c.BaseUrl = ConfigString{Value: GetResolvedBaseUrl(activeProfile)}
+	c.MgmntUrl = ConfigString{Value: GetResolvedMgmntUrl(activeProfile)}
+	c.ProxyURL = ConfigString{Value: os.Getenv("HTTP_PROXY")}
 	return nil
 }

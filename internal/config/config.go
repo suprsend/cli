@@ -47,13 +47,13 @@ type Config struct {
 	CfgFile       string
 	OutputType    string
 	Verbosity     string
-	ServiceToken  string
+	ServiceToken  ConfigString
 	NoColorOutput bool
 	Workspace     string
 	Quiet         bool
-	BaseUrl       string
-	MgmntUrl      string
-	ProxyURL      string
+	BaseUrl       ConfigString
+	MgmntUrl      ConfigString
+	ProxyURL      ConfigString
 }
 
 // cfg is the global configuration instance.

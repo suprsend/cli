@@ -202,9 +202,9 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	}
 
 	updatedProfile := config.Profile{
-		BaseUrl:      config.ProfileString{Value: modifyBaseUrl},
-		MgmntUrl:     config.ProfileString{Value: modifyMgmntUrl},
-		ServiceToken: config.ProfileString{Value: modifyServiceToken},
+		BaseUrl:      config.ConfigString{Value: modifyBaseUrl},
+		MgmntUrl:     config.ConfigString{Value: modifyMgmntUrl},
+		ServiceToken: config.ConfigString{Value: modifyServiceToken},
 	}
 
 	cfg.Profiles[modifyName] = updatedProfile

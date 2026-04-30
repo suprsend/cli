@@ -14,27 +14,27 @@ const (
 	DefaultMgmntUrl = "https://management-api.suprsend.com/"
 )
 
-type ProfileString struct {
+type ConfigString struct {
 	Value string
 }
 
-func (p ProfileString) MarshalYAML() (interface{}, error) {
+func (p ConfigString) MarshalYAML() (interface{}, error) {
 	return p.Value, nil
 }
 
-func (p *ProfileString) UnmarshalYAML(value *yaml.Node) error {
+func (p *ConfigString) UnmarshalYAML(value *yaml.Node) error {
 	p.Value = value.Value
 	return nil
 }
 
-func (p ProfileString) String() string {
+func (p ConfigString) String() string {
 	return p.Value
 }
 
 type Profile struct {
-	BaseUrl      ProfileString `yaml:"base_url"`
-	MgmntUrl     ProfileString `yaml:"mgmnt_url"`
-	ServiceToken ProfileString `yaml:"service_token"`
+	BaseUrl      ConfigString `yaml:"base_url"`
+	MgmntUrl     ConfigString `yaml:"mgmnt_url"`
+	ServiceToken ConfigString `yaml:"service_token"`
 }
 
 type ProfileConfig struct {

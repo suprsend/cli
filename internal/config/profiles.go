@@ -14,10 +14,27 @@ const (
 	DefaultMgmntUrl = "https://management-api.suprsend.com/"
 )
 
+type ProfileString struct {
+	Value string
+}
+
+func (p ProfileString) MarshalYAML() (interface{}, error) {
+	return p.Value, nil
+}
+
+func (p *ProfileString) UnmarshalYAML(value *yaml.Node) error {
+	p.Value = value.Value
+	return nil
+}
+
+func (p ProfileString) String() string {
+	return p.Value
+}
+
 type Profile struct {
-	BaseUrl      string `yaml:"base_url"`
-	MgmntUrl     string `yaml:"mgmnt_url"`
-	ServiceToken string `yaml:"service_token"`
+	BaseUrl      ProfileString `yaml:"base_url"`
+	MgmntUrl     ProfileString `yaml:"mgmnt_url"`
+	ServiceToken ProfileString `yaml:"service_token"`
 }
 
 type ProfileConfig struct {
@@ -66,9 +83,9 @@ func GetResolvedServiceToken(flagToken string, activeProfile Profile) string {
 		log.Debug("Using service token from command line flag")
 		return flagToken
 	}
-	if activeProfile.ServiceToken != "" {
+	if activeProfile.ServiceToken.Value != "" {
 		log.Debug("Using service token from config file profile")
-		return activeProfile.ServiceToken
+		return activeProfile.ServiceToken.Value
 	}
 	return ""
 }
@@ -77,8 +94,8 @@ func GetResolvedBaseUrl(activeProfile Profile) string {
 	if envUrl := os.Getenv("SUPRSEND_BASE_URL"); envUrl != "" {
 		return envUrl
 	}
-	if activeProfile.BaseUrl != "" {
-		return activeProfile.BaseUrl
+	if activeProfile.BaseUrl.Value != "" {
+		return activeProfile.BaseUrl.Value
 	}
 	return DefaultBaseUrl
 }
@@ -87,8 +104,8 @@ func GetResolvedMgmntUrl(activeProfile Profile) string {
 	if envUrl := os.Getenv("SUPRSEND_MGMNT_URL"); envUrl != "" {
 		return envUrl
 	}
-	if activeProfile.MgmntUrl != "" {
-		return activeProfile.MgmntUrl
+	if activeProfile.MgmntUrl.Value != "" {
+		return activeProfile.MgmntUrl.Value
 	}
 	return DefaultMgmntUrl
 }

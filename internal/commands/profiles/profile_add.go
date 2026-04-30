@@ -57,9 +57,9 @@ var profilesAddCmd = &cobra.Command{
 			}
 
 			cfg.Profiles[addName] = config.Profile{
-				BaseUrl:      addBaseUrl,
-				MgmntUrl:     addMgmntUrl,
-				ServiceToken: addServiceToken,
+				BaseUrl:      config.ProfileString{Value: addBaseUrl},
+				MgmntUrl:     config.ProfileString{Value: addMgmntUrl},
+				ServiceToken: config.ProfileString{Value: addServiceToken},
 			}
 
 			err := config.SaveProfileConfig(cfg, path)
@@ -211,9 +211,9 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 	}
 
 	cfg.Profiles[addName] = config.Profile{
-		BaseUrl:      addBaseUrl,
-		MgmntUrl:     addMgmntUrl,
-		ServiceToken: addServiceToken,
+		BaseUrl:      config.ProfileString{Value: addBaseUrl},
+		MgmntUrl:     config.ProfileString{Value: addMgmntUrl},
+		ServiceToken: config.ProfileString{Value: addServiceToken},
 	}
 
 	err := config.SaveProfileConfig(cfg, path)

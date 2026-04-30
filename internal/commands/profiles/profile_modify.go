@@ -44,16 +44,16 @@ var profilesModifyCmd = &cobra.Command{
 				if err != nil {
 					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --base-url")
 				}
-				selectedProfile.BaseUrl = normalized
+				selectedProfile.BaseUrl.Value = normalized
 			}
 			if modifyMgmntUrl != "" {
 				normalized, err := validateAndNormalizeUrl(modifyMgmntUrl)
 				if err != nil {
 					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --mgmnt-url")
 				}
-				selectedProfile.MgmntUrl = normalized
+				selectedProfile.MgmntUrl.Value = normalized
 			}
-			selectedProfile.ServiceToken = modifyServiceToken
+			selectedProfile.ServiceToken.Value = modifyServiceToken
 
 			cfg.Profiles[modifyName] = selectedProfile
 
@@ -121,7 +121,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	var questions []cobra_ui.Question
 
 	if modifyServiceToken == "" {
-		currentToken := selectedProfile.ServiceToken
+		currentToken := selectedProfile.ServiceToken.Value
 		maskedToken := MaskServiceToken(currentToken)
 		questions = append(questions, cobra_ui.Question{
 			Text: fmt.Sprintf("Service Token (current: %s, press Enter to keep): ", maskedToken),
@@ -130,7 +130,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 				if s != "" {
 					modifyServiceToken = s
 				} else {
-					modifyServiceToken = selectedProfile.ServiceToken
+					modifyServiceToken = selectedProfile.ServiceToken.Value
 				}
 				return nil
 			},
@@ -143,7 +143,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	// the field empty and clobber the stored URL on save. The handler
 	// overwrites the value when the user types a new URL.
 	if modifyBaseUrl == "" {
-		current := selectedProfile.BaseUrl
+		current := selectedProfile.BaseUrl.Value
 		if current == "" {
 			current = config.DefaultBaseUrl
 		}
@@ -165,7 +165,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 		})
 	}
 	if modifyMgmntUrl == "" {
-		current := selectedProfile.MgmntUrl
+		current := selectedProfile.MgmntUrl.Value
 		if current == "" {
 			current = config.DefaultMgmntUrl
 		}
@@ -202,9 +202,9 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	}
 
 	updatedProfile := config.Profile{
-		BaseUrl:      modifyBaseUrl,
-		MgmntUrl:     modifyMgmntUrl,
-		ServiceToken: modifyServiceToken,
+		BaseUrl:      config.ProfileString{Value: modifyBaseUrl},
+		MgmntUrl:     config.ProfileString{Value: modifyMgmntUrl},
+		ServiceToken: config.ProfileString{Value: modifyServiceToken},
 	}
 
 	cfg.Profiles[modifyName] = updatedProfile

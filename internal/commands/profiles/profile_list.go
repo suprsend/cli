@@ -50,13 +50,13 @@ var listProfilesCmd = &cobra.Command{
 
 		for _, name := range names {
 			profile := cfg.Profiles[name]
-			if profile.BaseUrl != "" {
+			if profile.BaseUrl.Value != "" {
 				hasBaseUrl = true
 			}
-			if profile.MgmntUrl != "" {
+			if profile.MgmntUrl.Value != "" {
 				hasMgmntUrl = true
 			}
-			if profile.ServiceToken != "" {
+			if profile.ServiceToken.Value != "" {
 				hasServiceToken = true
 			}
 		}
@@ -64,9 +64,9 @@ var listProfilesCmd = &cobra.Command{
 		// Cleanup service token so that it is not printed fully, only the first 4 characters and the last 4 characters are printed rested are replaced with *
 		for _, name := range names {
 			profile := cfg.Profiles[name]
-			length := len(profile.ServiceToken)
+			length := len(profile.ServiceToken.Value)
 			max_cut := int(math.Min(8, float64(length)))
-			profile.ServiceToken = profile.ServiceToken[:max_cut] + "*****************" + profile.ServiceToken[len(profile.ServiceToken)-4:]
+			profile.ServiceToken.Value = profile.ServiceToken.Value[:max_cut] + "*****************" + profile.ServiceToken.Value[len(profile.ServiceToken.Value)-4:]
 			cfg.Profiles[name] = profile
 		}
 
@@ -83,9 +83,9 @@ var listProfilesCmd = &cobra.Command{
 				profileData = append(profileData, ProfileListItem{
 					Name:         name,
 					Active:       isActive,
-					BaseUrl:      profile.BaseUrl,
-					MgmntUrl:     profile.MgmntUrl,
-					ServiceToken: profile.ServiceToken,
+					BaseUrl:      profile.BaseUrl.Value,
+					MgmntUrl:     profile.MgmntUrl.Value,
+					ServiceToken: profile.ServiceToken.Value,
 				})
 			}
 

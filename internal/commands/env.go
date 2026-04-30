@@ -6,19 +6,21 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/utils"
 )
 
-type envVar struct {
-	name        string
-	description string
+type EnvVar struct {
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Description string `json:"description"`
 }
 
-var recognizedEnvVars = []envVar{
-	{"SUPRSEND_SERVICE_TOKEN", "Service token for authentication (overrides --service-token flag and config file)"},
-	{"SUPRSEND_BASE_URL", "Base API URL for BYOC/self-hosted instances (overrides default)"},
-	{"SUPRSEND_MGMNT_URL", "Management API URL for BYOC/self-hosted instances (overrides default)"},
-	{"NO_COLOR", "Disable color output when set to any non-empty value"},
-	{"HTTP_PROXY", "HTTP proxy URL for outbound requests"},
+var recognizedEnvVarNames = []EnvVar{
+	{"SUPRSEND_SERVICE_TOKEN", "", "Service token for authentication (overrides --service-token flag and config file)"},
+	{"SUPRSEND_BASE_URL", "", "Base API URL for BYOC/self-hosted instances (overrides default)"},
+	{"SUPRSEND_MGMNT_URL", "", "Management API URL for BYOC/self-hosted instances (overrides default)"},
+	{"NO_COLOR", "", "Disable color output when set to any non-empty value"},
+	{"HTTP_PROXY", "", "HTTP proxy URL for outbound requests"},
 }
 
 var envCmd = &cobra.Command{
@@ -29,23 +31,30 @@ and how each one affects the CLI. Values for sensitive variables (tokens) are
 redacted. Useful for verifying configuration in CI/CD pipelines and agent contexts.`,
 	Example: `  suprsend env`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Recognized environment variables:")
-		fmt.Println()
-		for _, ev := range recognizedEnvVars {
-			val := os.Getenv(ev.name)
+		outputType, _ := cmd.Flags().GetString("output")
+		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+
+		var rows []EnvVar
+		for _, ev := range recognizedEnvVarNames {
+			val := os.Getenv(ev.Name)
 			display := "(unset)"
 			if val != "" {
-				if strings.Contains(ev.name, "TOKEN") || strings.Contains(ev.name, "SECRET") {
+				if strings.Contains(ev.Name, "TOKEN") || strings.Contains(ev.Name, "SECRET") {
 					display = fmt.Sprintf("<redacted, %d chars>", len(val))
 				} else {
 					display = val
 				}
 			}
-			fmt.Printf("  %-30s  %-30s  %s\n", ev.name, display, ev.description)
+			rows = append(rows, EnvVar{Name: ev.Name, Value: display, Description: ev.Description})
 		}
+		utils.OutputData(rows, outputType)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(envCmd)
+	envCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 }

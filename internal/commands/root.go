@@ -90,20 +90,21 @@ func earlySetup() {
 }
 
 func init() {
-	conf := config.Cfg
-	rootCmd.Flags().StringVarP(&conf.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
-	rootCmd.PersistentFlags().StringVar(&conf.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
-	rootCmd.PersistentFlags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
-	rootCmd.PersistentFlags().StringVarP(&conf.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
-	rootCmd.PersistentFlags().StringVarP(&conf.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
-	rootCmd.PersistentFlags().BoolVar(&conf.NoColorOutput, "no-color", false, "Disable color output (default: $NO_COLOR)")
-	rootCmd.PersistentFlags().BoolVarP(&conf.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
+	var flags config.FlagValues
+
+	rootCmd.Flags().StringVarP(&flags.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	rootCmd.PersistentFlags().StringVar(&flags.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&flags.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
+	rootCmd.PersistentFlags().StringVarP(&flags.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().StringVarP(&flags.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
+	rootCmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable color output (default: $NO_COLOR)")
+	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
 
 	viper.BindPFlag("service_token", rootCmd.PersistentFlags().Lookup("service-token"))
 	viper.BindPFlag("NO_COLOR", rootCmd.PersistentFlags().Lookup("no-color"))
-	//
+
 	cobra.OnInitialize(func() {
-		config.InitConfig(conf.CfgFile)
+		config.InitConfig(flags.CfgFile)
 	})
 	rootCmd.AddCommand(
 		// 1. Register the 'version' command
@@ -124,22 +125,18 @@ func init() {
 	rootCmd.AddCommand(workspace.WorkspaceCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		switch conf.OutputType {
+		switch flags.OutputType {
 		case "pretty", "json", "yaml":
 		default:
 			return clierr.New(
-				fmt.Sprintf("invalid output format %q: must be pretty, json, or yaml", conf.OutputType),
+				fmt.Sprintf("invalid output format %q: must be pretty, json, or yaml", flags.OutputType),
 				clierr.CodeInvalidUsage,
 			)
 		}
-		if err := config.SetUpLogs(); err != nil {
-			return err
-		}
-		// check the subcommand and return if it is gendocs or genskills
+
 		if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
 			return nil
 		}
-
 		if cmd.Name() == "version" || cmd.Name() == "help" || cmd.Name() == "env" {
 			return nil
 		}
@@ -149,21 +146,25 @@ func init() {
 		if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
 			return nil
 		}
-
 		if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
 			return nil
 		}
 
-		if err := conf.Resolve(viper.GetString("service_token")); err != nil {
+		if err := config.Cfg.Resolve(flags); err != nil {
 			return err
 		}
+
+		if err := config.SetUpLogs(); err != nil {
+			return err
+		}
+
 		utils.InitSDKWithUrls(
-			conf.ServiceToken,
-			conf.BaseUrl,
-			conf.MgmntUrl,
+			config.Cfg.ServiceToken,
+			config.Cfg.BaseUrl,
+			config.Cfg.MgmntUrl,
 			viper.GetBool("debug"),
 		)
+
 		return nil
 	}
 }
-

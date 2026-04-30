@@ -74,20 +74,21 @@ func SaveProfileConfig(cfg *ProfileConfig, path string) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func GetResolvedServiceToken(flagToken string, activeProfile Profile) string {
+func GetResolvedServiceToken(flagToken string, activeProfile Profile) (string, error) {
 	if envToken := os.Getenv("SUPRSEND_SERVICE_TOKEN"); envToken != "" {
 		log.Debug("Using service token from environment variable")
-		return envToken
+		return envToken, nil
 	}
 	if flagToken != "" {
 		log.Debug("Using service token from command line flag")
-		return flagToken
+		return flagToken, nil
 	}
 	if activeProfile.ServiceToken.Value != "" {
 		log.Debug("Using service token from config file profile")
-		return activeProfile.ServiceToken.Value
+		return activeProfile.ServiceToken.Value, nil
 	}
-	return ""
+	return "", clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
+		WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
 }
 
 func GetResolvedBaseUrl(activeProfile Profile) string {
@@ -110,10 +111,27 @@ func GetResolvedMgmntUrl(activeProfile Profile) string {
 	return DefaultMgmntUrl
 }
 
-// Resolve populates c with all env-var / flag / profile-resolved values.
+// FlagValues holds the raw values parsed from CLI flags before any resolution.
+type FlagValues struct {
+	Workspace    string
+	CfgFile      string
+	OutputType   string
+	Verbosity    string
+	ServiceToken string
+	NoColor      bool
+	Quiet        bool
+}
+
+// Resolve populates c with all flag-derived and env-var / profile-resolved values.
 // Priority: env var > CLI flag > active config-file profile > hardcoded default.
-// The profile config file is loaded once and passed to each resolver.
-func (c *Config) Resolve(flagToken string) error {
+func (c *Config) Resolve(flags FlagValues) error {
+	c.Workspace = flags.Workspace
+	c.CfgFile = flags.CfgFile
+	c.OutputType = flags.OutputType
+	c.Verbosity = flags.Verbosity
+	c.NoColorOutput = flags.NoColor
+	c.Quiet = flags.Quiet
+
 	var activeProfile Profile
 	if configPath := GetConfigFilePath(); configPath != "" {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
@@ -121,11 +139,11 @@ func (c *Config) Resolve(flagToken string) error {
 		}
 	}
 
-	c.ServiceToken = GetResolvedServiceToken(flagToken, activeProfile)
-	if c.ServiceToken == "" {
-		return clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
-			WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
+	token, err := GetResolvedServiceToken(flags.ServiceToken, activeProfile)
+	if err != nil {
+		return err
 	}
+	c.ServiceToken = token
 	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
 	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
 	c.ProxyURL = os.Getenv("HTTP_PROXY")

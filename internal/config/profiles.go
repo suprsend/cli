@@ -14,8 +14,18 @@ const (
 	DefaultMgmntUrl = "https://management-api.suprsend.com/"
 )
 
+type ConfigSource string
+
+const (
+	ConfigSourceEnv     ConfigSource = "env"
+	ConfigSourceFlag    ConfigSource = "flag"
+	ConfigSourceProfile ConfigSource = "profile"
+	ConfigSourceDefault ConfigSource = "default"
+)
+
 type ConfigString struct {
-	Value string
+	Value  string
+	Source ConfigSource
 }
 
 func (p ConfigString) MarshalYAML() (interface{}, error) {
@@ -74,41 +84,41 @@ func SaveProfileConfig(cfg *ProfileConfig, path string) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func GetResolvedServiceToken(flagToken string, activeProfile Profile) (string, error) {
+func GetResolvedServiceToken(flagToken string, activeProfile Profile) (ConfigString, error) {
 	if envToken := os.Getenv("SUPRSEND_SERVICE_TOKEN"); envToken != "" {
 		log.Debug("Using service token from environment variable")
-		return envToken, nil
+		return ConfigString{Value: envToken, Source: ConfigSourceEnv}, nil
 	}
 	if flagToken != "" {
 		log.Debug("Using service token from command line flag")
-		return flagToken, nil
+		return ConfigString{Value: flagToken, Source: ConfigSourceFlag}, nil
 	}
 	if activeProfile.ServiceToken.Value != "" {
 		log.Debug("Using service token from config file profile")
-		return activeProfile.ServiceToken.Value, nil
+		return ConfigString{Value: activeProfile.ServiceToken.Value, Source: ConfigSourceProfile}, nil
 	}
-	return "", clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
+	return ConfigString{}, clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
 		WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
 }
 
-func GetResolvedBaseUrl(activeProfile Profile) string {
+func GetResolvedBaseUrl(activeProfile Profile) ConfigString {
 	if envUrl := os.Getenv("SUPRSEND_BASE_URL"); envUrl != "" {
-		return envUrl
+		return ConfigString{Value: envUrl, Source: ConfigSourceEnv}
 	}
 	if activeProfile.BaseUrl.Value != "" {
-		return activeProfile.BaseUrl.Value
+		return ConfigString{Value: activeProfile.BaseUrl.Value, Source: ConfigSourceProfile}
 	}
-	return DefaultBaseUrl
+	return ConfigString{Value: DefaultBaseUrl, Source: ConfigSourceDefault}
 }
 
-func GetResolvedMgmntUrl(activeProfile Profile) string {
+func GetResolvedMgmntUrl(activeProfile Profile) ConfigString {
 	if envUrl := os.Getenv("SUPRSEND_MGMNT_URL"); envUrl != "" {
-		return envUrl
+		return ConfigString{Value: envUrl, Source: ConfigSourceEnv}
 	}
 	if activeProfile.MgmntUrl.Value != "" {
-		return activeProfile.MgmntUrl.Value
+		return ConfigString{Value: activeProfile.MgmntUrl.Value, Source: ConfigSourceProfile}
 	}
-	return DefaultMgmntUrl
+	return ConfigString{Value: DefaultMgmntUrl, Source: ConfigSourceDefault}
 }
 
 // FlagValues holds the raw values parsed from CLI flags before any resolution.
@@ -143,9 +153,11 @@ func (c *Config) Resolve(flags FlagValues) error {
 	if err != nil {
 		return err
 	}
-	c.ServiceToken = ConfigString{Value: token}
-	c.BaseUrl = ConfigString{Value: GetResolvedBaseUrl(activeProfile)}
-	c.MgmntUrl = ConfigString{Value: GetResolvedMgmntUrl(activeProfile)}
-	c.ProxyURL = ConfigString{Value: os.Getenv("HTTP_PROXY")}
+	c.ServiceToken = token
+	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
+	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
+	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
+		c.ProxyURL = ConfigString{Value: proxyURL, Source: ConfigSourceEnv}
+	}
 	return nil
 }

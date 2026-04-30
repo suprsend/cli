@@ -48,7 +48,7 @@ type Config struct {
 	OutputType    string
 	Verbosity     string
 	ServiceToken  ConfigString
-	NoColorOutput bool
+	NoColorOutput ConfigBool
 	Workspace     string
 	Quiet         bool
 	BaseUrl       ConfigString
@@ -115,7 +115,7 @@ func ShouldJSONErrors() bool {
 
 // setUpLogs set the log output ans the log level
 func SetUpLogs() error {
-	log.SetFormatter(&cliFormatter{noColor: viper.GetBool("NO_COLOR")})
+	log.SetFormatter(&cliFormatter{noColor: Cfg.NoColorOutput.Value})
 
 	// In JSON errors mode suppress logrus entirely — utils.WriteError is the sole stderr writer.
 	if Cfg.OutputType == "json" || IsStderrPiped() {

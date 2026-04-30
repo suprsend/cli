@@ -41,6 +41,23 @@ func (p ConfigString) String() string {
 	return p.Value
 }
 
+type ConfigBool struct {
+	Value  bool
+	Source ConfigSource
+}
+
+func (p ConfigBool) MarshalYAML() (interface{}, error) {
+	return p.Value, nil
+}
+
+func (p *ConfigBool) UnmarshalYAML(value *yaml.Node) error {
+	return value.Decode(&p.Value)
+}
+
+func (p ConfigBool) Bool() bool {
+	return p.Value
+}
+
 type Profile struct {
 	BaseUrl      ConfigString `yaml:"base_url"`
 	MgmntUrl     ConfigString `yaml:"mgmnt_url"`
@@ -101,6 +118,16 @@ func GetResolvedServiceToken(flagToken string, activeProfile Profile) (ConfigStr
 		WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
 }
 
+func GetResolvedNoColor(flagNoColor bool) ConfigBool {
+	if os.Getenv("NO_COLOR") != "" {
+		return ConfigBool{Value: true, Source: ConfigSourceEnv}
+	}
+	if flagNoColor {
+		return ConfigBool{Value: true, Source: ConfigSourceFlag}
+	}
+	return ConfigBool{Value: false, Source: ConfigSourceDefault}
+}
+
 func GetResolvedBaseUrl(activeProfile Profile) ConfigString {
 	if envUrl := os.Getenv("SUPRSEND_BASE_URL"); envUrl != "" {
 		return ConfigString{Value: envUrl, Source: ConfigSourceEnv}
@@ -135,13 +162,6 @@ type FlagValues struct {
 // Resolve populates c with all flag-derived and env-var / profile-resolved values.
 // Priority: env var > CLI flag > active config-file profile > hardcoded default.
 func (c *Config) Resolve(flags FlagValues) error {
-	c.Workspace = flags.Workspace
-	c.CfgFile = flags.CfgFile
-	c.OutputType = flags.OutputType
-	c.Verbosity = flags.Verbosity
-	c.NoColorOutput = flags.NoColor
-	c.Quiet = flags.Quiet
-
 	var activeProfile Profile
 	if configPath := GetConfigFilePath(); configPath != "" {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
@@ -149,15 +169,25 @@ func (c *Config) Resolve(flags FlagValues) error {
 		}
 	}
 
+	c.Workspace = flags.Workspace
+	c.CfgFile = flags.CfgFile
+	c.OutputType = flags.OutputType
+	c.Verbosity = flags.Verbosity
+	c.Quiet = flags.Quiet
+
+	c.NoColorOutput = GetResolvedNoColor(flags.NoColor)
+	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
+	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
+
 	token, err := GetResolvedServiceToken(flags.ServiceToken, activeProfile)
 	if err != nil {
 		return err
 	}
 	c.ServiceToken = token
-	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
-	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
+
 	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
 		c.ProxyURL = ConfigString{Value: proxyURL, Source: ConfigSourceEnv}
 	}
+
 	return nil
 }

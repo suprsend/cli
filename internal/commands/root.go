@@ -72,17 +72,17 @@ func isCobraUsageError(err error) bool {
 // earlySetup scans raw os.Args to apply critical initialization before Cobra
 // parses flags. This ensures correct behavior even when flag parsing fails.
 func earlySetup() {
-	conf := config.Cfg
+	var outputValue string
 	args := os.Args[1:]
 	for i, arg := range args {
 		switch {
 		case arg == "--output=json" || arg == "-o=json":
-			conf.OutputType.Value = "json"
+			outputValue = "json"
 		case (arg == "--output" || arg == "-o") && i+1 < len(args) && args[i+1] == "json":
-			conf.OutputType.Value = "json"
+			outputValue = "json"
 		}
 	}
-	if config.ShouldJSONErrors() {
+	if config.ShouldJSONErrors(outputValue) {
 		rootCmd.SilenceErrors = true
 		rootCmd.SilenceUsage = true
 	}

@@ -40,6 +40,9 @@ func LoadProfileConfig(path string) (*ProfileConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+	if cfg.Profiles == nil {
+		cfg.Profiles = make(map[string]Profile)
+	}
 	return &cfg, nil
 }
 

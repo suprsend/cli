@@ -115,7 +115,14 @@ var categoryPushCmd = &cobra.Command{
 				catSpinner.Stop("Pushed categories")
 			}
 
-			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr)
+			sectionCount, categoryCount := 0, 0
+			for _, rc := range input.Categories.RootCategories {
+				sectionCount += len(rc.Sections)
+				for _, s := range rc.Sections {
+					categoryCount += len(s.Categories)
+				}
+			}
+			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 			if !categorySuccess || translationStats.Failed > 0 {
 				return clierr.New("category push had errors", clierr.CodeAPIInternal)
 			}
@@ -192,7 +199,14 @@ var categoryPushCmd = &cobra.Command{
 			spinner2.Stop("Pushed categories")
 		}
 
-		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr)
+		sectionCount, categoryCount := 0, 0
+		for _, rc := range categories.RootCategories {
+			sectionCount += len(rc.Sections)
+			for _, s := range rc.Sections {
+				categoryCount += len(s.Categories)
+			}
+		}
+		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 		if !categorySuccess || translationStats.Failed > 0 {
 			return clierr.New("category push had errors", clierr.CodeAPIInternal)
 		}
@@ -203,32 +217,33 @@ var categoryPushCmd = &cobra.Command{
 // emitCategoryPushSummary prints the unified end-of-run block. Categories
 // always contribute exactly one item to the totals; translations contribute
 // one item per non-English locale attempted.
-func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) {
+func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string, sectionCount, categoryCount int) {
 	if t == nil {
 		t = &translation.PushTranslationStats{}
 	}
-	totalItems := t.Total + 1
-	successItems := t.Success
-	failedItems := t.Failed
-	if categorySuccess {
-		successItems++
-	} else {
-		failedItems++
-	}
+
 	log.Info("=== Category Push Summary ===")
-	log.Infof("Total items processed: %d", totalItems)
-	log.Infof("Successfully pushed: %d", successItems)
-	log.Infof("Failed to push: %d", failedItems)
-	if t.SkippedEnglish > 0 {
-		log.Infof("Skipped (English source of truth): %d", t.SkippedEnglish)
+	log.Infof("Sections: %d", sectionCount)
+	log.Infof("Categories: %d", categoryCount)
+	if categorySuccess {
+		log.Info("Successfully pushed")
+	} else {
+		log.Infof("Failed to push: %s", categoryFailErr)
 	}
-	if failedItems > 0 {
-		log.Info("Failed items:")
-		for _, e := range t.Errors {
-			log.Infof("  - %s", e)
+
+	if t.Total > 0 || t.SkippedEnglish > 0 {
+		log.Info("=== Translation Push Summary ===")
+		log.Infof("Total locales processed: %d", t.Total)
+		log.Infof("Successfully pushed: %d", t.Success)
+		log.Infof("Failed to push: %d", t.Failed)
+		if t.SkippedEnglish > 0 {
+			log.Infof("Skipped (English source of truth): %d", t.SkippedEnglish)
 		}
-		if !categorySuccess {
-			log.Infof("  - preference_categories/categories.json: failed to push: %s", categoryFailErr)
+		if len(t.Errors) > 0 {
+			log.Info("Errors:")
+			for _, e := range t.Errors {
+				log.Infof("  - %s", e)
+			}
 		}
 	}
 }

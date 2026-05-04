@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"gopkg.in/yaml.v3"
@@ -163,10 +165,20 @@ type FlagValues struct {
 // Resolve populates c with all flag-derived and env-var / profile-resolved values.
 // Priority: env var > CLI flag > active config-file profile > hardcoded default.
 func (c *Config) Resolve(flags FlagValues) error {
+	if flags.CfgFile != "" {
+		if _, err := os.Stat(flags.CfgFile); os.IsNotExist(err) {
+			return fmt.Errorf("config file does not exist: %s", flags.CfgFile)
+		}
+		if _, err := os.ReadFile(flags.CfgFile); err != nil {
+			return fmt.Errorf("config file is not readable: %s - %v", flags.CfgFile, err)
+		}
+	}
+
 	var activeProfile Profile
 	if configPath := GetConfigFilePath(); configPath != "" {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
 			activeProfile = cfg.Profiles[cfg.ActiveProfile]
+			log.Debug("Using config file:", configPath)
 		}
 	}
 
@@ -175,8 +187,12 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.OutputType = flags.OutputType
 	c.Verbosity = flags.Verbosity
 	c.Quiet = flags.Quiet
+	c.Debug = os.Getenv("DEBUG") != ""
 
 	c.NoColorOutput = GetResolvedNoColor(flags.NoColor)
+	if c.NoColorOutput.Value {
+		color.NoColor = true
+	}
 	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
 	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
 

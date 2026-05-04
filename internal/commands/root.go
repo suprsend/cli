@@ -12,7 +12,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category"
 	"github.com/suprsend/cli/internal/commands/event"
@@ -100,12 +99,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable color output (default: $NO_COLOR)")
 	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
 
-	viper.BindPFlag("service_token", rootCmd.PersistentFlags().Lookup("service-token"))
-	viper.BindPFlag("NO_COLOR", rootCmd.PersistentFlags().Lookup("no-color"))
-
-	cobra.OnInitialize(func() {
-		config.InitConfig(flags.CfgFile)
-	})
 	rootCmd.AddCommand(
 		// 1. Register the 'version' command
 		extension.NewVersionCobraCmd(
@@ -167,7 +160,7 @@ func init() {
 			config.Cfg.ServiceToken.String(),
 			config.Cfg.BaseUrl.String(),
 			config.Cfg.MgmntUrl.String(),
-			viper.GetBool("debug"),
+			config.Cfg.Debug,
 		)
 
 		return nil

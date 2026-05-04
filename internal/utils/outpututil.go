@@ -20,7 +20,6 @@ import (
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/tidwall/pretty"
@@ -62,7 +61,7 @@ func IsOutputPiped() bool {
 		return false
 	}
 	// return true if --no-color is set to be true
-	if viper.GetBool("NO_COLOR") {
+	if config.Cfg.NoColorOutput.Value {
 		return true
 	}
 
@@ -131,7 +130,7 @@ func supportsColor() bool {
 		return false
 	}
 
-	if viper.GetBool("NO_COLOR") {
+	if config.Cfg.NoColorOutput.Value {
 		return false
 	}
 

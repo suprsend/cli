@@ -63,12 +63,12 @@ type Config struct {
 	MgmntUrl      ConfigString
 	ProxyURL      ConfigString
 	// flag only configs (not resolved from env/profile)
-	CfgFile    string
-	Workspace  string
-	OutputType string
-	Verbosity  string
-	Quiet      bool
-	Debug      bool
+	CfgFile    ConfigString
+	Workspace  ConfigString
+	OutputType ConfigString
+	Verbosity  ConfigString
+	Quiet      ConfigBool
+	Debug      ConfigBool
 }
 
 const (
@@ -156,12 +156,12 @@ func (c *Config) Resolve(flags FlagValues) error {
 		}
 	}
 
-	c.Workspace = flags.Workspace
-	c.CfgFile = flags.CfgFile
-	c.OutputType = flags.OutputType
-	c.Verbosity = flags.Verbosity
-	c.Quiet = flags.Quiet
-	c.Debug = os.Getenv("DEBUG") != ""
+	c.Workspace = ConfigString{Value: flags.Workspace, Source: ConfigSourceFlag}
+	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
+	c.OutputType = ConfigString{Value: flags.OutputType, Source: ConfigSourceFlag}
+	c.Verbosity = ConfigString{Value: flags.Verbosity, Source: ConfigSourceFlag}
+	c.Quiet = ConfigBool{Value: flags.Quiet, Source: ConfigSourceFlag}
+	c.Debug = ConfigBool{Value: os.Getenv("DEBUG") != "", Source: ConfigSourceEnv}
 
 	c.NoColorOutput = GetResolvedNoColor(flags.NoColor)
 	if c.NoColorOutput.Value {

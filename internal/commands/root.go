@@ -77,9 +77,9 @@ func earlySetup() {
 	for i, arg := range args {
 		switch {
 		case arg == "--output=json" || arg == "-o=json":
-			conf.OutputType = "json"
+			conf.OutputType.Value = "json"
 		case (arg == "--output" || arg == "-o") && i+1 < len(args) && args[i+1] == "json":
-			conf.OutputType = "json"
+			conf.OutputType.Value = "json"
 		}
 	}
 	if config.ShouldJSONErrors() {
@@ -159,7 +159,7 @@ func init() {
 			config.Cfg.ServiceToken.String(),
 			config.Cfg.BaseUrl.String(),
 			config.Cfg.MgmntUrl.String(),
-			config.Cfg.Debug,
+			config.Cfg.Debug.Value,
 		)
 
 		return nil

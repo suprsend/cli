@@ -72,7 +72,7 @@ func IsOutputPiped() bool {
 
 // ShowSpinner returns true when a spinner should be displayed — i.e. output is not piped, quiet mode is off, and output format is not JSON.
 func ShowSpinner() bool {
-	return !IsOutputPiped() && !config.Cfg.Quiet && config.Cfg.OutputType != "json"
+	return !IsOutputPiped() && !config.Cfg.Quiet.Value && config.Cfg.OutputType.Value != "json"
 }
 
 // Spinner is a thin wrapper around pin.Pin that is nil-safe and no-ops when quiet/piped.

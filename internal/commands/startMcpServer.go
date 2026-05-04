@@ -76,10 +76,10 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		// `start-mcp-server list-tools` so the listing reflects what the
 		// real server would expose. Selectors default to "none", so users
 		// who don't pass --workflows / --events pay no API cost.
-		if err := toolset.RegisterDynamicEventsTools(conf.Workspace, events); err != nil {
+		if err := toolset.RegisterDynamicEventsTools(conf.Workspace.Value, events); err != nil {
 			log.Warnf("Failed to register event tools in mcp: %v", err)
 		}
-		if err := toolset.RegisterDynamicWorkflowTools(conf.Workspace, workflows); err != nil {
+		if err := toolset.RegisterDynamicWorkflowTools(conf.Workspace.Value, workflows); err != nil {
 			log.Warnf("Failed to register workflow tools in mcp: %v", err)
 		}
 		return nil

@@ -53,7 +53,7 @@ func IsStderrPiped() bool {
 
 // ShouldJSONErrors returns true when errors must be emitted as structured JSON.
 func ShouldJSONErrors() bool {
-	return Cfg.OutputType == "json" || IsStderrPiped()
+	return Cfg.OutputType.Value == "json" || IsStderrPiped()
 }
 
 // SetUpLogs sets the log output and log level.
@@ -61,20 +61,20 @@ func SetUpLogs() error {
 	log.SetFormatter(&cliFormatter{noColor: Cfg.NoColorOutput.Value})
 
 	// In JSON errors mode suppress logrus entirely — utils.WriteError is the sole stderr writer.
-	if Cfg.OutputType == "json" || IsStderrPiped() {
+	if Cfg.OutputType.Value == "json" || IsStderrPiped() {
 		log.SetLevel(log.FatalLevel)
 		return nil
 	}
 
-	if Cfg.Quiet {
+	if Cfg.Quiet.Value {
 		log.SetOutput(os.Stderr)
 		log.SetLevel(log.ErrorLevel)
 		return nil
 	}
-	if Cfg.Debug {
-		Cfg.Verbosity = "debug"
+	if Cfg.Debug.Value {
+		Cfg.Verbosity.Value = "debug"
 	}
-	lvl, err := log.ParseLevel(Cfg.Verbosity)
+	lvl, err := log.ParseLevel(Cfg.Verbosity.Value)
 	if err != nil {
 		return errors.Wrap(err, "parsing log level")
 	}

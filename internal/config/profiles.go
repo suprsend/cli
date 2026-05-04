@@ -20,8 +20,8 @@ type ProfileConfig struct {
 }
 
 func GetConfigFilePath() string {
-	if Cfg.CfgFile != "" {
-		return Cfg.CfgFile
+	if Cfg.CfgFile.Value != "" {
+		return Cfg.CfgFile.Value
 	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

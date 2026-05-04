@@ -146,10 +146,9 @@ func init() {
 		if err := config.Cfg.Resolve(flags); err != nil {
 			var ce *clierr.CLIError
 			if errors.As(err, &ce) && ce.Code == clierr.CodeAuthMissingToken && cmd.Name() == "env" {
-				// env command is allowed to run without a service token
-			} else {
-				return err
+				return nil
 			}
+			return err
 		}
 
 		if err := config.SetUpLogs(); err != nil {

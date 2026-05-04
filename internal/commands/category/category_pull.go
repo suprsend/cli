@@ -68,6 +68,19 @@ var categoryPullCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
+		totalSections := 0
+		totalCategories := 0
+		for _, rc := range categories.RootCategories {
+			totalSections += len(rc.Sections)
+			for _, s := range rc.Sections {
+				totalCategories += len(s.Categories)
+			}
+		}
+		log.Info("=== Category Pull Summary ===")
+		log.Infof("Sections: %d", totalSections)
+		log.Infof("Categories: %d", totalCategories)
+		log.Infof("Written to: %s", filePath)
+
 		translationDir := filepath.Join(outputDir, "translations")
 		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

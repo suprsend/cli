@@ -57,17 +57,18 @@ func (p ConfigBool) Bool() bool {
 
 // Config holds the application's configuration.
 type Config struct {
-	CfgFile       string
-	OutputType    string
-	Verbosity     string
 	ServiceToken  ConfigString
 	NoColorOutput ConfigBool
-	Workspace     string
-	Quiet         bool
-	Debug         bool
 	BaseUrl       ConfigString
 	MgmntUrl      ConfigString
 	ProxyURL      ConfigString
+	// flag only configs (not resolved from env/profile)
+	CfgFile    string
+	Workspace  string
+	OutputType string
+	Verbosity  string
+	Quiet      bool
+	Debug      bool
 }
 
 const (

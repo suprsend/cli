@@ -16,7 +16,7 @@ import (
 )
 
 type jsonCategoryInput struct {
-	Categories   interface{}                                   `json:"categories"`
+	Categories   *CategoriesOnDisk                             `json:"categories"`
 	Translations map[string]mgmnt.PreferenceTranslationContent `json:"translations"`
 }
 
@@ -70,7 +70,18 @@ var categoryPushCmd = &cobra.Command{
 			}
 
 			if dryRun {
-				log.Infof("DRY RUN: would push categories and %d translation(s) to %s", pushableLocales, workspace)
+				sectionCount, categoryCount := 0, 0
+				for _, rc := range input.Categories.RootCategories {
+					sectionCount += len(rc.Sections)
+					for _, s := range rc.Sections {
+						categoryCount += len(s.Categories)
+					}
+				}
+				log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
+					sectionCount, pluralS(sectionCount),
+					categoryCount, pluralIes(categoryCount),
+					pushableLocales, workspace,
+				)
 				return nil
 			}
 
@@ -154,7 +165,18 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		if dryRun {
-			log.Infof("DRY RUN: would push categories to %s", workspace)
+			sectionCount, categoryCount := 0, 0
+			for _, rc := range categories.RootCategories {
+				sectionCount += len(rc.Sections)
+				for _, s := range rc.Sections {
+					categoryCount += len(s.Categories)
+				}
+			}
+			log.Infof("DRY RUN: would push %d section%s, %d categor%s to %s",
+				sectionCount, pluralS(sectionCount),
+				categoryCount, pluralIes(categoryCount),
+				workspace,
+			)
 			return nil
 		}
 
@@ -209,6 +231,20 @@ func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySucces
 			log.Infof("  - preference_categories/categories.json: failed to push: %s", categoryFailErr)
 		}
 	}
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+func pluralIes(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
 }
 
 func init() {

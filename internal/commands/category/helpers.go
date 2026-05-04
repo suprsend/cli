@@ -15,16 +15,16 @@ import (
 
 const defaultCategoryDir = "suprsend/preference_categories"
 
-// categoriesOnDisk is the on-disk format for categories.json.
+// CategoriesOnDisk is the on-disk format for categories.json.
 // Only editable fields are stored; server-side readonly fields (hash, version_no, status, etc.) are excluded.
 // $schema is preserved from the API response.
-type categoriesOnDisk struct {
+type CategoriesOnDisk struct {
 	Schema         string               `json:"$schema,omitempty"`
 	RootCategories []mgmnt.RootCategory `json:"root_categories"`
 }
 
 func writeCategoriesFile(resp *mgmnt.PreferenceCategoryResponse, filePath string) error {
-	data := categoriesOnDisk{
+	data := CategoriesOnDisk{
 		Schema:         resp.Schema,
 		RootCategories: resp.RootCategories,
 	}
@@ -77,17 +77,16 @@ func WriteToFile(data interface{}, filePath string) error {
 	return WriteToFileWithPath(data, filePath)
 }
 
-func ReadFromFile(filepath string) (interface{}, error) {
+func ReadFromFile(filepath string) (*CategoriesOnDisk, error) {
 	jsonData, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	var data interface{}
-	err = json.Unmarshal(jsonData, &data)
-	if err != nil {
+	var data CategoriesOnDisk
+	if err := json.Unmarshal(jsonData, &data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal data: %w", err)
 	}
-	return data, nil
+	return &data, nil
 }
 
 func ensureOutputDirectory(path string) error {

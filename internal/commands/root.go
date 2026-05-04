@@ -137,7 +137,7 @@ func init() {
 		if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
 			return nil
 		}
-		if cmd.Name() == "version" || cmd.Name() == "help" || cmd.Name() == "env" {
+		if cmd.Name() == "version" || cmd.Name() == "help" {
 			return nil
 		}
 		if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
@@ -151,7 +151,12 @@ func init() {
 		}
 
 		if err := config.Cfg.Resolve(flags); err != nil {
-			return err
+			var ce *clierr.CLIError
+			if errors.As(err, &ce) && ce.Code == clierr.CodeAuthMissingToken && cmd.Name() == "env" {
+				// env command is allowed to run without a service token
+			} else {
+				return err
+			}
 		}
 
 		if err := config.SetUpLogs(); err != nil {

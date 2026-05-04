@@ -42,8 +42,9 @@ func (p ConfigString) String() string {
 }
 
 type ConfigBool struct {
-	Value  bool
-	Source ConfigSource
+	Value    bool
+	RawValue string
+	Source   ConfigSource
 }
 
 func (p ConfigBool) MarshalYAML() (interface{}, error) {
@@ -119,8 +120,8 @@ func GetResolvedServiceToken(flagToken string, activeProfile Profile) (ConfigStr
 }
 
 func GetResolvedNoColor(flagNoColor bool) ConfigBool {
-	if os.Getenv("NO_COLOR") != "" {
-		return ConfigBool{Value: true, Source: ConfigSourceEnv}
+	if v := os.Getenv("NO_COLOR"); v != "" {
+		return ConfigBool{Value: true, RawValue: v, Source: ConfigSourceEnv}
 	}
 	if flagNoColor {
 		return ConfigBool{Value: true, Source: ConfigSourceFlag}
@@ -179,15 +180,15 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
 	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
 
+	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
+		c.ProxyURL = ConfigString{Value: proxyURL, Source: ConfigSourceEnv}
+	}
+
 	token, err := GetResolvedServiceToken(flags.ServiceToken, activeProfile)
 	if err != nil {
 		return err
 	}
 	c.ServiceToken = token
-
-	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
-		c.ProxyURL = ConfigString{Value: proxyURL, Source: ConfigSourceEnv}
-	}
 
 	return nil
 }

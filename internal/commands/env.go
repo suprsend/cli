@@ -2,25 +2,17 @@ package commands
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
 type EnvVar struct {
 	Name        string `json:"name"`
 	Value       string `json:"value"`
+	Source      string `json:"source"`
 	Description string `json:"description"`
-}
-
-var recognizedEnvVarNames = []EnvVar{
-	{"SUPRSEND_SERVICE_TOKEN", "", "Service token for authentication (overrides --service-token flag and config file)"},
-	{"SUPRSEND_BASE_URL", "", "Base API URL for BYOC/self-hosted instances (overrides default)"},
-	{"SUPRSEND_MGMNT_URL", "", "Management API URL for BYOC/self-hosted instances (overrides default)"},
-	{"NO_COLOR", "", "Disable color output when set to any non-empty value"},
-	{"HTTP_PROXY", "", "HTTP proxy URL for outbound requests"},
 }
 
 var envCmd = &cobra.Command{
@@ -30,28 +22,65 @@ var envCmd = &cobra.Command{
 and how each one affects the CLI. Values for sensitive variables (tokens) are
 redacted. Useful for verifying configuration in CI/CD pipelines and agent contexts.`,
 	Example: `  suprsend env`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		outputType, _ := cmd.Flags().GetString("output")
 		if err := utils.ValidateOutputType(outputType, "pretty", "json", "yaml"); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
+			return err
 		}
-
-		var rows []EnvVar
-		for _, ev := range recognizedEnvVarNames {
-			val := os.Getenv(ev.Name)
-			display := "(unset)"
-			if val != "" {
-				if strings.Contains(ev.Name, "TOKEN") || strings.Contains(ev.Name, "SECRET") {
-					display = fmt.Sprintf("<redacted, %d chars>", len(val))
-				} else {
-					display = val
-				}
-			}
-			rows = append(rows, EnvVar{Name: ev.Name, Value: display, Description: ev.Description})
-		}
-		utils.OutputData(rows, outputType)
+		utils.OutputData(buildEnvRows(), outputType)
+		return nil
 	},
+}
+
+func buildEnvRows() []EnvVar {
+	cfg := config.Cfg
+	return []EnvVar{
+		{
+			Name:        "SUPRSEND_SERVICE_TOKEN",
+			Value:       serviceTokenDisplay(cfg.ServiceToken),
+			Source:      string(cfg.ServiceToken.Source),
+			Description: "Service token for authentication (overrides --service-token flag and config file)",
+		},
+		{
+			Name:        "SUPRSEND_BASE_URL",
+			Value:       cfg.BaseUrl.Value,
+			Source:      string(cfg.BaseUrl.Source),
+			Description: "Base API URL for BYOC/self-hosted instances (overrides default)",
+		},
+		{
+			Name:        "SUPRSEND_MGMNT_URL",
+			Value:       cfg.MgmntUrl.Value,
+			Source:      string(cfg.MgmntUrl.Source),
+			Description: "Management API URL for BYOC/self-hosted instances (overrides default)",
+		},
+		{
+			Name:        "NO_COLOR",
+			Value:       fmt.Sprintf("%v", cfg.NoColorOutput.Value),
+			Source:      string(cfg.NoColorOutput.Source),
+			Description: "Disable color output when set to any non-empty value",
+		},
+		{
+			Name:        "HTTP_PROXY",
+			Value:       proxyDisplay(cfg.ProxyURL),
+			Source:      string(cfg.ProxyURL.Source),
+			Description: "HTTP proxy URL for outbound requests",
+		},
+	}
+}
+
+func serviceTokenDisplay(tok config.ConfigString) string {
+	if tok.Value == "" {
+		return "(unset)"
+	}
+	return fmt.Sprintf("<redacted, %d chars>", len(tok.Value))
+}
+
+
+func proxyDisplay(proxy config.ConfigString) string {
+	if proxy.Value == "" {
+		return "(unset)"
+	}
+	return proxy.Value
 }
 
 func init() {

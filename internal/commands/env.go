@@ -39,19 +39,19 @@ func buildEnvRows() []EnvVar {
 			Name:        "SUPRSEND_SERVICE_TOKEN",
 			Value:       serviceTokenDisplay(cfg.ServiceToken),
 			Source:      string(cfg.ServiceToken.Source),
-			Description: "Service token for authentication (overrides --service-token flag and config file)",
+			Description: "Service token for authentication",
 		},
 		{
 			Name:        "SUPRSEND_BASE_URL",
 			Value:       cfg.BaseUrl.Value,
 			Source:      string(cfg.BaseUrl.Source),
-			Description: "Base API URL for BYOC/self-hosted instances (overrides default)",
+			Description: "Base API URL for BYOC/self-hosted instances",
 		},
 		{
 			Name:        "SUPRSEND_MGMNT_URL",
 			Value:       cfg.MgmntUrl.Value,
 			Source:      string(cfg.MgmntUrl.Source),
-			Description: "Management API URL for BYOC/self-hosted instances (overrides default)",
+			Description: "Management API URL for BYOC/self-hosted instances",
 		},
 		{
 			Name:        "NO_COLOR",
@@ -74,7 +74,6 @@ func serviceTokenDisplay(tok config.ConfigString) string {
 	}
 	return fmt.Sprintf("<redacted, %d chars>", len(tok.Value))
 }
-
 
 func proxyDisplay(proxy config.ConfigString) string {
 	if proxy.Value == "" {

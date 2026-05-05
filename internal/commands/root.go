@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/suprsend/cli/internal/clierr"
@@ -127,32 +128,41 @@ func init() {
 			)
 		}
 
-		if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
-			return nil
-		}
-		if cmd.Name() == "version" || cmd.Name() == "help" {
-			return nil
-		}
-		if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
-			return nil
-		}
-		if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
-			return nil
-		}
-		if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
-			return nil
-		}
-
-		if err := config.Cfg.Resolve(flags); err != nil {
-			var ce *clierr.CLIError
-			if errors.As(err, &ce) && ce.Code == clierr.CodeAuthMissingToken && cmd.Name() == "env" {
-				return nil
-			}
-			return err
-		}
+		resolveErr := config.Cfg.Resolve(flags)
 
 		if err := config.SetUpLogs(); err != nil {
 			return err
+		}
+
+		if config.Cfg.NoColorOutput.Value {
+			color.NoColor = true
+		}
+
+		if resolveErr != nil {
+			var ce *clierr.CLIError
+			if errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
+				if cmd.Name() == "env" {
+					return nil
+				}
+			}
+
+			if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
+				return nil
+			}
+			if cmd.Name() == "version" || cmd.Name() == "help" {
+				return nil
+			}
+			if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
+				return nil
+			}
+			if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
+				return nil
+			}
+			if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
+				return nil
+			}
+
+			return resolveErr
 		}
 
 		utils.InitSDKWithUrls(

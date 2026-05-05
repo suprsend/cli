@@ -140,12 +140,12 @@ func GetResolvedNoColor(flagNoColor bool) ConfigBool {
 // Resolve populates c with all flag-derived and env-var / profile-resolved values.
 // Priority: env var > CLI flag > active config-file profile > hardcoded default.
 func (c *Config) Resolve(flags FlagValues) error {
+	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
 	if flags.CfgFile != "" {
-		if _, err := os.ReadFile(flags.CfgFile); err != nil {
+		if _, err := os.Stat(flags.CfgFile); err != nil {
 			return fmt.Errorf("cannot read config file %s: %w", flags.CfgFile, err)
 		}
 	}
-
 	var activeProfile Profile
 	if configPath := GetConfigFilePath(); configPath != "" {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
@@ -157,7 +157,6 @@ func (c *Config) Resolve(flags FlagValues) error {
 	}
 
 	c.Workspace = ConfigString{Value: flags.Workspace, Source: ConfigSourceFlag}
-	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
 	c.OutputType = ConfigString{Value: flags.OutputType, Source: ConfigSourceFlag}
 	c.Verbosity = ConfigString{Value: flags.Verbosity, Source: ConfigSourceFlag}
 	c.Quiet = ConfigBool{Value: flags.Quiet, Source: ConfigSourceFlag}

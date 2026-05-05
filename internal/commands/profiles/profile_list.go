@@ -65,8 +65,10 @@ var listProfilesCmd = &cobra.Command{
 		for _, name := range names {
 			profile := cfg.Profiles[name]
 			length := len(profile.ServiceToken.Value)
-			max_cut := int(math.Min(8, float64(length)))
-			profile.ServiceToken.Value = profile.ServiceToken.Value[:max_cut] + "*****************" + profile.ServiceToken.Value[len(profile.ServiceToken.Value)-4:]
+			if length > 8 {
+				maxCut := int(math.Min(8, float64(length-4)))
+				profile.ServiceToken.Value = profile.ServiceToken.Value[:maxCut] + "*****************" + profile.ServiceToken.Value[length-4:]
+			}
 			cfg.Profiles[name] = profile
 		}
 

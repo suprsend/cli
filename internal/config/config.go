@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
@@ -127,6 +128,12 @@ func GetResolvedMgmntUrl(activeProfile Profile) ConfigString {
 	return ConfigString{Value: DefaultMgmntUrl, Source: ConfigSourceDefault}
 }
 
+func GetResolvedDebug() ConfigBool {
+	v := os.Getenv("DEBUG")
+	debugVal, _ := strconv.ParseBool(v)
+	return ConfigBool{Value: debugVal, RawValue: v, Source: ConfigSourceEnv}
+}
+
 func GetResolvedNoColor(flagNoColor bool) ConfigBool {
 	if v := os.Getenv("NO_COLOR"); v != "" {
 		return ConfigBool{Value: true, RawValue: v, Source: ConfigSourceEnv}
@@ -162,7 +169,7 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.OutputType = ConfigString{Value: flags.OutputType, Source: ConfigSourceFlag}
 	c.Verbosity = ConfigString{Value: flags.Verbosity, Source: ConfigSourceFlag}
 	c.Quiet = ConfigBool{Value: flags.Quiet, Source: ConfigSourceFlag}
-	c.Debug = ConfigBool{Value: os.Getenv("DEBUG") != "", Source: ConfigSourceEnv}
+	c.Debug = GetResolvedDebug()
 
 	c.NoColorOutput = GetResolvedNoColor(flags.NoColor)
 	if c.NoColorOutput.Value {

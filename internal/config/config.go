@@ -151,6 +151,8 @@ func (c *Config) Resolve(flags FlagValues) error {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
 			activeProfile = cfg.Profiles[cfg.ActiveProfile]
 			log.Debug("Using config file:", configPath)
+		} else if flags.CfgFile != "" {
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot parse config file %s", configPath))
 		} else {
 			log.Debugf("failed to load config file %s: %v", configPath, err)
 		}

@@ -49,6 +49,15 @@ Each resource follows a consistent pattern:
 
 Service token resolution priority: `SUPRSEND_SERVICE_TOKEN` env var > `--service-token` flag > active profile in config file. Profiles are managed via `suprsend profile` subcommands and stored in a YAML config file.
 
+### Error Handling
+
+Use `clierr` (`internal/clierr/clierr.go`) for all user-facing errors — never `fmt.Errorf` or `errors.New` at command boundaries.
+
+- `clierr.New(message, code)` — create a new structured error
+- `clierr.Wrap(err, code, hint)` — promote a plain error with a code and hint
+- Codes are constants in `clierr` (e.g. `CodeConfigInvalid`, `CodeAuthMissingToken`, `CodeFileParseFailed`). Pick the closest match; use `CodeUnknown` as a last resort.
+- `clierr` errors carry a numeric exit code (auth=3, validation=2, not-found=4, etc.) and render correctly in both plain-text and `--output json` modes.
+
 ### Special Features
 
 - **`sync` command** — Pulls all assets from one workspace and pushes to another, with an optional local directory as intermediate storage

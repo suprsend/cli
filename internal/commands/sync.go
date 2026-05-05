@@ -129,7 +129,6 @@ var syncCmd = &cobra.Command{
 			}
 		}
 		if hasErrors {
-			utils.WriteError(clierr.New("sync complete with errors", clierr.CodeAPIInternal))
 			return clierr.New("sync complete with errors", clierr.CodeAPIInternal)
 		}
 		log.Info("Sync complete")

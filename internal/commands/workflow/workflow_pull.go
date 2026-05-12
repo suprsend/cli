@@ -24,6 +24,10 @@ var workflowPullCmd = &cobra.Command{
 
   # Pull to a custom directory using the flag form
   suprsend workflow pull --slug welcome --dir ./my-workflows`,
+	Annotations: map[string]string{
+		"skills:tip.a-overwrite": "Pull overwrites local workflow JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

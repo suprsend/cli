@@ -32,7 +32,11 @@ var genSkillsCmd = &cobra.Command{
 		// Generate skills
 		doc.GenSkillsDir(rootCmd, dir, doc.SkillsConfig{
 			Name:        "suprsend-cli",
-			Description: "SuprSend CLI is a command-line interface tool for managing your SuprSend account and resources. It provides a convenient way to interact with the SuprSend API, allowing you to perform various operations such as managing workspaces, users, workflow, templates and more.",
+			Description: "SuprSend CLI is a command-line interface tool for managing your SuprSend account and resources. It provides a convenient way to interact with the SuprSend API, allowing you to perform various operations such as managing workspaces, workflows, templates, categories, events, schemas, and translations. Use when pushing, pulling, or committing SuprSend resources from local files, generating type definitions from JSON schemas, syncing between workspaces, or running CLI commands like `suprsend template pull`, `suprsend workflow push`, or `suprsend schema commit`.",
+			Metadata: map[string]string{
+				"author":   "suprsend",
+				"category": "cli",
+			},
 			Notes: []string{
 				"Commands that return data (list, get) support `-o json` for machine-readable JSON output and `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 				"The `profile` command and its subcommands (add, list, modify, remove, use) are only needed for self-hosted/BYOC SuprSend instances or managing multiple accounts. SaaS users do not need them. Profiles are not used for switching between workspaces within the same account; use the `--workspace` flag for that.",

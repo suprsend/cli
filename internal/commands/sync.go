@@ -34,6 +34,10 @@ var syncCmd = &cobra.Command{
 
   # Dry run: preview what would be synced without making changes
   suprsend sync --from staging --to production --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-direction": "`--from` is the source, `--to` is the destination. They must be different workspaces; sync **overwrites** drafts in the destination.",
+		"skills:tip.b-dryrun":    "Pair with `--dry-run` to validate every asset server-side without writing to the destination. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).",
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		mode, _ := cmd.Flags().GetString("mode")
 		fromWorkspace, _ := cmd.Flags().GetString("from")

@@ -21,6 +21,11 @@ suprsend template commit [<slug>] [flags]
   suprsend template commit welcome-email --dry-run
 ```
 
+### Tips
+
+- Commit is irreversible: it promotes the draft to **live**, overwriting the previous live version. Affected workflows immediately render the new content.
+- If you didn't author the draft locally, run `suprsend template get --slug <slug> --mode draft` first to inspect what will become live.
+
 ### Options
 
 ```

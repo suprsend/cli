@@ -21,6 +21,11 @@ suprsend workflow commit [<slug>] [flags]
   suprsend workflow commit welcome --dry-run
 ```
 
+### Tips
+
+- Commit is irreversible: it promotes the draft to **live**, and live workflows immediately begin executing the new definition for new trigger events.
+- If you didn't author the draft locally, run `suprsend workflow get --slug <slug> --mode draft` first to inspect what will become live.
+
 ### Options
 
 ```

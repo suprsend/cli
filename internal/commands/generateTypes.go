@@ -32,6 +32,10 @@ var generateTypesCmd = &cobra.Command{
 	Use:   "generate-types",
 	Short: "Generate type definitions from JSON Schema",
 	Long:  "Generate typed code from trigger payload JSON schemas. Fetches schemas linked to workflows and events from a workspace and generates type definitions in the target language.",
+	Annotations: map[string]string{
+		"skills:tip.a-after-commit": "Run after every `suprsend schema commit` so consuming code stays in sync with the live trigger payloads.",
+		"skills:tip.b-language":     "Pick the right subcommand for your stack: `python` (Pydantic), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.",
+	},
 }
 
 var generateTypesPythonCmd = &cobra.Command{

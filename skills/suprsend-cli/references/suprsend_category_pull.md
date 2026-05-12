@@ -21,6 +21,11 @@ suprsend category pull [flags]
   suprsend category pull --mode draft
 ```
 
+### Tips
+
+- Pull overwrites local `categories_preferences.json` and translation files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
+
 ### Options
 
 ```

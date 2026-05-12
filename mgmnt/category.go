@@ -35,12 +35,13 @@ type Section struct {
 }
 
 type Category struct {
-	Category                 string   `json:"category"`
-	Name                     string   `json:"name"`
-	Description              string   `json:"description"`
-	DefaultPreference        string   `json:"default_preference"`
-	DefaultMandatoryChannels []string `json:"default_mandatory_channels"`
-	Tags                     []string `json:"tags"`
+	Category                 string      `json:"category"`
+	Name                     string      `json:"name"`
+	Description              string      `json:"description"`
+	DefaultPreference        string      `json:"default_preference"`
+	DefaultMandatoryChannels []string    `json:"default_mandatory_channels"`
+	Tags                     []string    `json:"tags"`
+	DigestSchedule           interface{} `json:"digest_schedule,omitempty"`
 }
 
 type CategoryPushResponse struct {

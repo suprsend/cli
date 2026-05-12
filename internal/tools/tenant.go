@@ -158,11 +158,14 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		blockedChannels = append(blockedChannels, s)
 	}
 
-	prefPayload := suprsend.TenantCategoryPreferenceUpdateBody{
-		Preference:          pref,
+	prefPayload := suprsend.TenantPreferenceCategoryUpdateBody{
+		Preference:          &pref,
 		VisibleToSubscriber: &visibleToSubscriber,
 		MandatoryChannels:   mandatoryChannels,
 		BlockedChannels:     blockedChannels,
+	}
+	if digestSchedule, ok := args["digest_schedule"]; ok && digestSchedule != nil {
+		prefPayload.DigestSchedule = digestSchedule
 	}
 
 	workspace := request.GetString("workspace", "staging")
@@ -172,7 +175,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		return nil, err
 	}
 
-	tenantPref, err := suprsendClient.Tenants.UpdateCategoryPreference(ctx, tenantId, category, prefPayload)
+	tenantPref, err := suprsendClient.Tenants.UpdatePreferenceCategory(ctx, tenantId, category, prefPayload, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -360,6 +363,9 @@ Returns: the updated tenant default preference on success.`),
 				mcp.Description("The channels to block for the category."),
 				mcp.WithStringItems(),
 				mcp.Required(),
+			),
+			mcp.WithObject("digest_schedule",
+				mcp.Description("Optional digest schedule override for this category preference. Contains a slug field identifying the selected schedule option, plus any user-configurable fields defined by that option."),
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to update the tenant from.`),

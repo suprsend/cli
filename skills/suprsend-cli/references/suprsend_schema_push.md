@@ -24,7 +24,7 @@ suprsend schema push [<slug>] [flags]
 ### Tips
 
 - Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.
-- Pair with `--dry-run` to preview the diff before pushing; pair with `--commit` to push + commit in one step.
+- Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.
 - After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.
 
 ### Options

@@ -37,7 +37,7 @@ var categoryPushCmd = &cobra.Command{
   suprsend category push --json '{"categories": {...}}'`,
 	Annotations: map[string]string{
 		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend category commit` to promote draft → live.",
-		"skills:tip.b-dryrun": "Pair with `--dry-run` to preview the diff before pushing; pair with `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the categories server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

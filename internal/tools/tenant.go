@@ -167,6 +167,17 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 	if digestSchedule, ok := args["digest_schedule"]; ok && digestSchedule != nil {
 		prefPayload.DigestSchedule = digestSchedule
 	}
+	if rawConditions, ok := args["preference_conditions"]; ok && rawConditions != nil {
+		if conditionsSlice, ok := rawConditions.([]any); ok {
+			conditions := make([]map[string]any, 0, len(conditionsSlice))
+			for _, item := range conditionsSlice {
+				if m, ok := item.(map[string]any); ok {
+					conditions = append(conditions, m)
+				}
+			}
+			prefPayload.PreferenceConditions = conditions
+		}
+	}
 
 	workspace := request.GetString("workspace", "staging")
 
@@ -366,6 +377,17 @@ Returns: the updated tenant default preference on success.`),
 			),
 			mcp.WithObject("digest_schedule",
 				mcp.Description("Optional digest schedule override for this category preference. Contains a slug field identifying the selected schedule option, plus any user-configurable fields defined by that option."),
+			),
+			mcp.WithArray("preference_conditions",
+				mcp.Description("Optional list of condition overrides for this category. Each entry is an object with a 'key' field (matching a condition defined on the category) and a 'value' field. Pass an empty array to clear existing overrides."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"key":   utils.StringSchema("The condition key as defined on the category"),
+						"value": map[string]any{"description": "The value for this condition"},
+					},
+					"required": []string{"key", "value"},
+				}),
 			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to update the tenant from.`),

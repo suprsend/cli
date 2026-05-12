@@ -519,6 +519,18 @@ Returns: updated preference state on success; structured error on failure (e.g.,
 							"type":        "object",
 							"description": "Optional digest schedule override for this category. Contains a slug field identifying the selected schedule option, plus any user-configurable fields defined by that option.",
 						},
+						"preference_conditions": map[string]any{
+							"type":        "array",
+							"description": "Optional list of condition overrides for this category. Each entry is an object with a 'key' field (matching a condition defined on the category) and a 'value' field. Pass an empty array to clear existing overrides.",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"key":   utils.StringSchema("The condition key as defined on the category"),
+									"value": map[string]any{"description": "The value for this condition"},
+								},
+								"required": []string{"key", "value"},
+							},
+						},
 					},
 					"required": []string{"category", "preference", "opt_out_channels"},
 				}),

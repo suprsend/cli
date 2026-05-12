@@ -35,14 +35,15 @@ type Section struct {
 }
 
 type Category struct {
-	Category                 string         `json:"category"`
-	Name                     string         `json:"name"`
-	Description              string         `json:"description"`
-	DefaultPreference        string         `json:"default_preference"`
-	DefaultMandatoryChannels []string       `json:"default_mandatory_channels"`
-	DefaultOptInChannels     []string       `json:"default_opt_in_channels,omitempty"`
-	Tags                     []string       `json:"tags"`
-	DigestSchedule           map[string]any `json:"digest_schedule,omitempty"`
+	Category                 string           `json:"category"`
+	Name                     string           `json:"name"`
+	Description              string           `json:"description"`
+	DefaultPreference        string           `json:"default_preference"`
+	DefaultMandatoryChannels []string         `json:"default_mandatory_channels"`
+	DefaultOptInChannels     []string         `json:"default_opt_in_channels,omitempty"`
+	Tags                     []string         `json:"tags"`
+	DigestSchedule           map[string]any   `json:"digest_schedule,omitempty"`
+	PreferenceConditions     []map[string]any `json:"preference_conditions,omitempty"`
 }
 
 type CategoryPushResponse struct {

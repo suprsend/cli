@@ -24,6 +24,10 @@ var workflowPushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend workflow push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live.",
+		"skills:tip.b-dryrun": "Pair with `--dry-run` to preview the diff before pushing; pair with `--commit` to push + commit in one step.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

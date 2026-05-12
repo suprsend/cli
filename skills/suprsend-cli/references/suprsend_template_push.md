@@ -21,6 +21,11 @@ suprsend template push [<slug>] [flags]
   suprsend template push --dry-run
 ```
 
+### Tips
+
+- Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live.
+- Pair with `--dry-run` to preview the diff before pushing; pair with `--commit` to push + commit in one step.
+
 ### Options
 
 ```

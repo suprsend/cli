@@ -24,6 +24,10 @@ var categoryPullCmd = &cobra.Command{
 
   # Pull draft categories
   suprsend category pull --mode draft`,
+	Annotations: map[string]string{
+		"skills:tip.a-overwrite": "Pull overwrites local `categories_preferences.json` and translation files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")

@@ -21,6 +21,11 @@ suprsend schema commit [<slug>] [flags]
   suprsend schema commit order-placed --workspace production
 ```
 
+### Tips
+
+- Commit is irreversible: it promotes the draft to **live**, and new workflow triggers immediately validate against the new schema.
+- After commit, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync with the live schema.
+
 ### Options
 
 ```

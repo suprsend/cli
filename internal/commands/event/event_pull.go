@@ -23,6 +23,9 @@ var eventPullCmd = &cobra.Command{
 
   # Pull from the production workspace
   suprsend event pull --workspace production`,
+	Annotations: map[string]string{
+		"skills:tip.a-overwrite": "Pull overwrites local `events/<name>/event.json` files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		dirPath, _ := cmd.Flags().GetString("dir")

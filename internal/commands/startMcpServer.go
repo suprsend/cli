@@ -69,6 +69,11 @@ Built-in tool categories: users (get, upsert, preferences, subscriptions), objec
 Use --events and --workflows to dynamically register tools that trigger specific events or workflows by slug. Both default to none — pass 'all' to register tools for every event/workflow in the workspace, or a comma-separated list of slugs to register specific ones.
 
 Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse), http (listens on :8080/).`,
+	Annotations: map[string]string{
+		"skills:tip.a-auth":          "Requires `SUPRSEND_SERVICE_TOKEN` env var or an active profile (`suprsend profile use <name>`).",
+		"skills:tip.b-inspect-tools": "Run `suprsend start-mcp-server list-tools` to inspect the schema (tool names + descriptions) before wiring up an MCP client.",
+		"skills:tip.c-transport":     "stdio is right for IDE/CLI integrations; switch to `--transport sse` or `--transport http` for network-accessible deployments (both listen on :8080).",
+	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		conf := config.Cfg
 		workspace := conf.Workspace

@@ -21,6 +21,11 @@ suprsend workflow push [<slug>] [flags]
   suprsend workflow push --dry-run
 ```
 
+### Tips
+
+- Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live.
+- Pair with `--dry-run` to preview the diff before pushing; pair with `--commit` to push + commit in one step.
+
 ### Options
 
 ```

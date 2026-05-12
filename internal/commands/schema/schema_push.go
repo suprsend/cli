@@ -24,6 +24,11 @@ var schemaPushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.",
+		"skills:tip.b-dryrun":  "Pair with `--dry-run` to preview the diff before pushing; pair with `--commit` to push + commit in one step.",
+		"skills:tip.c-regen":   "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

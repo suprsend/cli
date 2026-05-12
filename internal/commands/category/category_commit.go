@@ -23,6 +23,10 @@ var categoryCommitCmd = &cobra.Command{
 
   # Commit with a message
   suprsend category commit --commit-message "Update notification preferences"`,
+	Annotations: map[string]string{
+		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**. End-users immediately see the new preference categories on their notification settings page.",
+		"skills:tip.b-translations": "Local translation files in the `translations/` subdirectory are pushed before commit. Edit them alongside the categories to keep locales in sync.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMsg, _ := cmd.Flags().GetString("commit-message")

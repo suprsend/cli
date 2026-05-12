@@ -21,6 +21,10 @@ var workflowCommitCmd = &cobra.Command{
 
   # Dry run: see what would be committed without making changes
   suprsend workflow commit welcome --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, and live workflows immediately begin executing the new definition for new trigger events.",
+		"skills:tip.b-inspect":      "If you didn't author the draft locally, run `suprsend workflow get --slug <slug> --mode draft` first to inspect what will become live.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)

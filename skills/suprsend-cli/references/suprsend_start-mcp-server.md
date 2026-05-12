@@ -14,6 +14,12 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 suprsend start-mcp-server [flags]
 ```
 
+### Tips
+
+- Requires `SUPRSEND_SERVICE_TOKEN` env var or an active profile (`suprsend profile use <name>`).
+- Run `suprsend start-mcp-server list-tools` to inspect the schema (tool names + descriptions) before wiring up an MCP client.
+- stdio is right for IDE/CLI integrations; switch to `--transport sse` or `--transport http` for network-accessible deployments (both listen on :8080).
+
 ### Options
 
 ```

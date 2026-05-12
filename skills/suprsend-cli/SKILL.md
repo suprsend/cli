@@ -1,6 +1,6 @@
 ---
 name: suprsend-cli
-description: "SuprSend CLI is a command-line interface tool for managing your SuprSend account and resources. It provides a convenient way to interact with the SuprSend API, allowing you to perform various operations such as managing workspaces, workflows, templates, categories, events, schemas, and translations. Use when pushing, pulling, or committing SuprSend resources from local files, generating type definitions from JSON schemas, syncing between workspaces, or running CLI commands like `suprsend template pull`, `suprsend workflow push`, or `suprsend schema commit`."
+description: "SuprSend CLI tool for managing SuprSend account and resources from the command line — workspaces, workflows, templates, categories, events, schemas, and translations. Use ONLY when the user wants the agent to RUN a `suprsend ...` command (e.g. \"push my template\", \"pull all workflows\", \"sync staging to prod\", \"generate Python types\") or asks about a specific CLI command's flags/behavior (\"what does `suprsend template commit --dry-run` do?\"). Do NOT load for documentation, lookup, or conceptual SuprSend questions (\"how does batching work\", \"what is a variant\", \"explain delivery nodes\") — load `suprsend-docs-support` for those. Do NOT load when the user is authoring workflow or template JSON without invoking the CLI — load `suprsend-workflow-schema` or `suprsend-template-schema` for those."
 metadata:
   author: suprsend
   category: cli

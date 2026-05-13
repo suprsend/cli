@@ -211,6 +211,9 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 		Preference:     pref,
 		OptOutChannels: optOutChannels,
 	}
+	if digestSchedule, ok := args["digest_schedule"]; ok && digestSchedule != nil {
+		prefPayload.DigestSchedule = digestSchedule
+	}
 
 	workspace := request.GetString("workspace", "staging")
 
@@ -522,6 +525,9 @@ Returns: updated preference state on success; structured error on failure.`),
 			mcp.WithArray("opt_out_channels",
 				mcp.Description("The channels to opt out from for the object."),
 				mcp.WithStringItems(),
+			),
+			mcp.WithObject("digest_schedule",
+				mcp.Description("Optional digest schedule override for this category. Contains a slug field identifying the selected schedule option, plus any user-configurable fields defined by that option."),
 			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),

@@ -148,7 +148,9 @@ func init() {
 		}
 
 		if resolveErr != nil {
-			if cmd.Name() == "env" {
+			// env runs without a token so users can verify setup, but other Resolve failures leave Cfg half-populated and would render a misleading table.
+			var ce *clierr.CLIError
+			if cmd.Name() == "env" && errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
 				return nil
 			}
 			if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {

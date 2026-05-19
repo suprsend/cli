@@ -119,13 +119,7 @@ var categoryPushCmd = &cobra.Command{
 				catSpinner.Stop("Pushed categories")
 			}
 
-			sectionCount, categoryCount := 0, 0
-			for _, rc := range input.Categories.RootCategories {
-				sectionCount += len(rc.Sections)
-				for _, s := range rc.Sections {
-					categoryCount += len(s.Categories)
-				}
-			}
+			sectionCount, categoryCount := countSectionsAndCategories(input.Categories)
 			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 			if !categorySuccess || translationStats.Failed > 0 {
 				return clierr.New("category push had errors", clierr.CodeAPIInternal)
@@ -176,13 +170,7 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		if dryRun {
-			sectionCount, categoryCount := 0, 0
-			for _, rc := range categories.RootCategories {
-				sectionCount += len(rc.Sections)
-				for _, s := range rc.Sections {
-					categoryCount += len(s.Categories)
-				}
-			}
+			sectionCount, categoryCount := countSectionsAndCategories(categories)
 			log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
 				sectionCount, pluralS(sectionCount),
 				categoryCount, pluralIes(categoryCount),
@@ -250,6 +238,20 @@ func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySucces
 			}
 		}
 	}
+}
+
+func countSectionsAndCategories(cats *CategoriesOnDisk) (int, int) {
+	if cats == nil {
+		return 0, 0
+	}
+	sectionCount, categoryCount := 0, 0
+	for _, rc := range cats.RootCategories {
+		sectionCount += len(rc.Sections)
+		for _, s := range rc.Sections {
+			categoryCount += len(s.Categories)
+		}
+	}
+	return sectionCount, categoryCount
 }
 
 func pluralS(n int) string {

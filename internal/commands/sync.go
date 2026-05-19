@@ -186,6 +186,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 	var errors []string
 	successCount := 0
+	dryRunCount := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -208,6 +209,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		wf["slug"] = slug
 
 		if dryRun {
+			dryRunCount++
 			log.Infof("DRY RUN: would push workflow %s to %s", slug, toWorkspace)
 			continue
 		}
@@ -227,7 +229,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		return clierr.New(fmt.Sprintf("one or more workflows failed to sync:\n%s", strings.Join(errors, "\n")), clierr.CodeAPIInternal)
 	}
 	if dryRun {
-		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d workflow(s) to %s", len(entries), toWorkspace))
+		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d workflow(s) to %s", dryRunCount, toWorkspace))
 	} else {
 		spinner.Stop(fmt.Sprintf("Synced %d workflow(s) to %s", successCount, toWorkspace))
 	}
@@ -265,6 +267,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 
 	var errors []string
 	successCount := 0
+	dryRunCount := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -278,6 +281,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 		}
 
 		if dryRun {
+			dryRunCount++
 			log.Infof("DRY RUN: would push schema %s to %s", slug, toWorkspace)
 			continue
 		}
@@ -297,7 +301,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 		return clierr.New(fmt.Sprintf("one or more schemas failed to sync:\n%s", strings.Join(errors, "\n")), clierr.CodeAPIInternal)
 	}
 	if dryRun {
-		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d schema(s) to %s", len(entries), toWorkspace))
+		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d schema(s) to %s", dryRunCount, toWorkspace))
 	} else {
 		spinner.Stop(fmt.Sprintf("Synced %d schema(s) to %s", successCount, toWorkspace))
 	}

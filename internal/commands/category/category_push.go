@@ -183,10 +183,10 @@ var categoryPushCmd = &cobra.Command{
 					categoryCount += len(s.Categories)
 				}
 			}
-			log.Infof("DRY RUN: would push %d section%s, %d categor%s to %s",
+			log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
 				sectionCount, pluralS(sectionCount),
 				categoryCount, pluralIes(categoryCount),
-				workspace,
+				translationStats.Total, workspace,
 			)
 			return nil
 		}

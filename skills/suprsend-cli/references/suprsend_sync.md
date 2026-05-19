@@ -33,7 +33,7 @@ suprsend sync [flags]
 
 ```
   -a, --assets string           Asset types to sync: all, workflow, schema, event, category, translation, or template (default "all")
-  -c, --commit                  Promote changes from draft to live after syncing
+  -c, --commit                  Promote changes from draft to live after syncing (default true)
       --commit-message string   Commit message applied to every committed resource in this sync run (required when --commit is set)
   -d, --dir string              Local directory for intermediate file storage during sync
   -n, --dry-run                 Print what would be synced without making any changes

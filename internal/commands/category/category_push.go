@@ -206,9 +206,11 @@ var categoryPushCmd = &cobra.Command{
 	},
 }
 
-// emitCategoryPushSummary prints the unified end-of-run block. Categories
-// always contribute exactly one item to the totals; translations contribute
-// one item per non-English locale attempted.
+// emitCategoryPushSummary prints the end-of-run summary for `category push`.
+// The "Category Push Summary" block is always printed and reports the
+// section/category counts plus push outcome. The "Translation Push Summary"
+// block follows only when translations were attempted or English files were
+// skipped (i.e. t.Total or t.SkippedEnglish is non-zero).
 func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string, sectionCount, categoryCount int) {
 	if t == nil {
 		t = &translation.PushTranslationStats{}

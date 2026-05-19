@@ -19,6 +19,10 @@ type ProfileConfig struct {
 	Profiles      map[string]Profile `yaml:"profiles"`
 }
 
+// GetConfigFilePath returns the resolved config file path. Reads Cfg.CfgFile,
+// so callers must invoke it after Resolve has populated that field — calling it
+// earlier returns the default $HOME/.suprsend.yaml even when --config was set.
+// Today the only caller is Resolve itself, which writes Cfg.CfgFile first.
 func GetConfigFilePath() string {
 	if Cfg.CfgFile.Value != "" {
 		return Cfg.CfgFile.Value

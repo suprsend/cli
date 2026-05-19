@@ -145,7 +145,12 @@ func GetResolvedNoColor(flagNoColor bool) ConfigBool {
 }
 
 // Resolve populates c with all flag-derived and env-var / profile-resolved values.
-// Priority: env var > CLI flag > active config-file profile > hardcoded default.
+// Priority varies by field:
+//   - ServiceToken: env > flag > profile (no default — errors if unset)
+//   - BaseUrl, MgmntUrl: env > profile > default
+//   - NoColorOutput: env > flag > default
+//   - Debug, ProxyURL: env only
+//   - Workspace, OutputType, Verbosity, Quiet, CfgFile: flag only
 func (c *Config) Resolve(flags FlagValues) error {
 	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
 	if flags.CfgFile != "" {

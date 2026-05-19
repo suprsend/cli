@@ -1,7 +1,6 @@
 package profiles
 
 import (
-	"math"
 	"sort"
 
 	log "github.com/sirupsen/logrus"
@@ -61,14 +60,9 @@ var listProfilesCmd = &cobra.Command{
 			}
 		}
 
-		// Cleanup service token so that it is not printed fully, only the first 4 characters and the last 4 characters are printed rested are replaced with *
 		for _, name := range names {
 			profile := cfg.Profiles[name]
-			length := len(profile.ServiceToken.Value)
-			if length > 8 {
-				maxCut := int(math.Min(8, float64(length-4)))
-				profile.ServiceToken.Value = profile.ServiceToken.Value[:maxCut] + "*****************" + profile.ServiceToken.Value[length-4:]
-			}
+			profile.ServiceToken.Value = MaskServiceToken(profile.ServiceToken.Value)
 			cfg.Profiles[name] = profile
 		}
 

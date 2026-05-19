@@ -8,7 +8,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mark3labs/mcp-go v0.49.0
 	github.com/olekukonko/tablewriter v1.1.4
-	github.com/pkg/errors v0.9.1
 	github.com/sabouaram/cobra_ui v1.0.2
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/sirupsen/logrus v1.9.4

@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
 )
 
 type cliFormatter struct {
@@ -81,7 +81,7 @@ func SetUpLogs() error {
 	}
 	lvl, err := log.ParseLevel(Cfg.Verbosity.Value)
 	if err != nil {
-		return errors.Wrap(err, "parsing log level")
+		return clierr.Wrap(err, clierr.CodeInvalidUsage, fmt.Sprintf("invalid log level %q", Cfg.Verbosity.Value))
 	}
 	log.SetOutput(os.Stderr)
 	log.SetLevel(lvl)

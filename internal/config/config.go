@@ -150,7 +150,7 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
 	if flags.CfgFile != "" {
 		if _, err := os.Stat(flags.CfgFile); err != nil {
-			return fmt.Errorf("cannot read config file %s: %w", flags.CfgFile, err)
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot read config file %s", flags.CfgFile))
 		}
 	}
 	var activeProfile Profile

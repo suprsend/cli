@@ -112,8 +112,10 @@ func (s *Spinner) UpdateMessage(msg string) {
 }
 
 // WriteError writes err to stderr as a structured JSON CLIError when in JSON errors mode.
-func WriteError(err error) {
-	if err == nil || !config.ShouldJSONErrors() {
+// Pass outputType when the call site runs before Resolve has populated Cfg.OutputType
+// (e.g. flag-parse-time errors); pass "" otherwise.
+func WriteError(err error, outputType string) {
+	if err == nil || !config.ShouldJSONErrors(outputType) {
 		return
 	}
 	var ce *clierr.CLIError

@@ -52,12 +52,13 @@ func IsStderrPiped() bool {
 }
 
 // ShouldJSONErrors returns true when errors must be emitted as structured JSON.
-func ShouldJSONErrors(outputValue ...string) bool {
-	v := Cfg.OutputType.Value
-	if len(outputValue) > 0 {
-		v = outputValue[0]
+// Pass "" to fall back to Cfg.OutputType; pass a non-empty value to override
+// when Cfg isn't populated yet (e.g. flag-parse-time error handling).
+func ShouldJSONErrors(outputValue string) bool {
+	if outputValue == "" {
+		outputValue = Cfg.OutputType.Value
 	}
-	return v == "json" || IsStderrPiped()
+	return outputValue == "json" || IsStderrPiped()
 }
 
 // SetUpLogs sets the log output and log level.

@@ -43,17 +43,23 @@ var rootCmd = &cobra.Command{
 	This CLI lets you interact with your SuprSend workspace and do actions like fetching/modifying template, workflows etc.`),
 }
 
+// earlyConfig captures state detected before cobra has parsed flags. Threaded
+// from Execute to WriteError so early errors render in the right format.
+type earlyConfig struct {
+	OutputType string
+}
+
 // Execute runs the root command and handles structured error output.
 func Execute() error {
 	// Run early setup so flag-parse errors (unknown flags) also get proper
 	// silencing and log formatting — PersistentPreRunE won't fire in that case.
-	earlySetup()
+	early := earlySetup()
 	err := rootCmd.Execute()
 	if err != nil {
 		if isCobraUsageError(err) {
 			err = clierr.Wrap(err, clierr.CodeInvalidUsage, "")
 		}
-		utils.WriteError(err)
+		utils.WriteError(err, early.OutputType)
 	}
 	return err
 }
@@ -72,21 +78,24 @@ func isCobraUsageError(err error) bool {
 
 // earlySetup scans raw os.Args to apply critical initialization before Cobra
 // parses flags. This ensures correct behavior even when flag parsing fails.
-func earlySetup() {
-	var outputValue string
+// Returns the detected state so the caller can thread it into error rendering,
+// since Cfg is not populated until Resolve runs.
+func earlySetup() earlyConfig {
+	var ec earlyConfig
 	args := os.Args[1:]
 	for i, arg := range args {
 		switch {
 		case arg == "--output=json" || arg == "-o=json":
-			outputValue = "json"
+			ec.OutputType = "json"
 		case (arg == "--output" || arg == "-o") && i+1 < len(args) && args[i+1] == "json":
-			outputValue = "json"
+			ec.OutputType = "json"
 		}
 	}
-	if config.ShouldJSONErrors(outputValue) {
+	if config.ShouldJSONErrors(ec.OutputType) {
 		rootCmd.SilenceErrors = true
 		rootCmd.SilenceUsage = true
 	}
+	return ec
 }
 
 func init() {

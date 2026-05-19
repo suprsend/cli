@@ -129,7 +129,10 @@ func GetResolvedMgmntUrl(activeProfile Profile) ConfigString {
 
 func GetResolvedDebug() ConfigBool {
 	v := os.Getenv("DEBUG")
-	debugVal, _ := strconv.ParseBool(v)
+	debugVal, err := strconv.ParseBool(v)
+	if err != nil && v != "" {
+		log.Warnf("invalid DEBUG=%q: expected true/false/1/0; treating as false", v)
+	}
 	return ConfigBool{Value: debugVal, RawValue: v, Source: ConfigSourceEnv}
 }
 

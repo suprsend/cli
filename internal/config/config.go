@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"gopkg.in/yaml.v3"
@@ -177,9 +176,6 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.Debug = GetResolvedDebug()
 
 	c.NoColorOutput = GetResolvedNoColor(flags.NoColor)
-	if c.NoColorOutput.Value {
-		color.NoColor = true
-	}
 	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
 	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
 

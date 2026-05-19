@@ -139,13 +139,9 @@ func init() {
 		}
 
 		if resolveErr != nil {
-			var ce *clierr.CLIError
-			if errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
-				if cmd.Name() == "env" {
-					return nil
-				}
+			if cmd.Name() == "env" {
+				return nil
 			}
-
 			if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
 				return nil
 			}

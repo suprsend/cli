@@ -21,6 +21,10 @@ suprsend event pull [flags]
   suprsend event pull --workspace production
 ```
 
+### Tips
+
+- Pull overwrites local `events/<name>/event.json` files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+
 ### Options
 
 ```

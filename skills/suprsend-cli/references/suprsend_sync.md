@@ -24,6 +24,11 @@ suprsend sync [flags]
   suprsend sync --from staging --to production --dry-run
 ```
 
+### Tips
+
+- `--from` is the source, `--to` is the destination. They must be different workspaces; sync **overwrites** drafts in the destination.
+- Pair with `--dry-run` to validate every asset server-side without writing to the destination. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).
+
 ### Options
 
 ```

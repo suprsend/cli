@@ -30,6 +30,7 @@ suprsend schema push [<slug>] [flags]
       --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing schema files (default: ./suprsend/schemas)
   -n, --dry-run                 Print what would be pushed without making any changes
+  -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
   -j, --json string             Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
   -g, --slug string             Schema slug to push (omit to push all)

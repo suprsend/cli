@@ -113,10 +113,14 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 		}
 
 		if existing, collision := seen[strings.ToLower(dirName)]; collision {
-			return stats, fmt.Errorf(
+			stats.Failed++
+			msg := fmt.Sprintf(
 				"events: names %q and %q collide on directory %q; rename one in the SuprSend UI and re-pull",
 				existing, name, dirName,
 			)
+			stats.Errors = append(stats.Errors, msg)
+			log.Warnf("Skipping %q: %s", name, msg)
+			continue
 		}
 		seen[strings.ToLower(dirName)] = name
 

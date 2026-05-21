@@ -17,9 +17,6 @@ suprsend sync [flags]
   # Sync only workflows
   suprsend sync --from staging --to production --assets workflow
 
-  # Sync and commit immediately (prompts for confirmation)
-  suprsend sync --from staging --to production --commit
-
   # Dry run: preview what would be synced without making changes
   suprsend sync --from staging --to production --dry-run
 ```
@@ -33,8 +30,7 @@ suprsend sync [flags]
 
 ```
   -a, --assets string           Asset types to sync: all, workflow, schema, event, category, translation, or template (default "all")
-  -c, --commit                  Promote changes from draft to live after syncing
-      --commit-message string   Commit message applied to every committed resource in this sync run (required when --commit is set)
+      --commit-message string   Commit message applied to every committed resource in this sync run
   -d, --dir string              Local directory for intermediate file storage during sync
   -n, --dry-run                 Print what would be synced without making any changes
   -F, --force                   Skip confirmation prompt

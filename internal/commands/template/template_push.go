@@ -195,6 +195,19 @@ var templatePushCmd = &cobra.Command{
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		var dryRunSlugs []string
 
+		if commit && !dryRun && !force {
+			target := "all templates"
+			if slug != "" {
+				target = fmt.Sprintf("template '%s'", slug)
+			}
+			msg := fmt.Sprintf("This will push and promote %s to live in workspace \"%s\". Continue?", target, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
+		}
+
 		if path == "" {
 			path = filepath.Join(".", "suprsend", "templates")
 		}

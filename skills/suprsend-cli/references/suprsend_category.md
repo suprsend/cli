@@ -12,7 +12,6 @@ suprsend category [flags]
 
 ```
   suprsend category list
-  suprsend category get --output json
   suprsend category pull --dir ./suprsend/categories
   suprsend category push --commit
 ```

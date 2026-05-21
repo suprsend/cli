@@ -1,138 +1,196 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"sync"
+	"strconv"
 
-	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/suprsend/cli/internal/clierr"
+	"gopkg.in/yaml.v3"
 )
 
-type cliFormatter struct {
-	noColor bool
+type ConfigSource string
+
+const (
+	ConfigSourceEnv     ConfigSource = "env"
+	ConfigSourceFlag    ConfigSource = "flag"
+	ConfigSourceProfile ConfigSource = "profile"
+	ConfigSourceDefault ConfigSource = "default"
+)
+
+type ConfigString struct {
+	Value  string
+	Source ConfigSource
 }
 
-func (f *cliFormatter) Format(entry *log.Entry) ([]byte, error) {
-	var buf bytes.Buffer
-	if entry.Level == log.InfoLevel {
-		fmt.Fprintf(&buf, "%s\n", entry.Message)
-		return buf.Bytes(), nil
-	}
-	var levelLabel string
-	if f.noColor {
-		levelLabel = fmt.Sprintf("%-5s", entry.Level.String())
-	} else {
-		switch entry.Level {
-		case log.WarnLevel:
-			levelLabel = color.YellowString("%-5s", entry.Level.String())
-		case log.ErrorLevel:
-			levelLabel = color.RedString("%-5s", entry.Level.String())
-		case log.DebugLevel:
-			levelLabel = color.CyanString("%-5s", entry.Level.String())
-		default:
-			levelLabel = fmt.Sprintf("%-5s", entry.Level.String())
-		}
-	}
-	fmt.Fprintf(&buf, "%s %s\n", levelLabel, entry.Message)
-	return buf.Bytes(), nil
+func (p ConfigString) MarshalYAML() (interface{}, error) {
+	return p.Value, nil
+}
+
+func (p *ConfigString) UnmarshalYAML(value *yaml.Node) error {
+	p.Value = value.Value
+	return nil
+}
+
+func (p ConfigString) String() string {
+	return p.Value
+}
+
+type ConfigBool struct {
+	Value    bool
+	RawValue string
+	Source   ConfigSource
+}
+
+func (p ConfigBool) MarshalYAML() (interface{}, error) {
+	return p.Value, nil
+}
+
+func (p *ConfigBool) UnmarshalYAML(value *yaml.Node) error {
+	return value.Decode(&p.Value)
+}
+
+func (p ConfigBool) Bool() bool {
+	return p.Value
 }
 
 // Config holds the application's configuration.
 type Config struct {
-	CfgFile       string
-	OutputType    string
-	Verbosity     string
-	ServiceToken  string
-	NoColorOutput bool
-	Workspace     string
-	Quiet         bool
+	ServiceToken  ConfigString
+	NoColorOutput ConfigBool
+	BaseUrl       ConfigString
+	MgmntUrl      ConfigString
+	ProxyURL      ConfigString
+	// flag only configs (not resolved from env/profile)
+	CfgFile    ConfigString
+	Workspace  ConfigString
+	OutputType ConfigString
+	Verbosity  ConfigString
+	Quiet      ConfigBool
+	Debug      ConfigBool
 }
 
-// cfg is the global configuration instance.
+const (
+	DefaultBaseUrl  = "https://hub.suprsend.com/"
+	DefaultMgmntUrl = "https://management-api.suprsend.com/"
+)
+
+// Cfg is the global configuration instance.
 var Cfg = &Config{}
 
-// initConfig reads in config file and ENV variables if set.
-func InitConfig(cfgFile string) {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
+// FlagValues holds the raw values parsed from CLI flags before any resolution.
+type FlagValues struct {
+	Workspace    string
+	CfgFile      string
+	OutputType   string
+	Verbosity    string
+	ServiceToken string
+	NoColor      bool
+	Quiet        bool
+}
 
-		if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
-			log.Fatalf("Config file does not exist: %s", cfgFile)
+func GetResolvedServiceToken(flagToken string, activeProfile Profile) (ConfigString, error) {
+	if envToken := os.Getenv("SUPRSEND_SERVICE_TOKEN"); envToken != "" {
+		log.Debug("Using service token from environment variable")
+		return ConfigString{Value: envToken, Source: ConfigSourceEnv}, nil
+	}
+	if flagToken != "" {
+		log.Debug("Using service token from command line flag")
+		return ConfigString{Value: flagToken, Source: ConfigSourceFlag}, nil
+	}
+	if activeProfile.ServiceToken.Value != "" {
+		log.Debug("Using service token from config file profile")
+		return ConfigString{Value: activeProfile.ServiceToken.Value, Source: ConfigSourceProfile}, nil
+	}
+	return ConfigString{}, clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
+		WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
+}
+
+func GetResolvedBaseUrl(activeProfile Profile) ConfigString {
+	if envUrl := os.Getenv("SUPRSEND_BASE_URL"); envUrl != "" {
+		return ConfigString{Value: envUrl, Source: ConfigSourceEnv}
+	}
+	if activeProfile.BaseUrl.Value != "" {
+		return ConfigString{Value: activeProfile.BaseUrl.Value, Source: ConfigSourceProfile}
+	}
+	return ConfigString{Value: DefaultBaseUrl, Source: ConfigSourceDefault}
+}
+
+func GetResolvedMgmntUrl(activeProfile Profile) ConfigString {
+	if envUrl := os.Getenv("SUPRSEND_MGMNT_URL"); envUrl != "" {
+		return ConfigString{Value: envUrl, Source: ConfigSourceEnv}
+	}
+	if activeProfile.MgmntUrl.Value != "" {
+		return ConfigString{Value: activeProfile.MgmntUrl.Value, Source: ConfigSourceProfile}
+	}
+	return ConfigString{Value: DefaultMgmntUrl, Source: ConfigSourceDefault}
+}
+
+func GetResolvedDebug() ConfigBool {
+	v := os.Getenv("DEBUG")
+	debugVal, err := strconv.ParseBool(v)
+	if err != nil && v != "" {
+		log.Warnf("invalid DEBUG=%q: expected true/false/1/0; treating as false", v)
+	}
+	return ConfigBool{Value: debugVal, RawValue: v, Source: ConfigSourceEnv}
+}
+
+func GetResolvedNoColor(flagNoColor bool) ConfigBool {
+	if v := os.Getenv("NO_COLOR"); v != "" {
+		return ConfigBool{Value: true, RawValue: v, Source: ConfigSourceEnv}
+	}
+	if flagNoColor {
+		return ConfigBool{Value: true, Source: ConfigSourceFlag}
+	}
+	return ConfigBool{Value: false, Source: ConfigSourceDefault}
+}
+
+// Resolve populates c with all flag-derived and env-var / profile-resolved values.
+// Priority varies by field:
+//   - ServiceToken: env > flag > profile (no default — errors if unset)
+//   - BaseUrl, MgmntUrl: env > profile > default
+//   - NoColorOutput: env > flag > default
+//   - Debug, ProxyURL: env only
+//   - Workspace, OutputType, Verbosity, Quiet, CfgFile: flag only
+func (c *Config) Resolve(flags FlagValues) error {
+	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
+	if flags.CfgFile != "" {
+		if _, err := os.Stat(flags.CfgFile); err != nil {
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot read config file %s", flags.CfgFile))
 		}
-		if _, err := os.ReadFile(cfgFile); err != nil {
-			log.Fatalf("Config file is not readable: %s - %v", cfgFile, err)
+	}
+	var activeProfile Profile
+	if configPath := GetConfigFilePath(); configPath != "" {
+		if cfg, err := LoadProfileConfig(configPath); err == nil {
+			activeProfile = cfg.Profiles[cfg.ActiveProfile]
+			log.Debug("Using config file:", configPath)
+		} else if flags.CfgFile != "" {
+			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot parse config file %s", configPath))
+		} else {
+			log.Debugf("failed to load config file %s: %v", configPath, err)
 		}
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".suprsend")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
-	// load configs from env
-	viper.BindEnv("debug", "DEBUG")
-	// if NO_COLOR is set, disable color output
-	if viper.GetBool("NO_COLOR") {
-		color.NoColor = true
+	c.Workspace = ConfigString{Value: flags.Workspace, Source: ConfigSourceFlag}
+	c.OutputType = ConfigString{Value: flags.OutputType, Source: ConfigSourceFlag}
+	c.Verbosity = ConfigString{Value: flags.Verbosity, Source: ConfigSourceFlag}
+	c.Quiet = ConfigBool{Value: flags.Quiet, Source: ConfigSourceFlag}
+	c.Debug = GetResolvedDebug()
+
+	c.NoColorOutput = GetResolvedNoColor(flags.NoColor)
+	c.BaseUrl = GetResolvedBaseUrl(activeProfile)
+	c.MgmntUrl = GetResolvedMgmntUrl(activeProfile)
+
+	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
+		c.ProxyURL = ConfigString{Value: proxyURL, Source: ConfigSourceEnv}
 	}
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		log.Debug("Using config file:", viper.ConfigFileUsed())
-	} else if cfgFile != "" {
-		log.Fatalf("Failed to read config file: %s - %v", cfgFile, err)
-	}
-}
-
-var isStderrPiped = sync.OnceValue(func() bool {
-	fi, err := os.Stderr.Stat()
-	return err == nil && (fi.Mode()&os.ModeCharDevice) == 0
-})
-
-// IsStderrPiped reports whether os.Stderr is not connected to a terminal.
-// Result is cached after the first call.
-func IsStderrPiped() bool {
-	return isStderrPiped()
-}
-
-// ShouldJSONErrors returns true when errors must be emitted as structured JSON.
-func ShouldJSONErrors() bool {
-	return Cfg.OutputType == "json" || IsStderrPiped()
-}
-
-// setUpLogs set the log output ans the log level
-func SetUpLogs() error {
-	log.SetFormatter(&cliFormatter{noColor: viper.GetBool("NO_COLOR")})
-
-	// In JSON errors mode suppress logrus entirely — utils.WriteError is the sole stderr writer.
-	if Cfg.OutputType == "json" || IsStderrPiped() {
-		log.SetLevel(log.FatalLevel)
-		return nil
-	}
-
-	if Cfg.Quiet {
-		log.SetOutput(os.Stderr)
-		log.SetLevel(log.ErrorLevel)
-		return nil
-	}
-	if viper.GetBool("debug") {
-		Cfg.Verbosity = "debug"
-	}
-	lvl, err := log.ParseLevel(Cfg.Verbosity)
+	token, err := GetResolvedServiceToken(flags.ServiceToken, activeProfile)
 	if err != nil {
-		return errors.Wrap(err, "parsing log level")
+		return err
 	}
-	log.SetOutput(os.Stderr)
-	log.SetLevel(lvl)
+	c.ServiceToken = token
+
 	return nil
 }

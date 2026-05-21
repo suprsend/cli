@@ -32,7 +32,17 @@ var translationPushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
 		var dryRunNames []string
+
+		if commit && !dryRun && !force {
+			msg := fmt.Sprintf("This will push and promote translations to live in workspace \"%s\". Continue?", workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
+		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
@@ -190,5 +200,6 @@ func init() {
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: ./suprsend/translations)")
 	translationPushCmd.Flags().StringP("json", "j", "", `Translations as a JSON object mapping locale codes (without .json extension) to their translation content objects, e.g. '{"en":{"key":"value"},"fr":{"key":"valeur"}}'`)
 	translationPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	translationPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

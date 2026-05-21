@@ -30,9 +30,6 @@ var syncCmd = &cobra.Command{
   # Sync only workflows
   suprsend sync --from staging --to production --assets workflow
 
-  # Sync and commit immediately (prompts for confirmation)
-  suprsend sync --from staging --to production --commit
-
   # Dry run: preview what would be synced without making changes
   suprsend sync --from staging --to production --dry-run`,
 	Annotations: map[string]string{
@@ -45,7 +42,7 @@ var syncCmd = &cobra.Command{
 		toWorkspace, _ := cmd.Flags().GetString("to")
 		assets, _ := cmd.Flags().GetString("assets")
 		dirPath, _ := cmd.Flags().GetString("dir")
-		commit, _ := cmd.Flags().GetBool("commit")
+		commit := true
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		force, _ := cmd.Flags().GetBool("force")
@@ -77,7 +74,7 @@ var syncCmd = &cobra.Command{
 			)
 		}
 
-		if commit && !dryRun && !force {
+		if !dryRun && !force {
 			msg := fmt.Sprintf("This will sync %s from \"%s\" to \"%s\" and commit each. Continue?", assets, fromWorkspace, toWorkspace)
 			confirmed, err := utils.ConfirmDestructiveAction(msg)
 			if err != nil || !confirmed {
@@ -149,8 +146,7 @@ func init() {
 	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage during sync")
 	syncCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
 	syncCmd.Flags().StringP("assets", "a", "all", "Asset types to sync: all, workflow, schema, event, category, translation, or template")
-	syncCmd.Flags().BoolP("commit", "c", true, "Promote changes from draft to live after syncing")
-	syncCmd.Flags().String("commit-message", "", "Commit message applied to every committed resource in this sync run (required when --commit is set)")
+	syncCmd.Flags().String("commit-message", "", "Commit message applied to every committed resource in this sync run")
 	syncCmd.Flags().BoolP("dry-run", "n", false, "Print what would be synced without making any changes")
 	syncCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 }

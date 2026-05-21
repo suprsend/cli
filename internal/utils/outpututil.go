@@ -22,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
+	"github.com/suprsend/cli/internal/termio"
 	"github.com/tidwall/pretty"
 	"github.com/yarlson/pin"
 	"gopkg.in/yaml.v3"
@@ -85,10 +86,16 @@ type Spinner struct {
 func NewSpinner(text string) *Spinner {
 	s := &Spinner{}
 	if ShowSpinner() {
+		// Wrapping pin's writer breaks its internal TTY detection (it checks for
+		// *os.File). ShowSpinner has already verified stdout is a TTY, so it's
+		// safe to force the interactive code path here.
+		pin.ForceInteractive = true
 		s.p = pin.New(text,
 			pin.WithSpinnerColor(pin.ColorCyan),
 			pin.WithTextColor(pin.ColorYellow),
+			pin.WithWriter(termio.SpinnerWriter(os.Stdout)),
 		)
+		termio.MarkSpinnerStart()
 		s.cancel = s.p.Start(context.Background())
 	}
 	return s
@@ -100,6 +107,7 @@ func (s *Spinner) Stop(msg string) {
 		s.p.Stop(msg)
 		s.cancel()
 		s.p = nil
+		termio.MarkSpinnerStop()
 	}
 }
 

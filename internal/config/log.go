@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/termio"
 )
 
 type cliFormatter struct {
@@ -72,7 +73,7 @@ func SetUpLogs() error {
 	}
 
 	if Cfg.Quiet.Value {
-		log.SetOutput(os.Stderr)
+		log.SetOutput(termio.LogWriter(os.Stderr))
 		log.SetLevel(log.ErrorLevel)
 		return nil
 	}
@@ -83,7 +84,7 @@ func SetUpLogs() error {
 	if err != nil {
 		return clierr.Wrap(err, clierr.CodeInvalidUsage, fmt.Sprintf("invalid log level %q", Cfg.Verbosity.Value))
 	}
-	log.SetOutput(os.Stderr)
+	log.SetOutput(termio.LogWriter(os.Stderr))
 	log.SetLevel(lvl)
 	return nil
 }

@@ -21,7 +21,6 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 
 - [`suprsend category`](references/suprsend_category.md) - Manage preference categories
 - [`suprsend category commit`](references/suprsend_category_commit.md) - Commit categories
-- [`suprsend category get`](references/suprsend_category_get.md) - Get categories and translations
 - [`suprsend category list`](references/suprsend_category_list.md) - List categories
 - [`suprsend category pull`](references/suprsend_category_pull.md) - Pull categories from a workspace
 - [`suprsend category push`](references/suprsend_category_push.md) - Push categories to a workspace

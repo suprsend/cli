@@ -46,6 +46,16 @@ var categoryPushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
+
+		if commit && !dryRun && !force {
+			msg := fmt.Sprintf("This will push and promote categories to live in workspace \"%s\". Continue?", workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
+		}
 
 		// Aggregate stats across translations + categories so the run finishes
 		// with a single "=== Category Push Summary ===" block matching the
@@ -276,5 +286,6 @@ func init() {
 	categoryPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
 	categoryPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	categoryPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

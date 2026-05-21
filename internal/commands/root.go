@@ -54,6 +54,7 @@ func Execute() error {
 	// Run early setup so flag-parse errors (unknown flags) also get proper
 	// silencing and log formatting — PersistentPreRunE won't fire in that case.
 	early := earlySetup()
+	warnSingleDashLongFlags(os.Args[1:])
 	err := rootCmd.Execute()
 	if err != nil {
 		if isCobraUsageError(err) {
@@ -74,6 +75,41 @@ func isCobraUsageError(err error) bool {
 		errors.As(err, &invalidValue) ||
 		errors.As(err, &invalidSyntax) ||
 		strings.Contains(err.Error(), "unknown command")
+}
+
+// warnSingleDashLongFlags scans raw args for tokens like `-slug` where the
+// suffix matches a registered long-flag name. In pflag, a single dash starts a
+// chain of *short* flags, so `-slug` parses as `-s lug` (or four bool shorts),
+// silently corrupting whatever `-s` is bound to. The classic case: `-s` is the
+// shorthand for `--service-token`, so `-slug foo` quietly overrides the token
+// with "lug" and the API returns 401 "invalid service token". We warn before
+// cobra parses so the user sees the hint even when parsing itself succeeds.
+func warnSingleDashLongFlags(args []string) {
+	longFlags := map[string]struct{}{}
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) { longFlags[f.Name] = struct{}{} })
+		c.PersistentFlags().VisitAll(func(f *pflag.Flag) { longFlags[f.Name] = struct{}{} })
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(rootCmd)
+
+	for _, arg := range args {
+		if len(arg) < 3 || !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") {
+			continue
+		}
+		name := strings.TrimPrefix(arg, "-")
+		if eq := strings.Index(name, "="); eq != -1 {
+			name = name[:eq]
+		}
+		if _, ok := longFlags[name]; ok {
+			fmt.Fprintf(os.Stderr,
+				"warning: %q looks like a typo for \"--%s\" — a single dash starts short flags, long flags need two dashes\n",
+				arg, name)
+		}
+	}
 }
 
 // earlySetup scans raw os.Args to apply critical initialization before Cobra

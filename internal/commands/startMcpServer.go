@@ -157,15 +157,26 @@ var listToolsCmd = &cobra.Command{
 			Tool_Name        string `json:"tool_name"`
 			Tool_Description string `json:"tool_description"`
 		}
+		// Dual-field envelope (Phase 4–5 transition): ported tool files
+		// populate t.Tool; un-ported files still populate t.MCPTool + t.Name.
+		// Read from whichever is set so the listing stays accurate while the
+		// per-file ports land. Removed in Task 5.x once the envelope collapses
+		// to a single *mcpsdk.Tool.
+		describe := func(t *toolset.Tool) toolListResponse {
+			if t.Tool != nil {
+				return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Tool.Name, Tool_Description: t.Tool.Description}
+			}
+			return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description}
+		}
 		var resp []toolListResponse
 		for _, t := range toolset.GetAllTools() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
+			resp = append(resp, describe(t))
 		}
 		for _, t := range toolset.GetAllEvents() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
+			resp = append(resp, describe(t))
 		}
 		for _, t := range toolset.GetAllWorkflows() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
+			resp = append(resp, describe(t))
 		}
 		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(resp, outputType)

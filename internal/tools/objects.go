@@ -2,28 +2,34 @@ package tools
 
 import (
 	"context"
+	"errors"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/pkg/mcpsdk"
+	"github.com/suprsend/cli/pkg/mcpserver"
 	"github.com/suprsend/suprsend-go"
 	"gopkg.in/yaml.v3"
 )
 
-func getObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	object_id, err := request.RequireString("object_id")
+func getObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	object_id, err := args.RequireString("object_id")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	object_type, err := request.RequireString("object_type")
+	object_type, err := args.RequireString("object_type")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	workspace := request.GetString("workspace", "staging")
-	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
+	workspace := args.GetString("workspace", "staging")
+	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	obj_identifier := suprsend.ObjectIdentifier{
@@ -33,37 +39,43 @@ func getObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 
 	objects_resp, err := suprsend_client.Objects.Get(ctx, obj_identifier)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	yamlobject, err := yaml.Marshal(objects_resp)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	return mcp.NewToolResultText(string(yamlobject)), nil
+	return mcpsdk.Result{Text: string(yamlobject)}, nil
 }
 
-func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	object_id, err := request.RequireString("object_id")
+func upsertObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	object_id, err := args.RequireString("object_id")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	object_type, err := request.RequireString("object_type")
+	object_type, err := args.RequireString("object_type")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	workspace := request.GetString("workspace", "staging")
-	action, err := request.RequireString("action")
+	workspace := args.GetString("workspace", "staging")
+	action, err := args.RequireString("action")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace)
+	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	obj_identifier := suprsend.ObjectIdentifier{
@@ -73,61 +85,67 @@ func upsertObjectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	obj_instance := suprsend_client.Objects.GetEditInstance(obj_identifier)
 
-	key := request.GetString("key", "")
-	value := request.GetString("value", "")
+	key := args.GetString("key", "")
+	value := args.GetString("value", "")
 
 	if utils.RequiresKey(action) && key == "" {
-		return mcp.NewToolResultError("key is required for " + action), nil
+		return mcpsdk.Result{Text: "key is required for " + action, IsError: true}, nil
 	}
 
 	if utils.RequiresValue(action) && value == "" {
-		return mcp.NewToolResultError("value is required for " + action), nil
+		return mcpsdk.Result{Text: "value is required for " + action, IsError: true}, nil
 	}
 
-	slack_details, err := getSlackDetails(request, action)
+	slack_details, err := getSlackDetailsFromArgs(args, action)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	ms_teams_details, err := getMSTeamsDetails(request, action)
+	ms_teams_details, err := getMSTeamsDetailsFromArgs(args, action)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	webpush_details, err := getWebpushDetails(request, action)
+	webpush_details, err := getWebpushDetailsFromArgs(args, action)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	out, err := utils.HandleObjectAction(ctx, obj_instance, action, key, value, slack_details, ms_teams_details, webpush_details, obj_identifier, workspace)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	_, err = suprsend_client.Objects.Edit(ctx, suprsend.ObjectEditRequest{EditInstance: obj_instance})
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
-	return mcp.NewToolResultText(out), nil
+	return mcpsdk.Result{Text: out}, nil
 }
 
-func getObjectPreferences(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	objId, err := request.RequireString("object_id")
+func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	objId, err := args.RequireString("object_id")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	objType, err := request.RequireString("object_type")
+	objType, err := args.RequireString("object_type")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	category := request.GetString("category", "")
-	channel_preferences := request.GetBool("channel_preferences", false)
-	workspace := request.GetString("workspace", "staging")
-	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	category := args.GetString("category", "")
+	channel_preferences := args.GetBool("channel_preferences", false)
+	workspace := args.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	objIdentifier := suprsend.ObjectIdentifier{
@@ -139,37 +157,46 @@ func getObjectPreferences(ctx context.Context, request mcp.CallToolRequest) (*mc
 	if channel_preferences {
 		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
 		if err != nil {
-			return nil, err
+			if utils.IsAuthError(err) {
+				mcpserver.MarkSessionDead(ctx)
+			}
+			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
 	} else if category == "" {
 		objPref, err = suprsendClient.Objects.GetFullPreference(ctx, objIdentifier, nil)
 		if err != nil {
-			return nil, err
+			if utils.IsAuthError(err) {
+				mcpserver.MarkSessionDead(ctx)
+			}
+			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
 	} else {
 		objPref, err = suprsendClient.Objects.GetCategoryPreference(ctx, objIdentifier, category, nil)
 		if err != nil {
-			return nil, err
+			if utils.IsAuthError(err) {
+				mcpserver.MarkSessionDead(ctx)
+			}
+			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
 	}
 
 	yamlPref, err := yaml.Marshal(objPref)
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	return mcp.NewToolResultText(string(yamlPref)), nil
+	return mcpsdk.Result{Text: string(yamlPref)}, nil
 }
 
-func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	objId, err := request.RequireString("object_id")
+func updateObjectCategoryPreference(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	objId, err := args.RequireString("object_id")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	objType, err := request.RequireString("object_type")
+	objType, err := args.RequireString("object_type")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	obj := suprsend.ObjectIdentifier{
@@ -177,32 +204,32 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 		ObjectType: objType,
 	}
 
-	category, err := request.RequireString("category")
+	category, err := args.RequireString("category")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	args := request.GetArguments()
+	rawArgs := args.Map()
 
-	pref, err := request.RequireString("preference")
+	pref, err := args.RequireString("preference")
 	if err != nil {
-		return mcp.NewToolResultError("preference must be a string"), nil
+		return mcpsdk.Result{Text: "preference must be a string", IsError: true}, nil
 	}
 
-	optOutAny, ok := args["opt_out_channels"]
+	optOutAny, ok := rawArgs["opt_out_channels"]
 	if !ok {
 		optOutAny = []any{}
 	}
 	optOutSlice, ok := optOutAny.([]any)
 	if !ok {
-		return mcp.NewToolResultError("opt_out_channels must be an array"), nil
+		return mcpsdk.Result{Text: "opt_out_channels must be an array", IsError: true}, nil
 	}
 
 	optOutChannels := make([]string, 0, len(optOutSlice))
 	for _, v := range optOutSlice {
 		s, ok := v.(string)
 		if !ok {
-			return mcp.NewToolResultError("opt_out_channels must be an array of strings"), nil
+			return mcpsdk.Result{Text: "opt_out_channels must be an array of strings", IsError: true}, nil
 		}
 		optOutChannels = append(optOutChannels, s)
 	}
@@ -212,78 +239,231 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 		OptOutChannels: optOutChannels,
 	}
 
-	workspace := request.GetString("workspace", "staging")
+	workspace := args.GetString("workspace", "staging")
 
-	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		return nil, err
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	objPref, err := suprsendClient.Objects.UpdateCategoryPreference(ctx, obj, category, prefPayload, nil)
 	if err != nil {
-		return nil, err
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	yamlPref, err := yaml.Marshal(objPref)
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	return mcp.NewToolResultText(string(yamlPref)), nil
+	return mcpsdk.Result{Text: string(yamlPref)}, nil
 }
 
-func updateObjectChannelPreferenceHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	objId, err := request.RequireString("object_id")
+func updateObjectChannelPreferenceHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	objId, err := args.RequireString("object_id")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	objType, err := request.RequireString("object_type")
+	objType, err := args.RequireString("object_type")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	obj := suprsend.ObjectIdentifier{
 		Id:         objId,
 		ObjectType: objType,
 	}
 
-	channelPreferencesAny, ok := request.GetArguments()["channel_preferences"].([]any)
+	channelPreferencesAny, ok := args.Map()["channel_preferences"].([]any)
 	if !ok {
-		return mcp.NewToolResultError("channel_preferences must be an array"), nil
+		return mcpsdk.Result{Text: "channel_preferences must be an array", IsError: true}, nil
 	}
 	var channelPreferences = []suprsend.ObjectGlobalChannelPreference{}
 	err = utils.Remarshal(channelPreferencesAny, &channelPreferences)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	prefPayload := suprsend.ObjectGlobalChannelsPreferenceUpdateBody{
 		ChannelPreferences: channelPreferences,
 	}
-	workspace := request.GetString("workspace", "staging")
-	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	workspace := args.GetString("workspace", "staging")
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		return nil, err
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	objPref, err := suprsendClient.Objects.UpdateGlobalChannelsPreference(ctx, obj, prefPayload, nil)
 	if err != nil {
-		return nil, err
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	yamlPref, err := yaml.Marshal(objPref)
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	return mcp.NewToolResultText(string(yamlPref)), nil
+	return mcpsdk.Result{Text: string(yamlPref)}, nil
+}
+
+// getSlackDetailsFromArgs is the mcpsdk.Args sibling of user.go's
+// getSlackDetails. Once user.go is ported (Task 5.4) this and the legacy
+// helper collapse into a single utility.
+func getSlackDetailsFromArgs(args mcpsdk.Args, action string) (map[string]any, error) {
+	if action != "add_slack" && action != "remove_slack" {
+		return nil, nil
+	}
+	raw, ok := args.Map()["slack_details"]
+	if !ok {
+		return nil, errors.New("required argument 'slack_details' not found")
+	}
+	details, ok := raw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid slack_details")
+	}
+	return details, nil
+}
+
+func getMSTeamsDetailsFromArgs(args mcpsdk.Args, action string) (map[string]any, error) {
+	if action != "add_ms_teams" && action != "remove_ms_teams" {
+		return nil, nil
+	}
+	raw, ok := args.Map()["ms_teams_details"]
+	if !ok {
+		return nil, errors.New("required argument 'ms_teams_details' not found")
+	}
+	details, ok := raw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid ms_teams_details")
+	}
+	return details, nil
+}
+
+func getWebpushDetailsFromArgs(args mcpsdk.Args, action string) (map[string]any, error) {
+	if action != "add_webpush" && action != "remove_webpush" {
+		return nil, nil
+	}
+	raw, ok := args.Map()["webpush_details"]
+	if !ok {
+		return nil, errors.New("required argument 'webpush_details' not found")
+	}
+	details, ok := raw.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid webpush_details")
+	}
+	return details, nil
+}
+
+// slackDetailsSchema mirrors user.go's slackPropertiesSchema as a typed
+// *jsonschema.Schema. Promoted to a package-level var so it can be reused once
+// user.go is ported in Task 5.4.
+var slackDetailsSchema = &jsonschema.Schema{
+	Type:        "object",
+	Description: "This is only applicable for add_slack and remove_slack actions.",
+	Properties: map[string]*jsonschema.Schema{
+		"access_token":               {Type: "string", Description: "Access token for the Slack workspace"},
+		"slack_email":                {Type: "string", Description: "Email of the user to add to the Slack workspace"},
+		"slack_channel_id":           {Type: "string", Description: "ID of the Slack channel"},
+		"slack_user_id":              {Type: "string", Description: "ID of the Slack user"},
+		"slack_incoming_webhook_url": {Type: "string", Description: "Incoming webhook URL for the Slack"},
+	},
+}
+
+// msTeamsDetailsSchema mirrors user.go's msTeamsPropertiesSchema (+ the
+// msTeamsRequiredFields() option that stamps `required: ["type"]`) as a
+// single typed *jsonschema.Schema.
+var msTeamsDetailsSchema = &jsonschema.Schema{
+	Type:        "object",
+	Description: "This is only applicable for add_ms_teams and remove_ms_teams actions.",
+	Properties: map[string]*jsonschema.Schema{
+		"type": {
+			Type: "string",
+			Enum: []any{"incoming_webhook", "channel", "user", "user_id"},
+		},
+		"incoming_webhook": {
+			Type:                 "object",
+			Title:                "IncomingWebhook",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties: map[string]*jsonschema.Schema{
+				"url": {Type: "string", Format: "uri"},
+			},
+			Required: []string{"url"},
+		},
+		"channel": {
+			Type:                 "object",
+			Title:                "Channel",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties: map[string]*jsonschema.Schema{
+				"tenant_id":       {Type: "string"},
+				"service_url":     {Type: "string", Format: "uri"},
+				"conversation_id": {Type: "string"},
+			},
+			Required: []string{"conversation_id", "service_url", "tenant_id"},
+		},
+		"user": {
+			Type:                 "object",
+			Title:                "Channel",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties: map[string]*jsonschema.Schema{
+				"tenant_id":       {Type: "string"},
+				"service_url":     {Type: "string", Format: "uri"},
+				"conversation_id": {Type: "string"},
+			},
+			Required: []string{"conversation_id", "service_url", "tenant_id"},
+		},
+		"user_id": {
+			Type:                 "object",
+			Title:                "UserID",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties: map[string]*jsonschema.Schema{
+				"tenant_id":   {Type: "string"},
+				"service_url": {Type: "string", Format: "uri"},
+				"user_id":     {Type: "string"},
+			},
+			Required: []string{"tenant_id", "user_id", "service_url"},
+		},
+	},
+	Required: []string{"type"},
+}
+
+// webpushDetailsSchema rewrites the inline mcp.WithObject(...) literal as a
+// typed *jsonschema.Schema. Keys.auth + keys.p256dh are both required and the
+// `keys` object disallows additional properties (matching the original
+// `additionalProperties: false`).
+var webpushDetailsSchema = &jsonschema.Schema{
+	Type:        "object",
+	Description: "This is only applicable for add_webpush and remove_webpush actions.",
+	Properties: map[string]*jsonschema.Schema{
+		"keys": {
+			Type:                 "object",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties: map[string]*jsonschema.Schema{
+				"auth":   {Type: "string", Description: "The auth key for the webpush"},
+				"p256dh": {Type: "string", Description: "The p256dh key for the webpush"},
+			},
+			Required: []string{"auth", "p256dh"},
+		},
+		"endpoint": {Type: "string", Description: "The endpoint for the webpush"},
+	},
 }
 
 func newObjectTools() []*Tool {
 	get_suprsend_object := &Tool{
-		Name:        "objects.get",
-		MCPTool: mcp.NewTool("get_suprsend_object",
-			mcp.WithDescription(`Get a SuprSend object's full state by object_type + object_id. Objects are non-user entities — organizations, projects, vehicles, devices — namespaced by object_type.
+		Tool: &mcpsdk.Tool{
+			Name: "get_suprsend_object",
+			Description: `Get a SuprSend object's full state by object_type + object_id. Objects are non-user entities — organizations, projects, vehicles, devices — namespaced by object_type.
 
 When to use: the user references an object by id and you need its stored properties or channel identifiers.
 
@@ -292,29 +472,29 @@ When NOT to use:
 - For preferences only — use get_suprsend_object_preferences.
 - For followers / members — use get_suprsend_object_subscriptions.
 
-Returns: YAML mirroring get_suprsend_user's shape — object_type, object_id, properties (custom fields), created_at, updated_at, and a channels array (each entry has channel value, status, perma_status).`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The type of object you want to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("Suprsend workspace to get the object from"),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: getObjectHandler,
+Returns: YAML mirroring get_suprsend_user's shape — object_type, object_id, properties (custom fields), created_at, updated_at, and a channels array (each entry has channel value, status, perma_status).`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"object_id":   {Type: "string", Description: "The object_id of the object to get."},
+					"object_type": {Type: "string", Description: "The type of object you want to get."},
+					"workspace":   {Type: "string", Description: "Suprsend workspace to get the object from"},
+				},
+				Required: []string{"object_id", "object_type"},
+			},
+			Annotations: mcpsdk.Annotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+				OpenWorldHint:  true,
+			},
+			Handler: getObjectHandler,
+		},
 	}
 
 	upsert_suprsend_object := &Tool{
-		Name:        "objects.upsert",
-		MCPTool: mcp.NewTool("upsert_suprsend_object",
-			mcp.WithDescription(`Modify properties or channel identifiers on a SuprSend object — a non-user entity like an organization, project, or vehicle. One call performs ONE action; for multiple changes, call this tool multiple times.
+		Tool: &mcpsdk.Tool{
+			Name: "upsert_suprsend_object",
+			Description: `Modify properties or channel identifiers on a SuprSend object — a non-user entity like an organization, project, or vehicle. One call performs ONE action; for multiple changes, call this tool multiple times.
 
 Actions:
 - set, set_once, unset, remove — modify a scalar property by key/value. remove permanently deletes the key.
@@ -334,120 +514,94 @@ Side effects: remove and unset permanently delete data. add_<channel> makes the 
 
 object_type namespaces the object (e.g., "organization", "project") and is required.
 
-Returns: the updated object on success; structured error with field reasons on failure.`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The type of object you want to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("Suprsend workspace to get the object from."),
-			),
-			mcp.WithObject("object_payload",
-				mcp.Description("Payload of the request that you want to pass for the object."),
-			),
-			mcp.WithString("action",
-				mcp.Description(`
-				the action to perform.
-				use action "upsert" to create a new object or update an existing object's properties.
-				use action "remove" to remove a object's properties.
-				use action "set" to set a object's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack, add ms_teams, add webpush use the respective actions.
-				use action "unset" to unset a object's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack, remove ms_teams, remove webpush use the respective actions.
-				use action "set_once" to set a object's property once, this will only set the property if it is not already set.
-				use action "append" to append a value to a object's property.
-				use action "increment" to increment a object's property.
-				use action "add_email" to add an email to a object.
-				use action "remove_email" to remove an email from a object.
-				use action "add_sms" to add an SMS to a object.
-				use action "remove_sms" to remove an SMS from a object.
-				use action "add_whatsapp" to add a WhatsApp to a object.
-				use action "remove_whatsapp" to remove a WhatsApp from a object.
-				use action "add_androidpush" to add an Android push to a object.
-				use action "remove_androidpush" to remove an Android push from a object.
-				use action "add_iospush" to add an iOS push to a object.
-				use action "remove_iospush" to remove an iOS push from a object.
-				use action "add_slack" to add a Slack to a object.
-				use action "remove_slack" to remove a Slack from a object.
-				use action "add_ms_teams" to add a Microsoft Teams to a object.
-				use action "remove_ms_teams" to remove a Microsoft Teams from a object.
-				use action "add_webpush" to add a Webpush to a object.
-				use action "remove_webpush" to remove a Webpush from a object.
-				`),
-				mcp.Required(),
-				mcp.Enum(
-					"upsert",
-					"remove",
-					"set",
-					"unset",
-					"set_once",
-					"append",
-					"increment",
-					"add_email",
-					"remove_email",
-					"add_sms",
-					"remove_sms",
-					"add_whatsapp",
-					"remove_whatsapp",
-					"add_androidpush",
-					"remove_androidpush",
-					"set_preferred_language",
-					"set_timezone",
-					"add_iospush",
-					"remove_iospush",
-					"add_slack",
-					"remove_slack",
-					"add_ms_teams",
-					"remove_ms_teams",
-					"add_webpush",
-					"remove_webpush",
-				),
-			),
-			mcp.WithString("key",
-				mcp.Description(`The key on which the action is to be performed. only required for set, append, increment, unset actions.`),
-			),
-			mcp.WithString("value",
-				mcp.Description(`The value to needs to be added/removed/set/unset/appended/incremented.`),
-			),
-			mcp.WithObject("slack_details",
-				mcp.Description(`This is only applicable for add_slack and remove_slack actions.`),
-				mcp.Properties(slackPropertiesSchema),
-			),
-			mcp.WithObject("ms_teams_details",
-				mcp.Description(`This is only applicable for add_ms_teams and remove_ms_teams actions.`),
-				mcp.Properties(msTeamsPropertiesSchema),
-				msTeamsRequiredFields(),
-			),
-			mcp.WithObject("webpush_details",
-				mcp.Description(`This is only applicable for add_webpush and remove_webpush actions.`),
-				mcp.Properties(
-					map[string]interface{}{
-						"keys": map[string]interface{}{
-							"type": "object",
-							"properties": map[string]interface{}{
-								"auth":   utils.StringSchema("The auth key for the webpush"),
-								"p256dh": utils.StringSchema("The p256dh key for the webpush"),
-							},
-							"required":             []string{"auth", "p256dh"},
-							"additionalProperties": false,
-						},
-						"endpoint": utils.StringSchema("The endpoint for the webpush"),
+Returns: the updated object on success; structured error with field reasons on failure.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"object_id":   {Type: "string", Description: "The object_id of the object to get."},
+					"object_type": {Type: "string", Description: "The type of object you want to get."},
+					"workspace":   {Type: "string", Description: "Suprsend workspace to get the object from."},
+					"object_payload": {
+						Type:        "object",
+						Description: "Payload of the request that you want to pass for the object.",
 					},
-				),
-			),
-			mcp.WithDestructiveHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: upsertObjectHandler,
+					"action": {
+						Type: "string",
+						Description: `
+					the action to perform.
+					use action "upsert" to create a new object or update an existing object's properties.
+					use action "remove" to remove a object's properties.
+					use action "set" to set a object's property, don't use this when trying to add email, add sms, add whatsapp, add androidpush, add iospush, add slack, add ms_teams, add webpush use the respective actions.
+					use action "unset" to unset a object's property, don't use this when trying to remove email, remove sms, remove whatsapp, remove androidpush, remove iospush, remove slack, remove ms_teams, remove webpush use the respective actions.
+					use action "set_once" to set a object's property once, this will only set the property if it is not already set.
+					use action "append" to append a value to a object's property.
+					use action "increment" to increment a object's property.
+					use action "add_email" to add an email to a object.
+					use action "remove_email" to remove an email from a object.
+					use action "add_sms" to add an SMS to a object.
+					use action "remove_sms" to remove an SMS from a object.
+					use action "add_whatsapp" to add a WhatsApp to a object.
+					use action "remove_whatsapp" to remove a WhatsApp from a object.
+					use action "add_androidpush" to add an Android push to a object.
+					use action "remove_androidpush" to remove an Android push from a object.
+					use action "add_iospush" to add an iOS push to a object.
+					use action "remove_iospush" to remove an iOS push from a object.
+					use action "add_slack" to add a Slack to a object.
+					use action "remove_slack" to remove a Slack from a object.
+					use action "add_ms_teams" to add a Microsoft Teams to a object.
+					use action "remove_ms_teams" to remove a Microsoft Teams from a object.
+					use action "add_webpush" to add a Webpush to a object.
+					use action "remove_webpush" to remove a Webpush from a object.
+					`,
+						Enum: []any{
+							"upsert",
+							"remove",
+							"set",
+							"unset",
+							"set_once",
+							"append",
+							"increment",
+							"add_email",
+							"remove_email",
+							"add_sms",
+							"remove_sms",
+							"add_whatsapp",
+							"remove_whatsapp",
+							"add_androidpush",
+							"remove_androidpush",
+							"set_preferred_language",
+							"set_timezone",
+							"add_iospush",
+							"remove_iospush",
+							"add_slack",
+							"remove_slack",
+							"add_ms_teams",
+							"remove_ms_teams",
+							"add_webpush",
+							"remove_webpush",
+						},
+					},
+					"key":              {Type: "string", Description: "The key on which the action is to be performed. only required for set, append, increment, unset actions."},
+					"value":            {Type: "string", Description: "The value to needs to be added/removed/set/unset/appended/incremented."},
+					"slack_details":    slackDetailsSchema,
+					"ms_teams_details": msTeamsDetailsSchema,
+					"webpush_details":  webpushDetailsSchema,
+				},
+				Required: []string{"object_id", "object_type", "action"},
+			},
+			Annotations: mcpsdk.Annotations{
+				DestructiveHint: true,
+				IdempotentHint:  false,
+				OpenWorldHint:   true,
+			},
+			Handler: upsertObjectHandler,
+		},
 	}
 
 	get_suprsend_object_preferences := &Tool{
-		Name:        "objects.get_preferences",
-		MCPTool: mcp.NewTool("get_suprsend_object_preferences",
-			mcp.WithDescription(`Read an object's category-level notification preferences and (optionally) per-channel overrides.
+		Tool: &mcpsdk.Tool{
+			Name: "get_suprsend_object_preferences",
+			Description: `Read an object's category-level notification preferences and (optionally) per-channel overrides.
 
 When to use:
 - Before update_suprsend_category_preference_object, to read current state.
@@ -457,35 +611,31 @@ When NOT to use:
 - For the object's identity or channels — use get_suprsend_object.
 - For users — use get_suprsend_user_preferences.
 
-Returns: the object's preference tree. Pass category to scope to one preference; omit for the full tree. Set channel_preferences=true to include per-channel overrides.`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object to get preferences from."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The object_type of the object to get preferences from."),
-				mcp.Required(),
-			),
-			mcp.WithString("category",
-				mcp.Description("The category_slug of the object to get preferences from, if not provided, it will get all the preferences for the object."),
-			),
-			mcp.WithBoolean("channel_preferences",
-				mcp.Description("set this to true to get all the channel preferences for the object."),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("SuprSend workspace to get the user from."),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: getObjectPreferences,
+Returns: the object's preference tree. Pass category to scope to one preference; omit for the full tree. Set channel_preferences=true to include per-channel overrides.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"object_id":           {Type: "string", Description: "The object_id of the object to get preferences from."},
+					"object_type":         {Type: "string", Description: "The object_type of the object to get preferences from."},
+					"category":            {Type: "string", Description: "The category_slug of the object to get preferences from, if not provided, it will get all the preferences for the object."},
+					"channel_preferences": {Type: "boolean", Description: "set this to true to get all the channel preferences for the object."},
+					"workspace":           {Type: "string", Description: "SuprSend workspace to get the user from."},
+				},
+				Required: []string{"object_id", "object_type"},
+			},
+			Annotations: mcpsdk.Annotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+				OpenWorldHint:  true,
+			},
+			Handler: getObjectPreferences,
+		},
 	}
 
 	update_suprsend_category_preference_object := &Tool{
-		Name:        "objects.update_preferences",
-		MCPTool: mcp.NewTool("update_suprsend_category_preference_object",
-			mcp.WithDescription(`Set ONE category's preference for ONE object — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
+		Tool: &mcpsdk.Tool{
+			Name: "update_suprsend_category_preference_object",
+			Description: `Set ONE category's preference for ONE object — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
 
 Replaces, does not merge. This call overwrites the existing preference for the named category. Previous opt-outs within the same category are lost; pass them again in opt_out_channels if you want to keep them.
 
@@ -498,45 +648,40 @@ When NOT to use:
 
 Preference values: opt_in enables; opt_out disables; cant_unsubscribe locks the object from toggling this category.
 
-Returns: updated preference state on success; structured error on failure.`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object to get preferences from."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The object_type of the object to get preferences from."),
-				mcp.Required(),
-			),
-			mcp.WithString("category",
-				mcp.Description("category_slug of an category to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("preference",
-				mcp.Enum(
-					"opt_in",
-					"opt_out",
-				),
-				mcp.Description("The preference to update for the object."),
-				mcp.Required(),
-			),
-			mcp.WithArray("opt_out_channels",
-				mcp.Description("The channels to opt out from for the object."),
-				mcp.WithStringItems(),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("SuprSend workspace to get the user from."),
-			),
-			mcp.WithDestructiveHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: updateObjectCategoryPreference,
+Returns: updated preference state on success; structured error on failure.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"object_id":   {Type: "string", Description: "The object_id of the object to get preferences from."},
+					"object_type": {Type: "string", Description: "The object_type of the object to get preferences from."},
+					"category":    {Type: "string", Description: "category_slug of an category to get."},
+					"preference": {
+						Type:        "string",
+						Description: "The preference to update for the object.",
+						Enum:        []any{"opt_in", "opt_out"},
+					},
+					"opt_out_channels": {
+						Type:        "array",
+						Description: "The channels to opt out from for the object.",
+						Items:       &jsonschema.Schema{Type: "string"},
+					},
+					"workspace": {Type: "string", Description: "SuprSend workspace to get the user from."},
+				},
+				Required: []string{"object_id", "object_type", "category", "preference"},
+			},
+			Annotations: mcpsdk.Annotations{
+				DestructiveHint: true,
+				IdempotentHint:  true,
+				OpenWorldHint:   true,
+			},
+			Handler: updateObjectCategoryPreference,
+		},
 	}
 
 	update_suprsend_object_channel_preference := &Tool{
-		Name:        "objects.update_channel_preference",
-		MCPTool: mcp.NewTool("update_suprsend_object_channel_preference",
-			mcp.WithDescription(`Block or allow specific delivery channels for ONE object, applied across ALL categories.
+		Tool: &mcpsdk.Tool{
+			Name: "update_suprsend_object_channel_preference",
+			Description: `Block or allow specific delivery channels for ONE object, applied across ALL categories.
 
 is_restricted semantics: true blocks delivery on that channel; false re-enables it. Each entry in channel_preferences is a {channel, is_restricted} pair.
 
@@ -546,35 +691,35 @@ When NOT to use:
 
 Side effects: takes effect on the next workflow run; in-flight notifications may still send.
 
-Returns: updated channel-preference state on success.`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object to update the channel preference for."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The object_type of the object to update the channel preference for."),
-				mcp.Required(),
-			),
-			mcp.WithArray("channel_preferences",
-				mcp.Description("The channel preferences to update for the users."),
-				mcp.Items(map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"channel":       utils.StringSchema("The channel identifier"),
-						"is_restricted": utils.BoolSchema("Whether the channel is restricted"),
+Returns: updated channel-preference state on success.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"object_id":   {Type: "string", Description: "The object_id of the object to update the channel preference for."},
+					"object_type": {Type: "string", Description: "The object_type of the object to update the channel preference for."},
+					"channel_preferences": {
+						Type:        "array",
+						Description: "The channel preferences to update for the users.",
+						Items: &jsonschema.Schema{
+							Type: "object",
+							Properties: map[string]*jsonschema.Schema{
+								"channel":       {Type: "string", Description: "The channel identifier"},
+								"is_restricted": {Type: "boolean", Description: "Whether the channel is restricted"},
+							},
+							Required: []string{"channel", "is_restricted"},
+						},
 					},
-					"required": []string{"channel", "is_restricted"},
-				}),
-				mcp.Required(),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("SuprSend workspace to update the channel preference for."),
-			),
-			mcp.WithDestructiveHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: updateObjectChannelPreferenceHandler,
+					"workspace": {Type: "string", Description: "SuprSend workspace to update the channel preference for."},
+				},
+				Required: []string{"object_id", "object_type", "channel_preferences"},
+			},
+			Annotations: mcpsdk.Annotations{
+				DestructiveHint: true,
+				IdempotentHint:  true,
+				OpenWorldHint:   true,
+			},
+			Handler: updateObjectChannelPreferenceHandler,
+		},
 	}
 
 	// NOTE: get_suprsend_object_subscriptions + add_suprsend_object_subscriptions

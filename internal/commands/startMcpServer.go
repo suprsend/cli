@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/config"
+	legacysdk "github.com/suprsend/cli/internal/mcpsdk/legacy"
 	toolset "github.com/suprsend/cli/internal/tools"
 	"github.com/suprsend/cli/internal/utils"
 	"go.szostok.io/version"
@@ -119,7 +120,14 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		)
 
 		for _, t := range selectedTools {
-			mcpServer.AddTool(t.MCPTool, t.Handler)
+			if t.Tool != nil {
+				// Ported: registered via mcpsdk abstraction → legacy adapter.
+				legacysdk.Register(mcpServer, t.Tool)
+			} else {
+				// Un-ported: still on raw mark3labs types. Keeps the CLI's tool
+				// surface complete during the Phase 5 incremental ports.
+				mcpServer.AddTool(t.MCPTool, t.Handler)
+			}
 		}
 
 		switch transport {

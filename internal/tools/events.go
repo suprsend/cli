@@ -6,23 +6,31 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/google/jsonschema-go/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/commands/schema"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/pkg/mcpsdk"
+	"github.com/suprsend/cli/pkg/mcpserver"
 	suprsend "github.com/suprsend/suprsend-go"
 	"golang.org/x/sync/errgroup"
 )
 
-func triggerEvent(_ context.Context, request mcp.CallToolRequest, workspace, name string) (*mcp.CallToolResult, error) {
-	allArgs := request.GetArguments()
-	distinctID, ok := allArgs["distinct_id"].(string)
-	if !ok {
-		return mcp.NewToolResultError("distinct_id is required"), nil
+// triggerEvent is the shared handler invoked by every dynamically registered
+// `trigger_<event_name>_event` tool. It validates distinct_id, builds the
+// event property bag from the remaining args, and calls the workspace
+// suprsend client's TrackEvent. Auth failures call MarkSessionDead so hosted
+// sessions get torn down instead of looping on a revoked token.
+func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string) (mcpsdk.Result, error) {
+	distinctID, err := args.RequireString("distinct_id")
+	if err != nil {
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
-	// create JSON of all other arguments except distinct_id
+
+	// Build event payload from every arg except distinct_id (which is a
+	// routing concern, not a property).
 	eventRequestBody := map[string]any{}
-	for k, v := range allArgs {
+	for k, v := range args.Map() {
 		if k != "distinct_id" {
 			eventRequestBody[k] = v
 		}
@@ -30,25 +38,38 @@ func triggerEvent(_ context.Context, request mcp.CallToolRequest, workspace, nam
 
 	log.Debugf("Event request body: %s, distinct_id: %s", eventRequestBody, distinctID)
 
-	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to get suprsend client: %v", err)), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: fmt.Sprintf("Failed to get suprsend client: %v", err), IsError: true}, nil
 	}
 	event := &suprsend.Event{
 		DistinctId: distinctID,
 		EventName:  name,
 		Properties: eventRequestBody,
 	}
-	_, err = suprsendClient.TrackEvent(event)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to trigger event: %v", err)), nil
+	if _, err := suprsendClient.TrackEvent(event); err != nil {
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: fmt.Sprintf("Failed to trigger event: %v", err), IsError: true}, nil
 	}
-	return mcp.NewToolResultText("Event triggered successfully"), nil
+	return mcpsdk.Result{Text: "Event triggered successfully"}, nil
 }
 
-func RegisterDynamicEventsTools(workspace string, eventsFlag string) error {
-	events := utils.FetchEventsMcp(workspace, eventsFlag)
-	mgmntClient := utils.GetSuprSendMgmntClient()
+// RegisterDynamicEventsToolsFor builds a per-tenant slice of event-trigger
+// tools using the mgmnt client on ctx. Used by the hosted MCP server where
+// each session has its own credentials and SDKInstance is nil. Returns an
+// empty slice (not an error) when no events are selected — callers decide
+// whether absence is fatal.
+func RegisterDynamicEventsToolsFor(ctx context.Context, workspace, eventsFlag string) ([]*Tool, error) {
+	events := utils.FetchEventsMcpFor(ctx, workspace, eventsFlag)
+	mgmntClient := utils.MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return nil, fmt.Errorf("tools: RegisterDynamicEventsToolsFor: no mgmnt client on ctx")
+	}
 	tools := make([]*Tool, len(events))
 
 	patchSchema := `{
@@ -73,14 +94,28 @@ func RegisterDynamicEventsTools(workspace string, eventsFlag string) error {
 				log.Errorf("event %s: skipping registration — failed to fetch payload schema: %s", event.Name, err)
 				return nil
 			}
-			inputSchema, err := json.Marshal(payloadSchema.JSONSchema)
+			inputSchemaBytes, err := json.Marshal(payloadSchema.JSONSchema)
 			if err != nil {
 				log.Errorf("event %s: skipping registration — failed to marshal schema: %s", event.Name, err)
 				return nil
 			}
-			mergedSchema, err := schema.MergeAndValidate(string(inputSchema), patchSchema)
+			mergedSchema, err := schema.MergeAndValidate(string(inputSchemaBytes), patchSchema)
 			if err != nil {
 				log.Errorf("event %s: skipping registration — failed to merge schema: %s", event.Name, err)
+				return nil
+			}
+			var inputSchema jsonschema.Schema
+			if err := json.Unmarshal(mergedSchema, &inputSchema); err != nil {
+				log.Errorf("event %s: skipping registration — failed to parse merged schema: %s", event.Name, err)
+				return nil
+			}
+			// CRITICAL (Issue-18, Machiavelli review): Server.AddTool in the
+			// new SDK panics if InputSchema.Type != "object" (verified
+			// mcp/server.go:241-260). Schema merge can yield a non-object
+			// type if a customer's payload schema is malformed; we skip
+			// (loud-log) rather than crash the whole MCP server boot.
+			if inputSchema.Type != "object" {
+				log.Errorf("event %s: skipping registration — merged schema is not type=object (got %q)", event.Name, inputSchema.Type)
 				return nil
 			}
 			name := strings.ToLower(strings.ReplaceAll(event.Name, " ", "_"))
@@ -92,24 +127,43 @@ func RegisterDynamicEventsTools(workspace string, eventsFlag string) error {
 			}
 			eventName := name
 			tools[i] = &Tool{
-				Name: "trigger_" + eventName + "_event",
-				MCPTool: mcp.NewToolWithRawSchema("trigger_"+eventName+"_event",
-					description,
-					mergedSchema,
-				),
-				Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-					return triggerEvent(ctx, request, workspace, eventName)
+				Tool: &mcpsdk.Tool{
+					Name:        "trigger_" + eventName + "_event",
+					Description: description,
+					InputSchema: &inputSchema,
+					Handler: func(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+						return triggerEvent(ctx, args, workspace, eventName)
+					},
 				},
 			}
 			return nil
 		})
 	}
+	// errgroup.Wait never returns an error here — failures are logged and
+	// skipped per-event above; registration is best-effort.
 	_ = g.Wait()
 
+	out := make([]*Tool, 0, len(tools))
 	for _, t := range tools {
 		if t != nil {
-			RegisterEvent(t)
+			t.Type = "event"
+			out = append(out, t)
 		}
+	}
+	return out, nil
+}
+
+// RegisterDynamicEventsTools is the CLI-compatibility wrapper used by
+// startMcpServer.go. Delegates to RegisterDynamicEventsToolsFor with a
+// background context (so it resolves the singleton SDKInstance via
+// MgmntClientFor's fallback) and appends to the package-level eventRegistry.
+func RegisterDynamicEventsTools(workspace, eventsFlag string) error {
+	out, err := RegisterDynamicEventsToolsFor(context.Background(), workspace, eventsFlag)
+	if err != nil {
+		return err
+	}
+	for _, t := range out {
+		eventRegistry = append(eventRegistry, t)
 	}
 	return nil
 }

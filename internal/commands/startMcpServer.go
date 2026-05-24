@@ -4,13 +4,16 @@ Copyright © 2025 SuprSend
 package commands
 
 import (
+	"log/slog"
+	"net/http"
+	"os"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/config"
-	legacysdk "github.com/suprsend/cli/internal/mcpsdk/legacy"
+	"github.com/suprsend/cli/internal/mcpsdk/official"
 	toolset "github.com/suprsend/cli/internal/tools"
 	"github.com/suprsend/cli/internal/utils"
 	"go.szostok.io/version"
@@ -95,13 +98,9 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
-		selectedEvents := toolset.GetAllEvents()
-		selectedWorkflows := toolset.GetAllWorkflows()
+		selectedTools = append(selectedTools, toolset.GetAllEvents()...)
+		selectedTools = append(selectedTools, toolset.GetAllWorkflows()...)
 
-		selectedTools = append(selectedTools, selectedEvents...)
-		selectedTools = append(selectedTools, selectedWorkflows...)
-
-		// Print a readable string representation of selectedTools
 		var toolStrs []string
 		for _, t := range selectedTools {
 			toolStrs = append(toolStrs, t.Type+":"+t.Name)
@@ -109,37 +108,31 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		log.Infof("Selected tools: [%s]", strings.Join(toolStrs, ", "))
 		info := version.Get()
 
-		mcpServer := server.NewMCPServer(
-			"SuprSend",
-			info.Version,
-			server.WithResourceCapabilities(true, true),
-			server.WithPromptCapabilities(true),
-			server.WithToolCapabilities(true),
-			server.WithLogging(),
-			server.WithRecovery(),
-		)
-
+		// CLI capability profile (per Question-11): tools no listChanged.
+		// Hosted profile lives in pkg/mcpserver. CLI doesn't change its tool
+		// list mid-session so listChanged wastes advertising here.
+		mcpServer := mcp.NewServer(&mcp.Implementation{Name: "SuprSend", Version: info.Version}, cliCapabilityProfile())
 		for _, t := range selectedTools {
-			legacysdk.Register(mcpServer, t.Tool)
+			official.Register(mcpServer, t.Tool)
 		}
 
 		switch transport {
 		case "stdio":
-			if err := server.ServeStdio(mcpServer); err != nil {
+			if err := mcpServer.Run(cmd.Context(), &mcp.StdioTransport{}); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
 		case "sse":
 			utils.Banner(info.Version)
-			sseServer := server.NewSSEServer(mcpServer)
+			handler := mcp.NewSSEHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)
 			log.Printf("SSE server listening on :8080/sse")
-			if err := sseServer.Start(":8080"); err != nil {
+			if err := http.ListenAndServe(":8080", handler); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
 		case "http":
 			utils.Banner(info.Version)
-			httpServer := server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/"))
+			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)
 			log.Printf("HTTP server listening on :8080/")
-			if err := httpServer.Start(":8080"); err != nil {
+			if err := http.ListenAndServe(":8080", handler); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
 		default:
@@ -186,4 +179,25 @@ func init() {
 	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, comma-separated slugs, or tag:<tag> entries (e.g. tag:onboarding,tag:transactional)")
 
 	listToolsCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
+}
+
+// cliCapabilityProfile returns the *mcp.ServerOptions for the single-tenant
+// CLI transport. Per Question-11:
+//   - tools: listChanged OFF (CLI registers all tools at startup, never changes mid-session).
+//   - resources/prompts: not advertised (we register none).
+//   - logging: off for the CLI (logs go to stderr via logrus, not via MCP).
+//   - recovery: the SDK has no automatic recovery; pkg/mcpserver installs
+//     its own recoveryMiddleware in the hosted path, but the CLI does NOT
+//     install it — a panic in a tool handler should still surface to the
+//     CLI user via the normal Go panic flow rather than be silently logged.
+//
+// Logger: bridges to logrus so handler log messages from the SDK end up in
+// the same stream as the rest of the CLI output.
+func cliCapabilityProfile() *mcp.ServerOptions {
+	return &mcp.ServerOptions{
+		Logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		Capabilities: &mcp.ServerCapabilities{
+			Tools: &mcp.ToolCapabilities{ListChanged: false}, // explicit override of inferred default
+		},
+	}
 }

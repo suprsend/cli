@@ -1,7 +1,7 @@
 // Package mcpsdk defines an SDK-agnostic representation of an MCP tool.
 //
-// The closed-source hosted MCP server (and any future OSS-library consumer)
-// constructs *Tool values here; internal adapters convert them to the runtime
+// Consumers (the CLI; any out-of-tree binary that embeds pkg/mcpserver)
+// construct *Tool values here; internal adapters convert them to the runtime
 // types of the official modelcontextprotocol/go-sdk.
 //
 // Stability: this package is part of the v1 stability commitment for

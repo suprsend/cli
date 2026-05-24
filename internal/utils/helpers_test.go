@@ -6,10 +6,11 @@ import (
 )
 
 // TestFetchEventsMcpFor_NoCredsNoSingleton_ReturnsNil asserts that when ctx has
-// no tenant credentials AND the singleton SDKInstance is nil (hosted-style
+// no tenant credentials AND the singleton SDKInstance is nil (multi-tenant
 // startup), FetchEventsMcpFor returns nil instead of panicking or returning a
-// bogus result. This is the safety net that lets the hosted MCP server skip
-// dynamic tool registration cleanly when called too early or in the wrong mode.
+// bogus result. This is the safety net that lets a multi-tenant MCP server
+// skip dynamic tool registration cleanly when called too early or in the
+// wrong mode.
 func TestFetchEventsMcpFor_NoCredsNoSingleton_ReturnsNil(t *testing.T) {
 	resetSDKGlobals(t)
 	SDKInstance = nil

@@ -1,7 +1,7 @@
 // Package tenant carries per-request SuprSend credentials on a context.Context.
-// Both the CLI (single tenant at startup) and the hosted HTTP server (one
-// tenant per session) populate this; tool handlers and utils.GetSuprSendWorkspaceClient
-// read from it.
+// Both the CLI (single tenant at startup) and any multi-tenant HTTP server
+// using pkg/mcpserver (one tenant per session) populate this; tool handlers
+// and utils.GetSuprSendWorkspaceClient read from it.
 package tenant
 
 import (
@@ -19,8 +19,8 @@ import (
 // debug prints, structured-logging field dumps, or JSON encoding. Callers
 // that genuinely need the raw token must read the field directly.
 type Credentials struct {
-	// ServiceToken authenticates against the bridge API. Required. Redacted
-	// by String() and MarshalJSON().
+	// ServiceToken authenticates against the SuprSend management API.
+	// Required. Redacted by String() and MarshalJSON().
 	ServiceToken string
 	// Workspace is the SuprSend workspace name handlers should act on by
 	// default when no workspace is named in the tool arguments.

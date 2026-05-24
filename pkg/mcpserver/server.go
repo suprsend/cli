@@ -1,13 +1,13 @@
-// Package mcpserver is the SuprSend MCP server library — the OSS half of the
-// hosted MCP service. The closed-source deployment binary imports this
-// package, supplies a TenantResolver that calls the bridge API, and runs
-// http.ListenAndServe on (*Handler).ServeHTTP. Call Handler.Shutdown(ctx)
-// during graceful shutdown to drain in-flight tool calls before the listener
-// closes.
+// Package mcpserver is an MCP server library supporting multi-tenant
+// deployments. Embedders supply a TenantResolver that authenticates each
+// incoming HTTP request and resolves it to a per-tenant credential set + tool
+// list; the library serves MCP over streamable HTTP with per-tenant tool
+// scoping. Call Handler.Shutdown(ctx) during graceful shutdown to drain
+// in-flight tool calls before the listener closes.
 //
-// The library is also useful standalone: pair it with FakeResolver to spin up
-// a single-tenant hosted server for local development, or with a custom
-// TenantResolver to integrate with any auth backend.
+// Pair with FakeResolver to spin up a single-tenant server for local
+// development, or with a custom TenantResolver to integrate with any auth
+// backend.
 package mcpserver
 
 import (
@@ -64,7 +64,7 @@ var (
 //	if err != nil { return nil, err }
 //	return &mcpserver.Tenant{Credentials: creds, Tools: tools}, nil
 //
-// Closed-source resolvers MUST use BuildTenantTools because they cannot import
+// Out-of-tree resolvers MUST use BuildTenantTools because they cannot import
 // internal/tools directly.
 type Tenant struct {
 	Credentials tenant.Credentials
@@ -80,7 +80,7 @@ type Tenant struct {
 // "none", a comma-separated slug list, or "tag:<tag>" entries (mixed forms
 // also work). An empty string is treated as "none".
 //
-// This helper exists so the closed-source deployment binary never imports
+// This helper exists so out-of-tree consumers never need to import
 // internal/tools directly. It is a thin convenience over
 // tools.GetAllTools / tools.RegisterDynamicWorkflowToolsFor / tools.RegisterDynamicEventsToolsFor.
 func BuildTenantTools(ctx context.Context) ([]*mcpsdk.Tool, error) {
@@ -189,7 +189,8 @@ type endHookCtx struct {
 
 // tenantIdentifier returns a stable, log-safe identifier for the tenant
 // derived from its credentials. SHA-256 of (service-token || "\x00" ||
-// workspace), hex-encoded. Used for session-tenant binding (Vuln-B fix).
+// workspace), hex-encoded. Used for session-tenant binding to prevent
+// stolen-session-ID reuse across tenants.
 func tenantIdentifier(c tenant.Credentials) string {
 	h := sha256.Sum256([]byte(c.ServiceToken + "\x00" + c.Workspace))
 	return hex.EncodeToString(h[:])
@@ -205,9 +206,11 @@ type deadOptions struct{}
 // before the SDK returns control to the HTTP handler. Subsequent requests
 // bearing the same Mcp-Session-Id get HTTP 404; the client must reconnect.
 //
-// Called by the internal/utils/sdk_instance.go transport interceptor when an
-// API response returns HTTP 401, indicating the tenant's credentials are no
-// longer valid.
+// Use for sessions where downstream credentials have become invalid — for
+// example, when a tool handler observes that the SuprSend API has rejected
+// the tenant's credentials with HTTP 401. The internal/utils transport
+// interceptor wires this to every HTTP 401 it observes from the management
+// API.
 //
 // Safe to call from any context that derives from a request handled by this
 // package. No-op if called outside such a context.
@@ -393,7 +396,9 @@ func randSessionID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// hostedCapabilityProfile — see plan Task 3.1 for the verified rationale.
+// hostedCapabilityProfile returns the default *mcp.ServerOptions applied to
+// every per-tenant server. Logging capability is advertised; tools/resources
+// capabilities are merged in on top of any base options supplied by the caller.
 func hostedCapabilityProfile() *mcp.ServerOptions {
 	return &mcp.ServerOptions{
 		Capabilities: &mcp.ServerCapabilities{

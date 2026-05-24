@@ -8,8 +8,8 @@ import (
 
 // newAuthMiddleware wraps next in an http.Handler that runs Resolver.Resolve
 // on every request, maps sentinel errors to HTTP status codes, enforces
-// session-tenant binding (Vuln-B mitigation), and stashes the resolved
-// *Tenant on the request context for getServer to pick up.
+// session-tenant binding to prevent stolen-session-ID reuse, and stashes the
+// resolved *Tenant on the request context for getServer to pick up.
 //
 // Auth runs per-request (not per-session) so revoked tokens stop working
 // immediately rather than at session expiry. The session-tenant binding
@@ -23,7 +23,7 @@ func newAuthMiddleware(resolver TenantResolver, h *Handler, next http.Handler) h
 		if h.closing.Load() {
 			// Don't accept new requests after Shutdown starts. Tell the
 			// load balancer to retry later (no Retry-After header for now;
-			// closed-source can wrap us if it wants finer control).
+			// embedders can wrap us if they want finer control).
 			http.Error(w, "Service Unavailable: shutting down", http.StatusServiceUnavailable)
 			return
 		}
@@ -48,19 +48,19 @@ func newAuthMiddleware(resolver TenantResolver, h *Handler, next http.Handler) h
 			return
 		}
 
-		// Session-tenant binding (Vuln-B mitigation). The binding is
-		// registered by the per-call GetSessionID hook in getServer
-		// (server.go) at the moment the SDK assigns a session ID — that's
-		// the only point at which we know the ID. Here we read the binding
-		// on subsequent requests: if a session ID we know maps to a
-		// different tenant than the bearer just resolved to, it's a hijack
-		// attempt → 403. Unknown session IDs skip the check (first request
-		// of a session has no Mcp-Session-Id header; second request and
-		// onward will have it).
+		// Session-tenant binding. The binding is registered by the per-call
+		// GetSessionID hook in getServer (server.go) at the moment the SDK
+		// assigns a session ID — that's the only point at which we know the
+		// ID. Here we read the binding on subsequent requests: if a session
+		// ID we know maps to a different tenant than the bearer just
+		// resolved to, the request is rejected with HTTP 403 (a stolen
+		// session ID cannot be reused across tenants). Unknown session IDs
+		// skip the check (first request of a session has no Mcp-Session-Id
+		// header; second request and onward will have it).
 		if sessID := r.Header.Get(sessionIDHeader); sessID != "" {
 			if originalIdent, ok := h.sessionTenants.Load(sessID); ok {
 				if originalIdent.(string) != tenantIdentifier(tenantRec.Credentials) {
-					// Log the security event so closed-source can alert. Log a
+					// Log the security event so embedders can alert. Log a
 					// PREFIX of the session ID only (full ID is sensitive).
 					if logger := h.serverLogger(); logger != nil {
 						prefixLen := 8

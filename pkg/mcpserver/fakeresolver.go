@@ -9,8 +9,8 @@ import (
 )
 
 // FakeResolver is an in-memory TenantResolver useful for tests and for
-// running the OSS library standalone without wiring real auth. Tenants are
-// keyed by bearer token in the Authorization header.
+// running the library standalone without wiring real auth. Tenants are keyed
+// by bearer token in the Authorization header.
 type FakeResolver struct {
 	mu      sync.RWMutex
 	tenants map[string]*Tenant

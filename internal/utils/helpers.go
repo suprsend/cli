@@ -94,9 +94,9 @@ func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
 
 // FetchWorkflowsMcpFor mirrors FetchWorkflowsMcp but uses the per-tenant mgmnt
 // client from ctx (via MgmntClientFor). Returns nil if ctx has no tenant
-// credentials AND the singleton SDKInstance is nil. Required for the hosted
-// MCP server's per-tenant dynamic tool registration — that path runs with
-// SDKInstance == nil and must resolve the client from ctx instead.
+// credentials AND the singleton SDKInstance is nil. Required for
+// multi-tenant MCP servers' per-tenant dynamic tool registration — that path
+// runs with SDKInstance == nil and must resolve the client from ctx instead.
 func FetchWorkflowsMcpFor(ctx context.Context, workspace, workflowsFlag string) []WorkflowInfo {
 	all, none, slugs, tags := parseSelector(workflowsFlag)
 	if none {
@@ -206,9 +206,9 @@ func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
 
 // FetchEventsMcpFor mirrors FetchEventsMcp but uses the per-tenant mgmnt
 // client from ctx (via MgmntClientFor). Returns nil if ctx has no tenant
-// credentials AND the singleton SDKInstance is nil. Required for the hosted
-// MCP server's per-tenant dynamic tool registration — that path runs with
-// SDKInstance == nil and must resolve the client from ctx instead.
+// credentials AND the singleton SDKInstance is nil. Required for
+// multi-tenant MCP servers' per-tenant dynamic tool registration — that path
+// runs with SDKInstance == nil and must resolve the client from ctx instead.
 func FetchEventsMcpFor(ctx context.Context, workspace, eventsFlag string) []EventInfo {
 	all, none, names, tags := parseSelector(eventsFlag)
 	if none {

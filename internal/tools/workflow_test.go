@@ -42,7 +42,7 @@ func TestListWorkflows_MissingWorkspace_ReturnsError(t *testing.T) {
 
 // TestRegisterDynamicWorkflowToolsFor_NoCredsNoSingleton_ReturnsEmpty
 // asserts that when ctx has no tenant credentials AND the singleton
-// SDKInstance is nil (hosted-style startup before InitSDK),
+// SDKInstance is nil (multi-tenant startup before InitSDK),
 // RegisterDynamicWorkflowToolsFor returns a clean error instead of
 // panicking. FetchWorkflowsMcpFor returns nil workflows, and MgmntClientFor
 // returns nil — the guard surfaces the latter as an explicit error so

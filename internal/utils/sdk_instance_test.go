@@ -157,10 +157,11 @@ func TestAuthExpiryTransport_NilBase_FallsBackToDefaultTransport(t *testing.T) {
 func TestGetSuprSendWorkspaceClient_VariadicNoCtx_UsesSingleton(t *testing.T) {
 	resetSDKGlobals(t)
 
-	// We don't want to hit the bridge API — but the 0-arg call must compile
-	// and select SDKInstance. We assert selection by making SDKInstance a
-	// nil pointer and observing that the call panics with a nil-deref. This
-	// confirms the legacy branch routed through SDKInstance (not MgmntClientFor).
+	// We don't want to hit the management API — but the 0-arg call must
+	// compile and select SDKInstance. We assert selection by making
+	// SDKInstance a nil pointer and observing that the call panics with a
+	// nil-deref. This confirms the legacy branch routed through SDKInstance
+	// (not MgmntClientFor).
 	SDKInstance = nil
 	defer func() {
 		if r := recover(); r == nil {
@@ -177,7 +178,7 @@ func TestGetSuprSendWorkspaceClient_VariadicWithCtx_UsesCtxClient(t *testing.T) 
 	// test would panic. Routing through ctx should pick the tenant client
 	// from MgmntClientFor's cache and only fail later inside
 	// GetWorkspaceClient (which we don't drive to completion because the
-	// bridge URL is unreachable).
+	// hub URL is unreachable).
 	SDKInstance = nil
 
 	creds := tenant.Credentials{
@@ -188,10 +189,11 @@ func TestGetSuprSendWorkspaceClient_VariadicWithCtx_UsesCtxClient(t *testing.T) 
 	ctx := tenant.WithCredentials(context.Background(), creds)
 
 	// Call must not panic — the ctx-derived client is non-nil even though
-	// SDKInstance is nil. The bridge lookup will fail with an error; we only
-	// assert that we got an error (not a panic) and that no panic surfaced.
+	// SDKInstance is nil. The workspace key/secret lookup will fail with
+	// an error; we only assert that we got an error (not a panic) and that
+	// no panic surfaced.
 	_, err := GetSuprSendWorkspaceClient("ws", ctx)
 	if err == nil {
-		t.Fatalf("expected bridge-lookup error (unreachable URL), got nil")
+		t.Fatalf("expected workspace key/secret lookup error (unreachable URL), got nil")
 	}
 }

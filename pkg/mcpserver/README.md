@@ -1,8 +1,9 @@
 # pkg/mcpserver
 
-OSS hosted-server library for SuprSend MCP. The closed-source deployment binary
-imports this package, supplies a `TenantResolver` that calls the bridge API,
-and runs `http.ListenAndServe` on the returned handler.
+MCP server library for multi-tenant deployments. Provides a streamable-HTTP
+`http.Handler` that authenticates each request via a caller-supplied
+`TenantResolver`, scopes the MCP tool list per tenant, and supports graceful
+shutdown that drains in-flight tool calls.
 
 ## Quickstart
 
@@ -34,55 +35,41 @@ func main() {
 
     handler := mcpserver.New(mcpserver.Options{Resolver: resolver})
 
-    // Graceful shutdown — call mcpHandler.Shutdown(ctx) before httpServer.Shutdown.
+    // Graceful shutdown — call handler.Shutdown(ctx) before httpServer.Shutdown.
     httpSrv := &http.Server{Addr: ":8080", Handler: handler}
     log.Fatal(httpSrv.ListenAndServe())
 }
 ```
 
-## Production: implementing `TenantResolver`
-
-Implement the `TenantResolver` interface against your auth backend. The
-contract is one method: given an `*http.Request`, return a `*Tenant` (with
-credentials + the per-tenant tool set) or an error wrapping `ErrUnauthorized`
-or `ErrForbidden` so the outer middleware returns the right HTTP status.
+## Implementing `TenantResolver`
 
 ```go
-import "fmt"
-
-func (r *bridgeResolver) Resolve(ctx context.Context, req *http.Request) (*mcpserver.Tenant, error) {
-    token := bearer(req)
-    if token == "" {
-        return nil, fmt.Errorf("missing bearer: %w", mcpserver.ErrUnauthorized)
-    }
-    workspace, err := r.lookupWorkspace(ctx, token) // bridge API call, cached
-    if err != nil {
-        return nil, fmt.Errorf("bridge lookup: %w", mcpserver.ErrUnauthorized)
-    }
-
-    creds := tenant.Credentials{
-        ServiceToken:      token,
-        Workspace:         workspace,
-        WorkflowsSelector: "all",
-        EventsSelector:    "all",
-    }
-    ctx = tenant.WithCredentials(ctx, creds)
-    tools, err := mcpserver.BuildTenantTools(ctx)
-    if err != nil { return nil, err }
-    // Append closed-source proprietary tools after the OSS static + dynamic set.
-    tools = append(tools, myProprietaryTools...)
-    return &mcpserver.Tenant{Credentials: creds, Tools: tools}, nil
+type TenantResolver interface {
+    Resolve(ctx context.Context, r *http.Request) (*Tenant, error)
 }
 ```
 
-Cache `(token -> workspace)` aggressively in your resolver. The OSS library
-deliberately owns no cache (Question-5 decision); pick a TTL that matches
-your security/staleness trade-off. Invalidate on 401 from the management API
-(handled reactively by `MarkSessionDead` — see below).
+Given an `*http.Request`, return a `*Tenant` (with credentials + the
+per-tenant tool set) or an error wrapping `ErrUnauthorized` or `ErrForbidden`
+so the outer middleware returns the right HTTP status. Implementations must
+be safe for concurrent use.
+
+A multi-tenant server typically:
+
+1. Extracts a bearer token (or other credential) from the request.
+2. Looks up the workspace / service token from the auth backend.
+3. Builds the per-tenant tool set via `mcpserver.BuildTenantTools(ctx)` and
+   optionally appends its own tools.
+4. Returns the `*Tenant`.
+
+Cache `(token -> Tenant)` aggressively in your resolver. The library does
+not cache; pick a TTL that matches your security/staleness trade-off.
+Invalidate on HTTP 401 from the management API (handled reactively by
+`MarkSessionDead` — see below).
 
 ## Reactive session closure on stale credentials
 
-The `internal/utils/sdk_instance.go` transport interceptor calls
+The `internal/utils` HTTP transport interceptor calls
 `mcpserver.MarkSessionDead(ctx)` automatically when the management API
 responds 401. The session is closed after the in-flight tool call returns;
 the client gets HTTP 404 on its next request and must reconnect (which
@@ -91,30 +78,29 @@ re-runs your resolver, which catches the revoked token).
 You don't need to do anything to enable this — it's wired by default for any
 tool handler that uses `utils.GetSuprSendWorkspaceClient(workspace, ctx)`.
 
+Call `MarkSessionDead(ctx)` manually from a handler when you have
+out-of-band evidence the session's downstream credentials have become
+invalid.
+
 ## Observability hooks
 
 ```go
 mcpserver.New(mcpserver.Options{
     Resolver: myResolver,
     OnSessionStart: func(ctx context.Context, t *mcpserver.Tenant) context.Context {
-        span := tracer.StartSpan("mcp.session", trace.WithAttributes(
-            attribute.String("tenant.workspace", t.Credentials.Workspace),
-        ))
-        return trace.ContextWithSpan(ctx, span)
+        // Stash per-session state (trace span, request ID, tenant logger, etc.)
+        // on the returned context. Every per-call handler in the session sees
+        // the values via ctx.Value lookups.
+        return ctx
     },
-    OnSessionEnd: func(ctx context.Context, _ *mcpserver.Tenant) {
-        if span := trace.SpanFromContext(ctx); span != nil {
-            span.End()
-        }
+    OnSessionEnd: func(ctx context.Context, t *mcpserver.Tenant) {
+        // Best-effort cleanup. Fires from a background reconciliation
+        // goroutine; may lag the actual session end by up to ~SessionTimeout/2.
     },
     OnToolCall: func(ctx context.Context, name string) (context.Context, func(*mcpsdk.Result, error)) {
-        span := tracer.StartSpan("mcp.tool."+name)
-        return trace.ContextWithSpan(ctx, span), func(r *mcpsdk.Result, err error) {
-            if err != nil || (r != nil && r.IsError) {
-                span.RecordError(err)
-            }
-            span.End()
-        }
+        // Before-fn returns the per-call context; after-fn runs with the
+        // result + error once the handler returns.
+        return ctx, func(_ *mcpsdk.Result, _ error) {}
     },
 })
 ```
@@ -135,21 +121,8 @@ if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 Always call `mcpHandler.Shutdown` BEFORE `httpSrv.Shutdown` so MCP sessions
 get a chance to drain before the listener closes.
 
-## Local development against an unreleased branch
-
-The closed-source repo is a separate Go module pinning a tag of this OSS
-repo (Question-b decision). To test against an unreleased branch:
-
-```bash
-# in the closed-source repo
-go mod edit -replace github.com/suprsend/cli=../cli
-go mod tidy
-```
-
-Remove the `replace` directive before committing.
-
 ## Stability
 
 See package-level doc on each `pkg/*` package. The pkg/* tree is stable
-under v1 SemVer from day one (Question-c decision); breaking changes
-require a v2 major bump. CHANGELOG.md at the repo root tracks every release.
+under v1 SemVer from day one; breaking changes require a v2 major bump.
+CHANGELOG.md at the repo root tracks every release.

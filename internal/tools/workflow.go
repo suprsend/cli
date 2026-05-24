@@ -25,7 +25,7 @@ const dynamicRegistrationConcurrency = 10
 // payload from args (peeling off tenant_id / actor / recipient as
 // first-class routing fields and slotting everything under "data") and calls
 // the workspace suprsend client's Workflows.Trigger. Auth failures call
-// MarkSessionDead so hosted sessions get torn down instead of looping on a
+// MarkSessionDead so MCP sessions get torn down instead of looping on a
 // revoked token.
 func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug string) (mcpsdk.Result, error) {
 	tenantId := args.GetString("tenant_id", "")
@@ -117,10 +117,10 @@ func listWorkflowsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 }
 
 // RegisterDynamicWorkflowToolsFor builds a per-tenant slice of
-// workflow-trigger tools using the mgmnt client on ctx. Used by the hosted
-// MCP server where each session has its own credentials and SDKInstance is
-// nil. Returns an empty slice (not an error) when no workflows are selected
-// — callers decide whether absence is fatal.
+// workflow-trigger tools using the mgmnt client on ctx. Used by
+// multi-tenant MCP servers where each session has its own credentials and
+// SDKInstance is nil. Returns an empty slice (not an error) when no
+// workflows are selected — callers decide whether absence is fatal.
 func RegisterDynamicWorkflowToolsFor(ctx context.Context, workspace, workflowsFlag string) ([]*Tool, error) {
 	workflows := utils.FetchWorkflowsMcpFor(ctx, workspace, workflowsFlag)
 	mgmntClient := utils.MgmntClientFor(ctx)
@@ -186,11 +186,10 @@ func RegisterDynamicWorkflowToolsFor(ctx context.Context, workspace, workflowsFl
 				log.Errorf("workflow %s: skipping registration — failed to parse merged schema: %s", workflow.Slug, err)
 				return nil
 			}
-			// CRITICAL (Issue-18, Machiavelli review): Server.AddTool in the
-			// new SDK panics if InputSchema.Type != "object" (verified
-			// mcp/server.go:241-260). Schema merge can yield a non-object
-			// type if a customer's payload schema is malformed; we skip
-			// (loud-log) rather than crash the whole MCP server boot.
+			// CRITICAL: Server.AddTool in the new SDK panics if
+			// InputSchema.Type != "object". Schema merge can yield a
+			// non-object type if a customer's payload schema is malformed;
+			// we skip (loud-log) rather than crash the whole MCP server boot.
 			if inputSchema.Type != "object" {
 				log.Errorf("workflow %s: skipping registration — merged schema is not type=object (got %q)", workflow.Slug, inputSchema.Type)
 				return nil

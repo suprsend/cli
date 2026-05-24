@@ -87,9 +87,9 @@ func upsertTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 		tenant_payload.Properties = custom_tenant_properties
 	}
 
-	// NOTE (Issue-20): no naming collision with pkg/tenant today because this
-	// file does not import it. If a future change adds that import, rename the
-	// local `tenantResp` (or similar) to avoid shadowing the package name.
+	// NOTE: no naming collision with pkg/tenant today because this file does
+	// not import it. If a future change adds that import, rename the local
+	// `tenantResp` (or similar) to avoid shadowing the package name.
 	tenant, err := suprsend_client.Tenants.Upsert(ctx, tenant_id, tenant_payload)
 	if err != nil {
 		if utils.IsAuthError(err) {

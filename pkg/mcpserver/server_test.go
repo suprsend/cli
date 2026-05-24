@@ -305,7 +305,7 @@ func TestSessionHijackRejected(t *testing.T) {
 	// Drain the SSE response body so the connection can be cleanly closed.
 	// Without this, the test occasionally leaks a goroutine that races
 	// against test teardown — bare Close() on an unread event-stream body
-	// leaves the underlying connection in an indeterminate state (Issue-21).
+	// leaves the underlying connection in an indeterminate state.
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 	sessionID := resp.Header.Get("Mcp-Session-Id")

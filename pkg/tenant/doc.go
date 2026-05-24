@@ -1,8 +1,9 @@
 // Package tenant carries per-request SuprSend credentials on a context.Context.
 //
-// Both the CLI (single tenant populated at startup) and the hosted HTTP server
-// (one tenant per session populated by the resolver) use this package. Tool
-// handlers and utils.GetSuprSendWorkspaceClient read from it.
+// Both the CLI (single tenant populated at startup) and multi-tenant HTTP
+// servers using pkg/mcpserver (one tenant per session populated by the
+// resolver) use this package. Tool handlers and
+// utils.GetSuprSendWorkspaceClient read from it.
 //
 // Credentials carry the service token. The Credentials type implements
 // fmt.Stringer (String()) and json.Marshaler (MarshalJSON) such that the

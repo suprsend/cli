@@ -13,9 +13,9 @@ import (
 
 // Options configures the resty client returned by NewHTTPClientWithOptions.
 type Options struct {
-	// Transport, if non-nil, is wired via resty.SetTransport. Used by the
-	// hosted MCP server to inject authExpiryTransport for reactive session
-	// closure on 401.
+	// Transport, if non-nil, is wired via resty.SetTransport. Used by
+	// pkg/mcpserver consumers to inject an authExpiryTransport for reactive
+	// session closure on 401.
 	Transport http.RoundTripper
 	// Timeout caps every request. Zero = no timeout (resty default).
 	Timeout time.Duration

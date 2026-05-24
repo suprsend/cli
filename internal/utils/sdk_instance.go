@@ -11,9 +11,9 @@ import (
 	suprsend "github.com/suprsend/suprsend-go"
 )
 
-// SDKInstance is the singleton mgmnt client populated at CLI startup. The
-// hosted HTTP server does NOT use this — it constructs per-tenant clients via
-// MgmntClientFor below.
+// SDKInstance is the singleton mgmnt client populated at CLI startup.
+// Multi-tenant HTTP servers using pkg/mcpserver do NOT use this — they
+// construct per-tenant clients via MgmntClientFor below.
 var SDKInstance *mgmnt.SS_MgmntClient
 
 var (
@@ -48,11 +48,11 @@ func GetSuprSendMgmntClient() *mgmnt.SS_MgmntClient { return SDKInstance }
 //
 // The returned client's underlying HTTP transport is wrapped with
 // authExpiryTransport, which calls mcpserver.MarkSessionDead on every HTTP
-// 401 response from any SuprSend API call (bridge, management, or workspace).
-// In hosted mode the SDK closes the session after the in-flight tool call
-// returns; the client must reconnect (and re-authenticate). In CLI mode the
-// MarkSessionDead call is a no-op because the per-request context has no
-// dead-session flag installed.
+// 401 response from any SuprSend API call. In a multi-tenant MCP server
+// using pkg/mcpserver, the SDK closes the session after the in-flight tool
+// call returns; the client must reconnect (and re-authenticate). In CLI
+// mode the MarkSessionDead call is a no-op because the per-request context
+// has no dead-session flag installed.
 func MgmntClientFor(ctx context.Context) *mgmnt.SS_MgmntClient {
 	creds, err := tenant.FromContext(ctx)
 	if err != nil {
@@ -94,10 +94,10 @@ func GetSuprSendWorkspaceClient(workspace string, ctx ...context.Context) (*supr
 // authExpiryTransport wraps an http.RoundTripper. When the wrapped response
 // is HTTP 401, it calls mcpserver.MarkSessionDead with the request's ctx —
 // which signals the per-session dead-flag installed by pkg/mcpserver's
-// hosted middleware. In CLI contexts (no dead-flag), the call is a harmless
-// no-op.
+// per-session middleware. In CLI contexts (no dead-flag), the call is a
+// harmless no-op.
 //
-// Note: a 401 from a TRANSIENT bridge-API outage will also trigger close,
+// Note: a 401 from a TRANSIENT auth-backend outage will also trigger close,
 // which is a false positive. The cost is small — the client reconnects and
 // re-auths. We accept this trade-off because the cost of NOT closing on a
 // true revocation is unbounded continued access with stale credentials.
@@ -123,19 +123,18 @@ func (t *authExpiryTransport) RoundTrip(req *http.Request) (*http.Response, erro
 // function, breaking the would-be import cycle (utils → mcpserver → tools →
 // utils). Nil in CLI-only builds; calls on it are guarded.
 //
-// Hosted servers pull in pkg/mcpserver via the closed-source binary, which
-// triggers the init() assignment.
+// Any binary that imports pkg/mcpserver triggers the init() assignment so
+// the transport interceptor's call becomes effective.
 var MarkSessionDead func(ctx context.Context)
 
 // IsAuthError reports whether err represents an authentication failure from a
-// SuprSend API call (bridge, management, or workspace). Used by tool handlers
-// in their error paths to call mcpserver.MarkSessionDead(ctx) when the
-// underlying API returned 401 — the transport-interceptor approach cannot
-// work because neither mgmnt/client.go nor suprsend-go propagate the
-// handler's context into their HTTP requests (verified mgmnt/client.go:103
-// and suprsend-go@v0.9.0/client.go:199 both use http.NewRequest without
-// context). Per-handler discipline is the v1 fallback; long-term fix is an
-// upstream PR to suprsend-go switching to NewRequestWithContext.
+// SuprSend API call. Used by tool handlers in their error paths to call
+// mcpserver.MarkSessionDead(ctx) when the underlying API returned 401 — the
+// transport-interceptor approach cannot work because neither mgmnt/client.go
+// nor suprsend-go propagate the handler's context into their HTTP requests
+// (both use http.NewRequest without context). Per-handler discipline is the
+// v1 fallback; long-term fix is an upstream PR to suprsend-go switching to
+// NewRequestWithContext.
 //
 // Implementation: inspects the error chain for suprsend.APIError /
 // mgmnt.APIError types whose status code is 401, and for any wrapped error

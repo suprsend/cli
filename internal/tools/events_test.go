@@ -33,7 +33,7 @@ func TestTriggerEvent_MissingDistinctID_ReturnsError(t *testing.T) {
 
 // TestRegisterDynamicEventsToolsFor_NoCredsNoSingleton_ReturnsEmpty asserts
 // that when ctx has no tenant credentials AND the singleton SDKInstance is
-// nil (hosted-style startup before InitSDK), RegisterDynamicEventsToolsFor
+// nil (multi-tenant startup before InitSDK), RegisterDynamicEventsToolsFor
 // returns a clean error instead of panicking. FetchEventsMcpFor returns nil
 // events, and MgmntClientFor returns nil — the guard surfaces the latter as
 // an explicit error so callers don't silently get an empty tool surface.

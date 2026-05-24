@@ -14,29 +14,29 @@ import (
 
 // installSessionMiddleware wires the per-session middleware chain on srv.
 // One AddReceivingMiddleware call with multiple middlewares so ordering is
-// deterministic and recovery is genuinely outermost (Bug-6 fix). The
-// middleware chain becomes:
+// deterministic and recovery is genuinely outermost. The middleware chain
+// becomes:
 //
 //	recovery(session(handler))
 //
 // The session middleware does:
 //   - credential injection (tenant.WithCredentials on every method ctx)
 //   - dead-session flag installation (atomic.Bool for MarkSessionDead)
-//   - OnSessionStart context propagation (via mergeContextValues, Bug-8 fix)
+//   - OnSessionStart context propagation (via mergeContextValues)
 //   - OnToolCall hook (if configured) — wraps tools/call only
 //   - active-call tracking for Handler.Shutdown drain
 //   - reactive close — after each tool call, if the dead flag is set, close
 //     the *mcp.ServerSession.
 //
 // Session-tenant binding registration AND OnSessionStart invocation happen
-// in getServer (Bugs 9 + 15), not here, because:
+// in getServer, not here, because:
 //   - the SDK assigns the session ID AFTER this function returns;
 //   - sessionCtx must be in scope before GetSessionID fires so the endHookCtx
 //     can be stored alongside the binding.
 //
 // OnSessionEnd is fired by the periodic reconciliation goroutine when it
-// detects a session is no longer live (Bug-7 workaround — the SDK exposes
-// no synchronous session-end hook).
+// detects a session is no longer live (the SDK exposes no synchronous
+// session-end hook).
 func installSessionMiddleware(srv *mcp.Server, h *Handler, t *Tenant, sessionCtx context.Context) {
 	deadFlag := new(atomic.Bool)
 
@@ -60,7 +60,7 @@ func sessionMiddleware(h *Handler, t *Tenant, sessionCtx context.Context, deadFl
 			// Merge session-scoped values into per-call ctx. Deadline +
 			// cancellation stay with the per-call ctx; values fall back to
 			// sessionCtx for keys not on the per-call ctx (real impl in
-			// mergeContextValues, Bug-8 fix).
+			// mergeContextValues).
 			ctx = mergeContextValues(ctx, sessionCtx)
 			ctx = tenant.WithCredentials(ctx, t.Credentials)
 			ctx = context.WithValue(ctx, deadSessionKey{}, deadFlag)
@@ -144,14 +144,14 @@ func sessionMiddleware(h *Handler, t *Tenant, sessionCtx context.Context, deadFl
 
 // recoveryMiddleware catches panics from inner middleware / handlers and
 // converts them to JSON-RPC errors so a single buggy handler does not crash
-// the entire hosted process. Logs the panic + stack via the configured
+// the entire server process. Logs the panic + stack via the configured
 // Logger if any.
 func recoveryMiddleware(sopts *mcp.ServerOptions) mcp.Middleware {
 	var logFn func(format string, args ...any)
 	if sopts != nil && sopts.Logger != nil {
 		logFn = func(format string, args ...any) { sopts.Logger.Error(fmt.Sprintf(format, args...)) }
 	} else {
-		logFn = func(format string, args ...any) {} // silent default; closed-source should set Logger
+		logFn = func(format string, args ...any) {} // silent default; embedders should set Logger
 	}
 
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
@@ -185,10 +185,10 @@ const methodCallTool = "tools/call"
 // to parent (the session-scoped ctx from OnSessionStart) for any key not
 // present on child.
 //
-// This is what makes OnSessionStart actually useful: a closed-source resolver
-// can stash a span context, request ID, tenant logger, etc. on the returned
-// session ctx, and every per-call handler sees those values via standard
-// context.Value lookups.
+// This is what makes OnSessionStart actually useful: a resolver can stash a
+// span context, request ID, tenant logger, etc. on the returned session ctx,
+// and every per-call handler sees those values via standard context.Value
+// lookups.
 func mergeContextValues(child, parent context.Context) context.Context {
 	if parent == nil {
 		return child

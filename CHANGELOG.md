@@ -19,15 +19,16 @@ stability commitment from initial release. Breaking changes to anything under
   Credentials' service token is redacted by overridden `String()` and
   `MarshalJSON()` to prevent accidental leaks via debug prints / structured
   logging.
-- **`pkg/mcpserver`** — OSS hosted-server library: `New(Options) *Handler`,
-  `TenantResolver` interface, `Tenant`, `BuildTenantTools`, `MarkSessionDead`,
-  `FakeResolver`. Sentinel errors `ErrUnauthorized`, `ErrForbidden` for outer
-  auth middleware HTTP status mapping. Observability hooks `OnSessionStart`,
-  `OnSessionEnd`, `OnToolCall`. Graceful shutdown via `(*Handler).Shutdown(ctx)`.
-  Stateful streamable HTTP transport with hosted capability profile
-  (recovery + tools(listChanged) + resources(listChanged) + logging).
-  Outer auth middleware enforces session-tenant binding to mitigate
-  Mcp-Session-Id theft. Background reconciliation goroutine bounds memory.
+- **`pkg/mcpserver`** — MCP server library for multi-tenant deployments:
+  `New(Options) *Handler`, `TenantResolver` interface, `Tenant`,
+  `BuildTenantTools`, `MarkSessionDead`, `FakeResolver`. Sentinel errors
+  `ErrUnauthorized`, `ErrForbidden` for outer auth middleware HTTP status
+  mapping. Observability hooks `OnSessionStart`, `OnSessionEnd`, `OnToolCall`.
+  Graceful shutdown via `(*Handler).Shutdown(ctx)`. Stateful streamable HTTP
+  transport with a default capability profile (recovery + tools(listChanged)
+  + resources(listChanged) + logging). Outer auth middleware enforces
+  session-tenant binding to prevent stolen-session-ID reuse across tenants.
+  Background reconciliation goroutine bounds memory.
 
 ### Changed
 
@@ -36,11 +37,12 @@ stability commitment from initial release. Breaking changes to anything under
   1-arg form remains source-compatible.
 - **`mgmnt`** — refactored to accept an injectable `http.RoundTripper` via
   `NewClientWithUrlsAndTransport`, applied through `(c *SS_MgmntClient).restyClient()`
-  to all ~40 management API call sites. Added 10s bridge-call timeout
-  (was previously unbounded). All eight `internal/tools/*.go` files ported
-  from the legacy `mark3labs/mcp-go` API to `pkg/mcpsdk.Tool` abstraction,
-  with per-handler `utils.IsAuthError → mcpserver.MarkSessionDead` discipline
-  on every SuprSend API error path.
+  to all ~40 management API call sites. Added 10s timeout on the workspace
+  key/secret lookup (was previously unbounded). All eight
+  `internal/tools/*.go` files ported from the legacy `mark3labs/mcp-go` API
+  to `pkg/mcpsdk.Tool` abstraction, with per-handler
+  `utils.IsAuthError → mcpserver.MarkSessionDead` discipline on every
+  SuprSend API error path.
 - **CLI's `start-mcp-server`** — migrated from `github.com/mark3labs/mcp-go`
   to `github.com/modelcontextprotocol/go-sdk`. No user-visible behavior change
   expected. CLI capability profile: recovery + tools (no listChanged).

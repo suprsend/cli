@@ -108,8 +108,8 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		log.Infof("Selected tools: [%s]", strings.Join(toolStrs, ", "))
 		info := version.Get()
 
-		// CLI capability profile (per Question-11): tools no listChanged.
-		// Hosted profile lives in pkg/mcpserver. CLI doesn't change its tool
+		// CLI capability profile: tools no listChanged. The multi-tenant
+		// profile lives in pkg/mcpserver. The CLI doesn't change its tool
 		// list mid-session so listChanged wastes advertising here.
 		mcpServer := mcp.NewServer(&mcp.Implementation{Name: "SuprSend", Version: info.Version}, cliCapabilityProfile())
 		for _, t := range selectedTools {
@@ -182,13 +182,13 @@ func init() {
 }
 
 // cliCapabilityProfile returns the *mcp.ServerOptions for the single-tenant
-// CLI transport. Per Question-11:
+// CLI transport:
 //   - tools: listChanged OFF (CLI registers all tools at startup, never changes mid-session).
 //   - resources/prompts: not advertised (we register none).
 //   - logging: off for the CLI (logs go to stderr via logrus, not via MCP).
 //   - recovery: the SDK has no automatic recovery; pkg/mcpserver installs
-//     its own recoveryMiddleware in the hosted path, but the CLI does NOT
-//     install it — a panic in a tool handler should still surface to the
+//     its own recoveryMiddleware in the multi-tenant path, but the CLI does
+//     NOT install it — a panic in a tool handler should still surface to the
 //     CLI user via the normal Go panic flow rather than be silently logged.
 //
 // Logger: bridges to logrus so handler log messages from the SDK end up in

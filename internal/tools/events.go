@@ -18,7 +18,7 @@ import (
 // triggerEvent is the shared handler invoked by every dynamically registered
 // `trigger_<event_name>_event` tool. It validates distinct_id, builds the
 // event property bag from the remaining args, and calls the workspace
-// suprsend client's TrackEvent. Auth failures call MarkSessionDead so hosted
+// suprsend client's TrackEvent. Auth failures call MarkSessionDead so MCP
 // sessions get torn down instead of looping on a revoked token.
 func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string) (mcpsdk.Result, error) {
 	distinctID, err := args.RequireString("distinct_id")
@@ -59,9 +59,9 @@ func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string)
 }
 
 // RegisterDynamicEventsToolsFor builds a per-tenant slice of event-trigger
-// tools using the mgmnt client on ctx. Used by the hosted MCP server where
-// each session has its own credentials and SDKInstance is nil. Returns an
-// empty slice (not an error) when no events are selected — callers decide
+// tools using the mgmnt client on ctx. Used by multi-tenant MCP servers
+// where each session has its own credentials and SDKInstance is nil. Returns
+// an empty slice (not an error) when no events are selected — callers decide
 // whether absence is fatal.
 func RegisterDynamicEventsToolsFor(ctx context.Context, workspace, eventsFlag string) ([]*Tool, error) {
 	events := utils.FetchEventsMcpFor(ctx, workspace, eventsFlag)
@@ -108,11 +108,10 @@ func RegisterDynamicEventsToolsFor(ctx context.Context, workspace, eventsFlag st
 				log.Errorf("event %s: skipping registration — failed to parse merged schema: %s", event.Name, err)
 				return nil
 			}
-			// CRITICAL (Issue-18, Machiavelli review): Server.AddTool in the
-			// new SDK panics if InputSchema.Type != "object" (verified
-			// mcp/server.go:241-260). Schema merge can yield a non-object
-			// type if a customer's payload schema is malformed; we skip
-			// (loud-log) rather than crash the whole MCP server boot.
+			// CRITICAL: Server.AddTool in the new SDK panics if
+			// InputSchema.Type != "object". Schema merge can yield a
+			// non-object type if a customer's payload schema is malformed;
+			// we skip (loud-log) rather than crash the whole MCP server boot.
 			if inputSchema.Type != "object" {
 				log.Errorf("event %s: skipping registration — merged schema is not type=object (got %q)", event.Name, inputSchema.Type)
 				return nil

@@ -7,7 +7,6 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/pkg/mcpsdk"
-	"github.com/suprsend/cli/pkg/mcpserver"
 	suprsend "github.com/suprsend/suprsend-go"
 	"gopkg.in/yaml.v3"
 )
@@ -23,7 +22,7 @@ func getTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -31,7 +30,7 @@ func getTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 	user, err := suprsend_client.Tenants.Get(ctx, tenant_id)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -54,7 +53,7 @@ func upsertTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -94,7 +93,7 @@ func upsertTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 	tenant, err := suprsend_client.Tenants.Upsert(ctx, tenant_id, tenant_payload)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		err_str := err.Error()
 		if strings.Contains(err_str, `{"tenant_name": "missing value"}`) {
@@ -187,7 +186,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, args mcpsdk.Args) (mcps
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -195,7 +194,7 @@ func updateCategoryPreferenceTenant(ctx context.Context, args mcpsdk.Args) (mcps
 	tenantPref, err := suprsendClient.Tenants.UpdateCategoryPreference(ctx, tenantId, category, prefPayload)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -219,7 +218,7 @@ func getDefaultPreferenceTenant(ctx context.Context, args mcpsdk.Args) (mcpsdk.R
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -227,7 +226,7 @@ func getDefaultPreferenceTenant(ctx context.Context, args mcpsdk.Args) (mcpsdk.R
 	tenantPref, err := suprsendClient.Tenants.GetAllCategoriesPreference(ctx, tenantId, nil)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -247,7 +246,7 @@ func getAllTenantsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -257,7 +256,7 @@ func getAllTenantsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	})
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}

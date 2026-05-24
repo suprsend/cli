@@ -6,7 +6,6 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/pkg/mcpsdk"
-	"github.com/suprsend/cli/pkg/mcpserver"
 	suprsend "github.com/suprsend/suprsend-go"
 	"gopkg.in/yaml.v3"
 )
@@ -22,14 +21,14 @@ func getUserHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	user, err := suprsend_client.Users.Get(ctx, distinct_id)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -81,7 +80,7 @@ func upsertUserHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, er
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -100,7 +99,7 @@ func upsertUserHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, er
 	_, err = suprsendClient.Users.Edit(ctx, suprsend.UserEditRequest{EditInstance: userInstance})
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -122,7 +121,7 @@ func getUserPreferencesHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Re
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -132,7 +131,7 @@ func getUserPreferencesHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Re
 		userPref, err = suprsendClient.Users.GetFullPreference(ctx, distinctId, &suprsend.UserFullPreferencesOptions{TenantId: tenantId})
 		if err != nil {
 			if utils.IsAuthError(err) {
-				mcpserver.MarkSessionDead(ctx)
+				markSessionDead(ctx)
 			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
@@ -140,7 +139,7 @@ func getUserPreferencesHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Re
 		userPref, err = suprsendClient.Users.GetCategoryPreference(ctx, distinctId, category, &suprsend.UserCategoryPreferenceOptions{TenantId: tenantId})
 		if err != nil {
 			if utils.IsAuthError(err) {
-				mcpserver.MarkSessionDead(ctx)
+				markSessionDead(ctx)
 			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
@@ -150,7 +149,7 @@ func getUserPreferencesHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Re
 		userPref, err = suprsendClient.Users.GetGlobalChannelsPreference(ctx, distinctId, &suprsend.UserGlobalChannelsPreferenceOptions{TenantId: tenantId})
 		if err != nil {
 			if utils.IsAuthError(err) {
-				mcpserver.MarkSessionDead(ctx)
+				markSessionDead(ctx)
 			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
@@ -205,7 +204,7 @@ func updateUserPreference(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -213,7 +212,7 @@ func updateUserPreference(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	userPref, err := suprsendClient.Users.BulkUpdatePreferences(ctx, prefPayload, nil)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -247,14 +246,14 @@ func updateUserChannelPreferenceHandler(ctx context.Context, args mcpsdk.Args) (
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	userPref, err := suprsendClient.Users.UpdateGlobalChannelsPreference(ctx, distinctId, prefPayload, nil)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -275,7 +274,7 @@ func getUserListSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (mcp
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -283,7 +282,7 @@ func getUserListSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (mcp
 	userListSubscriptions, err := suprsendClient.Users.GetListsSubscribedTo(ctx, distinctId, &suprsend.CursorListApiOptions{Limit: limit})
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -306,7 +305,7 @@ func getUserObjectsSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -314,7 +313,7 @@ func getUserObjectsSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (
 	userObjectsSubscriptions, err := suprsendClient.Users.GetObjectsSubscribedTo(ctx, distinctId, &suprsend.CursorListApiOptions{Limit: limit})
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}

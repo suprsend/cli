@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/suprsend/cli/internal/tools"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/pkg/mcpsdk"
 	"github.com/suprsend/cli/pkg/tenant"
@@ -54,16 +55,59 @@ var (
 
 // Tenant is what a TenantResolver returns. Credentials become the per-handler
 // context payload; Tools is the runtime-agnostic tool set this session should
-// see. The canonical recipe is:
+// see. The canonical way for resolvers to populate Tools — including the
+// per-tenant dynamic workflow/event-trigger tools — is to call BuildTenantTools
+// with a context carrying the credentials:
 //
 //	ctx = tenant.WithCredentials(ctx, creds)
 //	tools, err := mcpserver.BuildTenantTools(ctx)
 //	if err != nil { return nil, err }
-//	tools = append(tools, myCustomTools...) // closed-source proprietary tools
 //	return &mcpserver.Tenant{Credentials: creds, Tools: tools}, nil
+//
+// Closed-source resolvers MUST use BuildTenantTools because they cannot import
+// internal/tools directly.
 type Tenant struct {
 	Credentials tenant.Credentials
 	Tools       []*mcpsdk.Tool
+}
+
+// BuildTenantTools returns the per-tenant tool set for the credentials on ctx:
+// the workspace-agnostic static tools plus the tenant's dynamic
+// workflow/event-trigger tools, scoped by the WorkflowsSelector and
+// EventsSelector on the credentials.
+//
+// Selector grammar matches the CLI's --workflows / --events flags: "all",
+// "none", a comma-separated slug list, or "tag:<tag>" entries (mixed forms
+// also work). An empty string is treated as "none".
+//
+// This helper exists so the closed-source deployment binary never imports
+// internal/tools directly. It is a thin convenience over
+// tools.GetAllTools / tools.RegisterDynamicWorkflowToolsFor / tools.RegisterDynamicEventsToolsFor.
+func BuildTenantTools(ctx context.Context) ([]*mcpsdk.Tool, error) {
+	creds, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mcpserver: BuildTenantTools: %w", err)
+	}
+	static := tools.GetAllTools()
+	wf, err := tools.RegisterDynamicWorkflowToolsFor(ctx, creds.Workspace, creds.WorkflowsSelector)
+	if err != nil {
+		return nil, fmt.Errorf("mcpserver: workflow tool registration: %w", err)
+	}
+	ev, err := tools.RegisterDynamicEventsToolsFor(ctx, creds.Workspace, creds.EventsSelector)
+	if err != nil {
+		return nil, fmt.Errorf("mcpserver: event tool registration: %w", err)
+	}
+	out := make([]*mcpsdk.Tool, 0, len(static)+len(wf)+len(ev))
+	for _, envelope := range static {
+		out = append(out, envelope.Tool)
+	}
+	for _, envelope := range wf {
+		out = append(out, envelope.Tool)
+	}
+	for _, envelope := range ev {
+		out = append(out, envelope.Tool)
+	}
+	return out, nil
 }
 
 // TenantResolver authenticates an incoming HTTP request and resolves it to a

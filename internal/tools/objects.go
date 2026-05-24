@@ -7,7 +7,6 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/pkg/mcpsdk"
-	"github.com/suprsend/cli/pkg/mcpserver"
 	"github.com/suprsend/suprsend-go"
 	"gopkg.in/yaml.v3"
 )
@@ -27,7 +26,7 @@ func getObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -40,7 +39,7 @@ func getObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 	objects_resp, err := suprsend_client.Objects.Get(ctx, obj_identifier)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -73,7 +72,7 @@ func upsertObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -119,7 +118,7 @@ func upsertObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 	_, err = suprsend_client.Objects.Edit(ctx, suprsend.ObjectEditRequest{EditInstance: obj_instance})
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -143,7 +142,7 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -158,7 +157,7 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
 		if err != nil {
 			if utils.IsAuthError(err) {
-				mcpserver.MarkSessionDead(ctx)
+				markSessionDead(ctx)
 			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
@@ -166,7 +165,7 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 		objPref, err = suprsendClient.Objects.GetFullPreference(ctx, objIdentifier, nil)
 		if err != nil {
 			if utils.IsAuthError(err) {
-				mcpserver.MarkSessionDead(ctx)
+				markSessionDead(ctx)
 			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
@@ -174,7 +173,7 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 		objPref, err = suprsendClient.Objects.GetCategoryPreference(ctx, objIdentifier, category, nil)
 		if err != nil {
 			if utils.IsAuthError(err) {
-				mcpserver.MarkSessionDead(ctx)
+				markSessionDead(ctx)
 			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
@@ -244,7 +243,7 @@ func updateObjectCategoryPreference(ctx context.Context, args mcpsdk.Args) (mcps
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -252,7 +251,7 @@ func updateObjectCategoryPreference(ctx context.Context, args mcpsdk.Args) (mcps
 	objPref, err := suprsendClient.Objects.UpdateCategoryPreference(ctx, obj, category, prefPayload, nil)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -297,7 +296,7 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, args mcpsdk.Args)
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -305,7 +304,7 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, args mcpsdk.Args)
 	objPref, err := suprsendClient.Objects.UpdateGlobalChannelsPreference(ctx, obj, prefPayload, nil)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}

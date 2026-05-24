@@ -11,7 +11,6 @@ import (
 	"github.com/suprsend/cli/internal/commands/schema"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/pkg/mcpsdk"
-	"github.com/suprsend/cli/pkg/mcpserver"
 	suprsend "github.com/suprsend/suprsend-go"
 	"golang.org/x/sync/errgroup"
 )
@@ -41,7 +40,7 @@ func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string)
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: fmt.Sprintf("Failed to get suprsend client: %v", err), IsError: true}, nil
 	}
@@ -52,7 +51,7 @@ func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string)
 	}
 	if _, err := suprsendClient.TrackEvent(event); err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: fmt.Sprintf("Failed to trigger event: %v", err), IsError: true}, nil
 	}

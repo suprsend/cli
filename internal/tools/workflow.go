@@ -11,7 +11,6 @@ import (
 	"github.com/suprsend/cli/internal/commands/schema"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/pkg/mcpsdk"
-	"github.com/suprsend/cli/pkg/mcpserver"
 	"github.com/suprsend/suprsend-go"
 	"golang.org/x/sync/errgroup"
 )
@@ -36,7 +35,7 @@ func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug stri
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		log.Error("Error getting workspace client: ", err)
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
@@ -73,7 +72,7 @@ func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug stri
 	resp, err := suprsendClient.Workflows.Trigger(wf)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -106,7 +105,7 @@ func listWorkflowsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
 	if err != nil {
 		if utils.IsAuthError(err) {
-			mcpserver.MarkSessionDead(ctx)
+			markSessionDead(ctx)
 		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}

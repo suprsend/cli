@@ -439,3 +439,46 @@ func TestObservabilityHooksFire(t *testing.T) {
 		t.Errorf("OnToolCall after-fn fired %d times, want 1", callCount.Load())
 	}
 }
+
+func TestBuildTenantTools_StaticOnly(t *testing.T) {
+	ctx := tenant.WithCredentials(context.Background(), tenant.Credentials{
+		ServiceToken:      "tok",
+		Workspace:         "staging",
+		WorkflowsSelector: "none",
+		EventsSelector:    "none",
+	})
+	tools, err := mcpserver.BuildTenantTools(ctx)
+	if err != nil {
+		t.Fatalf("BuildTenantTools: %v", err)
+	}
+	if len(tools) == 0 {
+		t.Fatal("expected at least the static tool set, got 0")
+	}
+	// Sanity: a known static tool name appears.
+	if !containsToolNamed(tools, "get_suprsend_tenant") {
+		t.Errorf("static tool get_suprsend_tenant missing from %v", toolNamesMcpsdk(tools))
+	}
+}
+
+func TestBuildTenantTools_MissingCredentials(t *testing.T) {
+	if _, err := mcpserver.BuildTenantTools(context.Background()); err == nil {
+		t.Fatal("expected error when ctx has no tenant credentials")
+	}
+}
+
+func containsToolNamed(tools []*mcpsdk.Tool, name string) bool {
+	for _, t := range tools {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func toolNamesMcpsdk(tools []*mcpsdk.Tool) []string {
+	out := make([]string, len(tools))
+	for i, t := range tools {
+		out[i] = t.Name
+	}
+	return out
+}

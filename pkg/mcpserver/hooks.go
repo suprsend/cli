@@ -70,8 +70,27 @@ func sessionMiddleware(h *Handler, t *Tenant, sessionCtx context.Context, deadFl
 			}
 
 			// Tool call — track for graceful shutdown + observability hook.
+			//
+			// Done() runs from a goroutine that waits on the per-call ctx
+			// rather than firing synchronously when middleware returns. The
+			// SDK writes the response AFTER this middleware returns
+			// (jsonrpc2.processResult: c.write(response) then req.cancel()).
+			// If activeCalls hit zero the instant middleware returned, a
+			// concurrent Handler.Shutdown could move past its Wait() and
+			// call ServerSession.Close() — which flips connClosing=true and
+			// makes the about-to-happen response write fail with
+			// ErrServerClosing. Clients then see "request terminated without
+			// response" for the very call Shutdown is supposed to drain.
+			// Waiting on ctx.Done() (which the SDK cancels right after the
+			// response write) tracks the precise window during which a
+			// premature session close would corrupt the response.
 			h.activeCalls.Add(1)
-			defer h.activeCalls.Done()
+			defer func() {
+				go func() {
+					<-ctx.Done()
+					h.activeCalls.Done()
+				}()
+			}()
 
 			var after func(*mcpsdk.Result, error)
 			if h.opts.OnToolCall != nil {
@@ -93,8 +112,29 @@ func sessionMiddleware(h *Handler, t *Tenant, sessionCtx context.Context, deadFl
 			// utils.authExpiryTransport marked the session dead. Close the
 			// underlying ServerSession so the SDK refuses further requests
 			// on the same Mcp-Session-Id.
+			//
+			// Two correctness constraints control the timing of the Close:
+			//
+			//  1. Close MUST NOT be called synchronously from inside this
+			//     middleware. The SDK's ServerSession.Close → Connection.Close
+			//     → wait() blocks until every in-flight handler returns; this
+			//     IS that in-flight handler, so a synchronous Close deadlocks.
+			//
+			//  2. Close MUST NOT race with the SDK writing this call's
+			//     response. Connection.Close flips connClosing=true
+			//     immediately, after which Connection.write() returns
+			//     ErrServerClosing for any subsequent write — including the
+			//     response to the current tool call (which the SDK writes
+			//     AFTER this middleware returns).
+			//
+			// The SDK's jsonrpc2 layer cancels the per-call ctx in
+			// processResult AFTER the response has been written (see
+			// conn.go processResult: c.write(...) then req.cancel()). So
+			// waiting on ctx.Done() in a background goroutine gives us the
+			// signal we need: the response is on the wire, the handler
+			// goroutine is winding down, and Close can safely fire.
 			if deadFlag.Load() {
-				closeSessionFromRequest(req)
+				closeSessionAfterResponse(ctx, req)
 			}
 
 			return result, err
@@ -199,11 +239,29 @@ func resultToMcpsdk(r mcp.Result) *mcpsdk.Result {
 	return out
 }
 
-// closeSessionFromRequest looks up the ServerSession associated with req
-// and calls Close on it. The CallToolRequest's Session field exposes the
-// *ServerSession (mcp/shared.go ServerRequest.Session).
-func closeSessionFromRequest(req mcp.Request) {
-	if r, ok := req.(*mcp.CallToolRequest); ok && r.Session != nil {
-		_ = r.Session.Close() // idempotent + concurrency-safe per SDK
+// closeSessionAfterResponse closes the ServerSession associated with req
+// AFTER the SDK has finished writing this call's response. See the call
+// site in sessionMiddleware for the full ordering argument; in summary:
+//
+//   - We must not call Close synchronously (would deadlock — see above).
+//   - We must not race Close with the not-yet-written response (Close flips
+//     connClosing immediately, after which the write of THIS response fails
+//     with ErrServerClosing and the client sees "request terminated
+//     without response").
+//
+// The SDK's jsonrpc2.processResult writes the response and then cancels
+// the per-call ctx (conn.go: req.cancel() after c.write). Waiting on
+// <-ctx.Done() in a background goroutine therefore gives us a precise
+// "response is on the wire" signal — at which point Close can fire and
+// the next request on this Mcp-Session-Id will be rejected by the SDK.
+func closeSessionAfterResponse(ctx context.Context, req mcp.Request) {
+	r, ok := req.(*mcp.CallToolRequest)
+	if !ok || r.Session == nil {
+		return
 	}
+	ss := r.Session
+	go func() {
+		<-ctx.Done()                 // wait until processResult cancels per-call ctx
+		_ = ss.Close()               // idempotent + concurrency-safe per SDK
+	}()
 }

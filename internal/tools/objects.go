@@ -577,86 +577,14 @@ Returns: updated channel-preference state on success.`),
 		Handler: updateObjectChannelPreferenceHandler,
 	}
 
-	get_suprsend_obj_subscriptions := &Tool{
-		Name:        "object.get_subscriptions",
-		MCPTool: mcp.NewTool("get_suprsend_object_subscriptions",
-			mcp.WithDescription(`List users / objects subscribed TO this object (its followers / members). Subscriptions are stored on the followed object.
+	// NOTE: get_suprsend_object_subscriptions + add_suprsend_object_subscriptions
+	// (handlers + tool literals) moved to obj_subscriptions.go as part of the
+	// Phase-5 mcpsdk port (Task 5.2). They register themselves via their own
+	// init() under type "objects", so the surface stays unchanged.
 
-When to use: the user asks "who follows project X?", "who's a member of organization Y?", or you need to enumerate an object's inbound subscribers.
-
-When NOT to use:
-- For the inverse direction (what a user follows) — use get_suprsend_user_objects_subscriptions.
-- For mailing-list members — use get_suprsend_user_list_subscriptions on each user.
-
-Returns: a paginated list of subscriber {type, id} entries. Set channel_preferences=true to also include each subscriber's channel preferences for this object. Default limit is 20.`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object's subscriptions to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The type of object you want to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("Suprsend workspace to get the object from."),
-			),
-			mcp.WithBoolean("channel_preferences",
-				mcp.Description("Whether to include channel preferences in the response. Default is false."),
-			),
-			mcp.WithNumber("limit",
-				mcp.Description("Number of subscriptions to get for an object."),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: getObjectSubscriptionsHandler,
-	}
-
-	add_suprsend_obj_subscriptions := &Tool{
-		Name:        "object.upsert_subscriptions",
-		MCPTool: mcp.NewTool("add_suprsend_object_subscriptions",
-			mcp.WithDescription(`Subscribe one or more users or other objects TO this object. The recipient list can mix users and objects in a single call.
-
-Recipients: users by distinct_id, objects by object_type + id. Each entry's shape follows the SuprSend recipient format. Optional properties attach metadata to each subscription (role, joined_at, etc.).
-
-When NOT to use:
-- To remove subscribers — there is no remove tool; use the SuprSend API directly.
-- For mailing-list / segment membership — those are managed via the Lists API.
-- For preference changes on existing subscribers — use the per-user / per-object preference tools.
-
-Side effects: each successful subscription is a separate row. Calling this twice with the same recipient creates duplicate-looking entries; check existing state with get_suprsend_object_subscriptions first if duplicates would be a problem.
-
-Returns: the created subscription records on success.`),
-			mcp.WithString("object_id",
-				mcp.Description("The object_id of the object's subscriptions to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("object_type",
-				mcp.Description("The type of object you want to get."),
-				mcp.Required(),
-			),
-			mcp.WithString("workspace",
-				mcp.Description("Suprsend workspace to get the object from."),
-			),
-			mcp.WithArray("recipients",
-				mcp.Description("Users & Objects who are subscribing to an object"),
-				mcp.Required(),
-			),
-			mcp.WithObject("properties",
-				mcp.Description("Properties of an user/object"),
-			),
-			mcp.WithDestructiveHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: addObjectSubscriptionsHandler,
-	}
 	tools := []*Tool{
 		get_suprsend_object,
 		upsert_suprsend_object,
-		get_suprsend_obj_subscriptions,
-		add_suprsend_obj_subscriptions,
 		get_suprsend_object_preferences,
 		update_suprsend_category_preference_object,
 		update_suprsend_object_channel_preference,

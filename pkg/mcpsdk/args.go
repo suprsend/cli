@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-// Args wraps a tool call's raw JSON arguments. The helper methods mirror the
-// mark3labs/mcp-go CallToolRequest helpers so handler code reads the same way
-// regardless of which runtime registered the tool.
+// Args wraps a tool call's raw JSON arguments. The helper methods give handler
+// code a small, runtime-agnostic surface for pulling typed values out of a tool
+// call regardless of which adapter registered the tool.
 type Args struct {
 	raw    json.RawMessage
 	parsed map[string]any

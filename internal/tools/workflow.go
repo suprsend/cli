@@ -57,8 +57,8 @@ func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug stri
 	if recipientDistinctId != "" {
 		wfRequestBody["recipients"] = []string{recipientDistinctId}
 	}
-	// Add data to the request body — pulled from args by name to preserve the
-	// legacy behavior (the old mark3labs handler grabbed args["data"] directly).
+	// Add data to the request body — pulled from args by name so the trigger
+	// payload mirrors the workflow input schema field-for-field.
 	if data, ok := args.Map()["data"]; ok {
 		wfRequestBody["data"] = data
 	}

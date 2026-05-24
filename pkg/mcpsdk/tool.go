@@ -1,8 +1,8 @@
 // Package mcpsdk defines an SDK-agnostic representation of an MCP tool.
 // Adapters in subpackages register these against a specific MCP runtime
-// (the official modelcontextprotocol/go-sdk in mcpsdk/official, mark3labs/mcp-go
-// in mcpsdk/legacy). Tool definitions and handlers live in internal/tools and
-// depend only on this package, so they remain single-sourced across runtimes.
+// (currently only the official modelcontextprotocol/go-sdk in mcpsdk/official).
+// Tool definitions and handlers live in internal/tools and depend only on this
+// package, so they remain single-sourced across runtimes.
 package mcpsdk
 
 import (

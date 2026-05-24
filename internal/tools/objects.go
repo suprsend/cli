@@ -318,9 +318,8 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, args mcpsdk.Args)
 	return mcpsdk.Result{Text: string(yamlPref)}, nil
 }
 
-// getSlackDetailsFromArgs is the mcpsdk.Args sibling of user.go's
-// getSlackDetails. Once user.go is ported (Task 5.4) this and the legacy
-// helper collapse into a single utility.
+// getSlackDetailsFromArgs extracts the slack_details argument for
+// add_slack / remove_slack actions. Shared by objects.go and user.go handlers.
 func getSlackDetailsFromArgs(args mcpsdk.Args, action string) (map[string]any, error) {
 	if action != "add_slack" && action != "remove_slack" {
 		return nil, nil
@@ -366,9 +365,8 @@ func getWebpushDetailsFromArgs(args mcpsdk.Args, action string) (map[string]any,
 	return details, nil
 }
 
-// slackDetailsSchema mirrors user.go's slackPropertiesSchema as a typed
-// *jsonschema.Schema. Promoted to a package-level var so it can be reused once
-// user.go is ported in Task 5.4.
+// slackDetailsSchema is the typed *jsonschema.Schema for slack_details on
+// upsert tools. Shared by objects.go and user.go upsert tools.
 var slackDetailsSchema = &jsonschema.Schema{
 	Type:        "object",
 	Description: "This is only applicable for add_slack and remove_slack actions.",
@@ -381,9 +379,9 @@ var slackDetailsSchema = &jsonschema.Schema{
 	},
 }
 
-// msTeamsDetailsSchema mirrors user.go's msTeamsPropertiesSchema (+ the
-// msTeamsRequiredFields() option that stamps `required: ["type"]`) as a
-// single typed *jsonschema.Schema.
+// msTeamsDetailsSchema is the typed *jsonschema.Schema for ms_teams_details on
+// upsert tools (with `required: ["type"]` baked in). Shared by objects.go and
+// user.go upsert tools.
 var msTeamsDetailsSchema = &jsonschema.Schema{
 	Type:        "object",
 	Description: "This is only applicable for add_ms_teams and remove_ms_teams actions.",
@@ -438,10 +436,9 @@ var msTeamsDetailsSchema = &jsonschema.Schema{
 	Required: []string{"type"},
 }
 
-// webpushDetailsSchema rewrites the inline mcp.WithObject(...) literal as a
-// typed *jsonschema.Schema. Keys.auth + keys.p256dh are both required and the
-// `keys` object disallows additional properties (matching the original
-// `additionalProperties: false`).
+// webpushDetailsSchema is the typed *jsonschema.Schema for webpush_details on
+// upsert tools. keys.auth + keys.p256dh are both required and `keys`
+// disallows additional properties. Shared by objects.go and user.go upsert tools.
 var webpushDetailsSchema = &jsonschema.Schema{
 	Type:        "object",
 	Description: "This is only applicable for add_webpush and remove_webpush actions.",

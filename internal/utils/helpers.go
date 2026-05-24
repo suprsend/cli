@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/suprsend/cli/mgmnt"
 	suprsend "github.com/suprsend/suprsend-go"
 )
 
@@ -88,6 +89,31 @@ func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
 	if mgmntClient == nil {
 		return nil
 	}
+	return fetchWorkflowsBody(mgmntClient, workspace, all, slugs, tags)
+}
+
+// FetchWorkflowsMcpFor mirrors FetchWorkflowsMcp but uses the per-tenant mgmnt
+// client from ctx (via MgmntClientFor). Returns nil if ctx has no tenant
+// credentials AND the singleton SDKInstance is nil. Required for the hosted
+// MCP server's per-tenant dynamic tool registration — that path runs with
+// SDKInstance == nil and must resolve the client from ctx instead.
+func FetchWorkflowsMcpFor(ctx context.Context, workspace, workflowsFlag string) []WorkflowInfo {
+	all, none, slugs, tags := parseSelector(workflowsFlag)
+	if none {
+		return nil
+	}
+	mgmntClient := MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return nil
+	}
+	return fetchWorkflowsBody(mgmntClient, workspace, all, slugs, tags)
+}
+
+// fetchWorkflowsBody contains the post-client-resolution logic shared by
+// FetchWorkflowsMcp and FetchWorkflowsMcpFor. Pure code-motion extraction; the
+// behavior is identical to the inlined version that lived in FetchWorkflowsMcp
+// prior to the per-tenant variant being added.
+func fetchWorkflowsBody(mgmntClient *mgmnt.SS_MgmntClient, workspace string, all bool, slugs, tags []string) []WorkflowInfo {
 	workflowsResp, err := mgmntClient.GetWorkflows(workspace, "live")
 	if err != nil {
 		return nil
@@ -175,6 +201,31 @@ func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
 	if mgmntClient == nil {
 		return nil
 	}
+	return fetchEventsBody(mgmntClient, workspace, all, names, tags)
+}
+
+// FetchEventsMcpFor mirrors FetchEventsMcp but uses the per-tenant mgmnt
+// client from ctx (via MgmntClientFor). Returns nil if ctx has no tenant
+// credentials AND the singleton SDKInstance is nil. Required for the hosted
+// MCP server's per-tenant dynamic tool registration — that path runs with
+// SDKInstance == nil and must resolve the client from ctx instead.
+func FetchEventsMcpFor(ctx context.Context, workspace, eventsFlag string) []EventInfo {
+	all, none, names, tags := parseSelector(eventsFlag)
+	if none {
+		return nil
+	}
+	mgmntClient := MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return nil
+	}
+	return fetchEventsBody(mgmntClient, workspace, all, names, tags)
+}
+
+// fetchEventsBody contains the post-client-resolution logic shared by
+// FetchEventsMcp and FetchEventsMcpFor. Pure code-motion extraction; the
+// behavior is identical to the inlined version that lived in FetchEventsMcp
+// prior to the per-tenant variant being added.
+func fetchEventsBody(mgmntClient *mgmnt.SS_MgmntClient, workspace string, all bool, names, tags []string) []EventInfo {
 	eventsResp, err := mgmntClient.GetEvents(workspace)
 	if err != nil {
 		return nil

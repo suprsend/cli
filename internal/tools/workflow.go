@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/google/jsonschema-go/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/commands/schema"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/pkg/mcpsdk"
+	"github.com/suprsend/cli/pkg/mcpserver"
 	"github.com/suprsend/suprsend-go"
 	"golang.org/x/sync/errgroup"
 )
@@ -19,17 +21,25 @@ import (
 // to amortize HTTP latency without overwhelming the management API.
 const dynamicRegistrationConcurrency = 10
 
-func triggerWorkflow(_ context.Context, request mcp.CallToolRequest, workspace, slug string) (*mcp.CallToolResult, error) {
-	wfRequestRaw := request.GetArguments()
-	tenantId := request.GetString("tenant_id", "")
+// triggerWorkflow is the shared handler invoked by every dynamically
+// registered `trigger_<slug>_workflow` tool. It builds the workflow trigger
+// payload from args (peeling off tenant_id / actor / recipient as
+// first-class routing fields and slotting everything under "data") and calls
+// the workspace suprsend client's Workflows.Trigger. Auth failures call
+// MarkSessionDead so hosted sessions get torn down instead of looping on a
+// revoked token.
+func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug string) (mcpsdk.Result, error) {
+	tenantId := args.GetString("tenant_id", "")
+	actorDistinctId := args.GetString("actor_distinct_id", "")
+	recipientDistinctId := args.GetString("recipient_distinct_id", "")
 
-	actorDistinctId := request.GetString("actor_distinct_id", "")
-	recipientDistinctId := request.GetString("recipient_distinct_id", "")
-
-	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace)
+	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
 		log.Error("Error getting workspace client: ", err)
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	// add workflow slug to the request body
@@ -48,8 +58,11 @@ func triggerWorkflow(_ context.Context, request mcp.CallToolRequest, workspace, 
 	if recipientDistinctId != "" {
 		wfRequestBody["recipients"] = []string{recipientDistinctId}
 	}
-	// Add data to the request body
-	wfRequestBody["data"] = wfRequestRaw["data"]
+	// Add data to the request body — pulled from args by name to preserve the
+	// legacy behavior (the old mark3labs handler grabbed args["data"] directly).
+	if data, ok := args.Map()["data"]; ok {
+		wfRequestBody["data"] = data
+	}
 	idempotencyKey := utils.GenerateUUID()
 	wf := &suprsend.WorkflowTriggerRequest{
 		Body:           wfRequestBody,
@@ -59,7 +72,10 @@ func triggerWorkflow(_ context.Context, request mcp.CallToolRequest, workspace, 
 
 	resp, err := suprsendClient.Workflows.Trigger(wf)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	responseStruct := map[string]any{
@@ -69,36 +85,50 @@ func triggerWorkflow(_ context.Context, request mcp.CallToolRequest, workspace, 
 	}
 	jsonData, err := json.MarshalIndent(responseStruct, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
-	return mcp.NewToolResultStructured(responseStruct, string(jsonData)), nil
+	return mcpsdk.Result{Text: string(jsonData), Structured: responseStruct}, nil
 }
 
-func listWorkflowsHandler(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	workspace, err := request.RequireString("workspace")
+func listWorkflowsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	workspace, err := args.RequireString("workspace")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
-	limit := request.GetInt("limit", 50)
-	offset := request.GetInt("offset", 0)
-	mode := request.GetString("mode", "live")
-	mgmntClient := utils.GetSuprSendMgmntClient()
+	limit := args.GetInt("limit", 50)
+	offset := args.GetInt("offset", 0)
+	mode := args.GetString("mode", "live")
+
+	mgmntClient := utils.MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return mcpsdk.Result{Text: "no mgmnt client available", IsError: true}, nil
+	}
 	workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		if utils.IsAuthError(err) {
+			mcpserver.MarkSessionDead(ctx)
+		}
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	jsonData, err := json.MarshalIndent(workflows, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
-	return mcp.NewToolResultStructured(workflows, string(jsonData)), nil
+	return mcpsdk.Result{Text: string(jsonData), Structured: workflows}, nil
 }
 
-func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
-	workflows := utils.FetchWorkflowsMcp(workspace, workflowsFlag)
-	if len(workflows) == 0 {
-		return fmt.Errorf("no workflows present in %s workspace", workspace)
+// RegisterDynamicWorkflowToolsFor builds a per-tenant slice of
+// workflow-trigger tools using the mgmnt client on ctx. Used by the hosted
+// MCP server where each session has its own credentials and SDKInstance is
+// nil. Returns an empty slice (not an error) when no workflows are selected
+// — callers decide whether absence is fatal.
+func RegisterDynamicWorkflowToolsFor(ctx context.Context, workspace, workflowsFlag string) ([]*Tool, error) {
+	workflows := utils.FetchWorkflowsMcpFor(ctx, workspace, workflowsFlag)
+	mgmntClient := utils.MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return nil, fmt.Errorf("tools: RegisterDynamicWorkflowToolsFor: no mgmnt client on ctx")
 	}
+
 	patchSchema := json.RawMessage(`
 		{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -126,7 +156,6 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 		}
 	`)
 
-	mgmntClient := utils.GetSuprSendMgmntClient()
 	tools := make([]*Tool, len(workflows))
 
 	g := new(errgroup.Group)
@@ -143,14 +172,28 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 				log.Errorf("workflow %s: skipping registration — failed to fetch payload schema: %s", workflow.Slug, err)
 				return nil
 			}
-			inputSchema, err := json.Marshal(payloadSchema.JSONSchema)
+			inputSchemaBytes, err := json.Marshal(payloadSchema.JSONSchema)
 			if err != nil {
 				log.Errorf("workflow %s: skipping registration — failed to marshal schema: %s", workflow.Slug, err)
 				return nil
 			}
-			mergedSchema, err := schema.MergeUnderDataAndValidate(string(patchSchema), string(inputSchema))
+			mergedSchema, err := schema.MergeUnderDataAndValidate(string(patchSchema), string(inputSchemaBytes))
 			if err != nil {
 				log.Errorf("workflow %s: skipping registration — failed to merge schema: %s", workflow.Slug, err)
+				return nil
+			}
+			var inputSchema jsonschema.Schema
+			if err := json.Unmarshal(mergedSchema, &inputSchema); err != nil {
+				log.Errorf("workflow %s: skipping registration — failed to parse merged schema: %s", workflow.Slug, err)
+				return nil
+			}
+			// CRITICAL (Issue-18, Machiavelli review): Server.AddTool in the
+			// new SDK panics if InputSchema.Type != "object" (verified
+			// mcp/server.go:241-260). Schema merge can yield a non-object
+			// type if a customer's payload schema is malformed; we skip
+			// (loud-log) rather than crash the whole MCP server boot.
+			if inputSchema.Type != "object" {
+				log.Errorf("workflow %s: skipping registration — merged schema is not type=object (got %q)", workflow.Slug, inputSchema.Type)
 				return nil
 			}
 			name := workflow.Name
@@ -166,14 +209,15 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 			}
 			cleanSlug := strings.ReplaceAll(workflow.Slug, "-", "_")
 			slugLocal := workflow.Slug
+			toolName := "trigger_" + cleanSlug + "_workflow"
 			tools[i] = &Tool{
-				Name: "trigger_" + cleanSlug + "_workflow",
-				MCPTool: mcp.NewToolWithRawSchema("trigger_"+cleanSlug+"_workflow",
-					description,
-					mergedSchema,
-				),
-				Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-					return triggerWorkflow(ctx, request, workspace, slugLocal)
+				Tool: &mcpsdk.Tool{
+					Name:        toolName,
+					Description: description,
+					InputSchema: &inputSchema,
+					Handler: func(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+						return triggerWorkflow(ctx, args, workspace, slugLocal)
+					},
 				},
 			}
 			return nil
@@ -183,48 +227,80 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 	// skipped per-workflow above; registration is best-effort.
 	_ = g.Wait()
 
+	out := make([]*Tool, 0, len(tools))
 	for _, t := range tools {
 		if t != nil {
-			RegisterWorkflow(t)
+			t.Type = "workflow"
+			out = append(out, t)
 		}
+	}
+	return out, nil
+}
+
+// RegisterDynamicWorkflowTools is the CLI-compatibility wrapper used by
+// startMcpServer.go. Delegates to RegisterDynamicWorkflowToolsFor with a
+// background context (so it resolves the singleton SDKInstance via
+// MgmntClientFor's fallback) and appends to the package-level
+// workflowRegistry.
+func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
+	// Preserve the legacy "no workflows in workspace" guard — the CLI path
+	// surfaces this as a fatal error during boot.
+	workflows := utils.FetchWorkflowsMcp(workspace, workflowsFlag)
+	if len(workflows) == 0 {
+		return fmt.Errorf("no workflows present in %s workspace", workspace)
+	}
+	out, err := RegisterDynamicWorkflowToolsFor(context.Background(), workspace, workflowsFlag)
+	if err != nil {
+		return err
+	}
+	for _, t := range out {
+		workflowRegistry = append(workflowRegistry, t)
 	}
 	return nil
 }
 
 func newWorkflowTools() []*Tool {
 	list_workflows := &Tool{
-		Name:        "workflows.list",
-		MCPTool: mcp.NewTool("list_workflows",
-			mcp.WithDescription(`List notification workflows in a workspace, in either draft or live mode.
+		Tool: &mcpsdk.Tool{
+			Name: "list_workflows",
+			Description: `List notification workflows in a workspace, in either draft or live mode.
 
 mode=live returns the currently-active version of each workflow; mode=draft returns the staged-but-not-yet-promoted version. The two can differ — workflows often have a draft change in flight.
 
-Returns: workflow slug, name, status, category, enabled state, and tags.`),
-			mcp.WithString("workspace",
-				mcp.Description("SuprSend workspace to list workflows from."),
-				mcp.Required(),
-				mcp.DefaultString("staging"),
-			),
-			mcp.WithNumber("limit",
-				mcp.Description("Limit the number of workflows to list."),
-				mcp.Required(),
-				mcp.DefaultNumber(50),
-			),
-			mcp.WithNumber("offset",
-				mcp.Description("Offset the number of workflows to list."),
-				mcp.DefaultNumber(0),
-			),
-			mcp.WithString("mode",
-				mcp.Description("Mode of workflows to list (draft, live), default: live."),
-				mcp.Required(),
-				mcp.DefaultString("live"),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: listWorkflowsHandler,
+Returns: workflow slug, name, status, category, enabled state, and tags.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"workspace": {
+						Type:        "string",
+						Description: "SuprSend workspace to list workflows from.",
+						Default:     json.RawMessage(`"staging"`),
+					},
+					"limit": {
+						Type:        "number",
+						Description: "Limit the number of workflows to list.",
+						Default:     json.RawMessage(`50`),
+					},
+					"offset": {
+						Type:        "number",
+						Description: "Offset the number of workflows to list.",
+						Default:     json.RawMessage(`0`),
+					},
+					"mode": {
+						Type:        "string",
+						Description: "Mode of workflows to list (draft, live), default: live.",
+						Default:     json.RawMessage(`"live"`),
+					},
+				},
+				Required: []string{"workspace", "limit", "mode"},
+			},
+			Annotations: mcpsdk.Annotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+				OpenWorldHint:  true,
+			},
+			Handler: listWorkflowsHandler,
+		},
 	}
 
 	return []*Tool{list_workflows}

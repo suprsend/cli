@@ -120,14 +120,7 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		)
 
 		for _, t := range selectedTools {
-			if t.Tool != nil {
-				// Ported: registered via mcpsdk abstraction → legacy adapter.
-				legacysdk.Register(mcpServer, t.Tool)
-			} else {
-				// Un-ported: still on raw mark3labs types. Keeps the CLI's tool
-				// surface complete during the Phase 5 incremental ports.
-				mcpServer.AddTool(t.MCPTool, t.Handler)
-			}
+			legacysdk.Register(mcpServer, t.Tool)
 		}
 
 		switch transport {
@@ -165,16 +158,8 @@ var listToolsCmd = &cobra.Command{
 			Tool_Name        string `json:"tool_name"`
 			Tool_Description string `json:"tool_description"`
 		}
-		// Dual-field envelope (Phase 4–5 transition): ported tool files
-		// populate t.Tool; un-ported files still populate t.MCPTool + t.Name.
-		// Read from whichever is set so the listing stays accurate while the
-		// per-file ports land. Removed in Task 5.x once the envelope collapses
-		// to a single *mcpsdk.Tool.
 		describe := func(t *toolset.Tool) toolListResponse {
-			if t.Tool != nil {
-				return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Tool.Name, Tool_Description: t.Tool.Description}
-			}
-			return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description}
+			return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description}
 		}
 		var resp []toolListResponse
 		for _, t := range toolset.GetAllTools() {

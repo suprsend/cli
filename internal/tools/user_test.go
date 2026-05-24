@@ -157,9 +157,6 @@ func TestNewUserTools_RegistersExpectedSurface(t *testing.T) {
 		if env.Tool == nil {
 			t.Fatalf("envelope missing .Tool — ported envelopes must populate it: %+v", env)
 		}
-		if env.MCPTool.Name != "" || env.Handler != nil {
-			t.Errorf("%s: legacy MCPTool/Handler must be zero on ported envelope (got name=%q)", env.Tool.Name, env.MCPTool.Name)
-		}
 		expect, ok := want[env.Tool.Name]
 		if !ok {
 			t.Errorf("unexpected tool %q registered", env.Tool.Name)

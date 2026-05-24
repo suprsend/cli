@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
@@ -370,6 +371,10 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 		return fmt.Errorf("slug cannot be empty")
 	}
 	client := resty.New()
+	if c.transport != nil {
+		client.SetTransport(c.transport)
+	}
+	client.SetTimeout(10 * time.Second)
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "commit", "/")

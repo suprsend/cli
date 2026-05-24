@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	suprsend "github.com/suprsend/suprsend-go"
@@ -28,6 +30,7 @@ type SS_MgmntClient struct {
 	hub_base_URL     string
 	mgmnt_base_URL   string
 	workspaceClients map[string]*suprsend.Client
+	transport        http.RoundTripper
 	debug            bool
 }
 
@@ -68,15 +71,54 @@ func NewClientWithUrls(serviceToken string, baseURL string, mgmntURL string, deb
 	return client
 }
 
-// Add method to client to get WorkspaceClient
+// NewClientWithUrlsAndTransport behaves like NewClientWithUrls but lets the
+// caller inject a shared http.RoundTripper. The transport is applied to:
+//   - the bridge API HTTP client (in GetWorkspaceKeyAndSecret)
+//   - the resty client used for schema fetches (via resty.SetTransport)
+//   - the suprsend-go workspace client (via suprsend.WithHTTPClient)
+//
+// Used by the hosted MCP server (internal/utils.MgmntClientFor) to wrap an
+// authExpiryTransport that calls mcpserver.MarkSessionDead on HTTP 401.
+func NewClientWithUrlsAndTransport(serviceToken, baseURL, mgmntURL string, transport http.RoundTripper, debug bool) *SS_MgmntClient {
+	c := NewClientWithUrls(serviceToken, baseURL, mgmntURL, debug)
+	c.transport = transport
+	return c
+}
+
+// httpClient returns an *http.Client honoring c.transport. Always sets a
+// 10-second timeout — both the bridge API and the management API should
+// respond well within that, and an unbounded client makes the hosted
+// server's auth path hangable.
+func (c *SS_MgmntClient) httpClient() *http.Client {
+	rt := c.transport
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	return &http.Client{Transport: rt, Timeout: 10 * time.Second}
+}
+
+// GetWorkspaceClient returns a cached suprsend workspace client. Uses a
+// background context for bridge-API lookups. Prefer GetWorkspaceClientCtx
+// from any code path that already has a request context.
 func (c *SS_MgmntClient) GetWorkspaceClient(workspace string) (*suprsend.Client, error) {
+	return c.GetWorkspaceClientCtx(context.Background(), workspace)
+}
+
+// GetWorkspaceClientCtx is the context-aware variant of GetWorkspaceClient.
+// The ctx is propagated to the bridge-API key/secret lookup; once the
+// workspace client is cached it is reused for the lifetime of c.
+func (c *SS_MgmntClient) GetWorkspaceClientCtx(ctx context.Context, workspace string) (*suprsend.Client, error) {
 	// Store a hashmap of workspaces and their clients, if the client doesn't exist, create it
 	if c.workspaceClients[workspace] == nil {
-		key, secret, err := c.GetWorkspaceKeyAndSecret(workspace)
+		key, secret, err := c.GetWorkspaceKeyAndSecret(ctx, workspace)
 		if err != nil {
 			return nil, err
 		}
-		client, err := suprsend.NewClient(key, secret, suprsend.WithBaseUrl(c.hub_base_URL), suprsend.WithDebug(c.debug))
+		opts := []suprsend.ClientOption{suprsend.WithBaseUrl(c.hub_base_URL), suprsend.WithDebug(c.debug)}
+		if c.transport != nil {
+			opts = append(opts, suprsend.WithHTTPClient(&http.Client{Transport: c.transport, Timeout: 30 * time.Second}))
+		}
+		client, err := suprsend.NewClient(key, secret, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -88,11 +130,11 @@ func (c *SS_MgmntClient) GetWorkspaceClient(workspace string) (*suprsend.Client,
 }
 
 // Function to get workspace key and secret for a given workspace name
-func (c *SS_MgmntClient) GetWorkspaceKeyAndSecret(workspace string) (string, string, error) {
+func (c *SS_MgmntClient) GetWorkspaceKeyAndSecret(ctx context.Context, workspace string) (string, string, error) {
 	// Make a GET request to bridge API to get workspace key and secret, pass in service token as header
 
-	// Create a new HTTP client
-	client := &http.Client{}
+	// Use the shared client so the injected transport (and bridge timeout) apply.
+	client := c.httpClient()
 
 	// Create a new GET request
 	urlStr, err := url.JoinPath(c.hub_base_URL, "v1", workspace, "ws_key", "bridge", "/")
@@ -100,7 +142,7 @@ func (c *SS_MgmntClient) GetWorkspaceKeyAndSecret(workspace string) (string, str
 		log.Info("Error creating request: ", err)
 		return "", "", err
 	}
-	req, err := http.NewRequest("GET", urlStr, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
 		log.Info("Error creating request: ", err)
 		return "", "", err

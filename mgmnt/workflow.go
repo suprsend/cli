@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type Workflow struct {
@@ -59,7 +58,7 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -128,7 +127,7 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 }
 
 func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (*map[string]any, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
 	if err != nil {
@@ -158,7 +157,7 @@ func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (
 }
 
 func (c *SS_MgmntClient) GetWorkflowDetail(workspace, slug, mode string) (*WorkflowDetailResponse, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
@@ -195,7 +194,7 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	limit := 50
@@ -262,7 +261,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
@@ -307,7 +306,7 @@ func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string)
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "commit", "/")
@@ -342,7 +341,7 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "enable", "/")
 	if err != nil {

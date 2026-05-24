@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type Workspace struct {
@@ -29,7 +28,7 @@ type WorkspaceListResponse struct {
 }
 
 func (c *SS_MgmntClient) ListWorkspaces(limit, offset int) (*WorkspaceListResponse, error) {
-	httpClient := client.NewHTTPClient()
+	httpClient := c.restyClient()
 	defer httpClient.Close()
 
 	apiLimit := 50

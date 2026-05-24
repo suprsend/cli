@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type Template struct {
@@ -42,7 +41,7 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -83,7 +82,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/", c.mgmnt_base_URL, workspace, slug)
@@ -119,7 +118,7 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 	var body map[string]any
 	json.Unmarshal(b, &body)
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv2/%s/template/%s/channel/%s/variant/%s/", c.mgmnt_base_URL, workspace, slug, channel, variantID)
@@ -157,7 +156,7 @@ func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitVa
 		return nil, fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/pre_commit_validate/", c.mgmnt_base_URL, workspace, slug)
@@ -183,7 +182,7 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
@@ -212,7 +211,7 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 }
 
 func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string]any, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
@@ -241,7 +240,7 @@ func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string
 }
 
 func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
@@ -267,7 +266,7 @@ func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, e
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
@@ -292,7 +291,7 @@ func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, 
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -365,7 +364,7 @@ func (c *SS_MgmntClient) GetVariantOrder(workspace, slug, mode string) (*Variant
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/order/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
@@ -390,7 +389,7 @@ func (c *SS_MgmntClient) PostVariantOrder(workspace, slug, mode string, order *V
 		return fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/order/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)

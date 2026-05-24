@@ -47,3 +47,36 @@ func TestNewClientWithUrls_DefaultsToHTTPDefaultTransport(t *testing.T) {
 		t.Fatalf("expected 10s timeout, got %v", hc.Timeout)
 	}
 }
+
+func TestRestyClient_WiresTransportAndTimeout(t *testing.T) {
+	var calls int
+	rt := roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		return nil, http.ErrUseLastResponse
+	})
+
+	c := NewClientWithUrlsAndTransport("tok", "https://hub.example.com", "https://mgmnt.example.com/", rt, false)
+
+	rc := c.restyClient()
+	defer rc.Close()
+
+	if got := rc.Timeout(); got != 10*time.Second {
+		t.Fatalf("expected 10s resty timeout, got %v", got)
+	}
+	if _, err := rc.Transport().RoundTrip(&http.Request{}); err == nil && calls == 0 {
+		t.Fatalf("expected injected RoundTripper to be invoked")
+	}
+	if calls != 1 {
+		t.Fatalf("expected injected RoundTripper to be invoked once, got %d", calls)
+	}
+}
+
+func TestRestyClient_NoTransportStillSets10sTimeout(t *testing.T) {
+	c := NewClientWithUrls("tok", "https://hub.example.com", "https://mgmnt.example.com/", false)
+	rc := c.restyClient()
+	defer rc.Close()
+
+	if got := rc.Timeout(); got != 10*time.Second {
+		t.Fatalf("expected 10s resty timeout even without transport, got %v", got)
+	}
+}

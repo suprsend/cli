@@ -12,7 +12,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/client"
 	suprsend "github.com/suprsend/suprsend-go"
+	"resty.dev/v3"
 )
 
 func normalizeURL(url string) string {
@@ -95,6 +97,18 @@ func (c *SS_MgmntClient) httpClient() *http.Client {
 		rt = http.DefaultTransport
 	}
 	return &http.Client{Transport: rt, Timeout: 10 * time.Second}
+}
+
+// restyClient returns a configured resty.Client that honors c.transport
+// (the hosted server's authExpiryTransport, when set) and a 10s default
+// timeout. ALL mgmnt-package HTTP construction MUST go through this method
+// instead of calling client.NewHTTPClient() or resty.New() directly —
+// otherwise the auth-expiry interceptor and the timeout are bypassed.
+func (c *SS_MgmntClient) restyClient() *resty.Client {
+	return client.NewHTTPClientWithOptions(client.Options{
+		Transport: c.transport,
+		Timeout:   10 * time.Second,
+	})
 }
 
 // GetWorkspaceClient returns a cached suprsend workspace client. Uses a

@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type EventsResponse struct {
@@ -37,7 +36,7 @@ type Event struct {
 }
 
 func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListEventsResponse, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
@@ -71,7 +70,7 @@ func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListE
 }
 
 func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	limit := 50
@@ -118,7 +117,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 }
 
 func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", eventName, "/")
@@ -141,7 +140,7 @@ func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, er
 }
 
 func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]any) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "bulk", "event", "/")

@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type TranslationItem struct {
@@ -43,7 +42,7 @@ type TranslationResponse struct {
 }
 
 func (c *SS_MgmntClient) ListTranslations(workspace, mode, includeContent string, limit, offset int) (*ListTranslation, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv1/%s/translation/?mode=%s&limit=%d&offset=%d&include_content=%s&include_version_info=true", c.mgmnt_base_URL, workspace, mode, limit, offset, includeContent)
@@ -71,7 +70,7 @@ func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationRe
 		log.Errorf("%s: invalid mode. Available modes are: draft, live", mode)
 		return nil, nil
 	}
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	limit := 10
@@ -120,7 +119,7 @@ func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationRe
 }
 
 func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation map[string]any) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	url := fmt.Sprintf("%sv1/%s/translation/content/%s/", c.mgmnt_base_URL, workspace, filename)
 	res, err := client.R().
@@ -139,7 +138,7 @@ func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation
 }
 
 func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	encodedCommitMessage := url.QueryEscape(commitMessage)
 	url := fmt.Sprintf("%sv1/%s/translation/commit/?commit_message=%s", c.mgmnt_base_URL, workspace, encodedCommitMessage)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type PreferenceTranslation struct {
@@ -24,7 +23,7 @@ type ListPreferenceTranslation struct {
 }
 
 func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPreferenceTranslation, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/locale", c.mgmnt_base_URL, workspace)
@@ -48,7 +47,7 @@ func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPref
 }
 
 func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale string) (*PreferenceTranslationContent, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/content/%s", c.mgmnt_base_URL, workspace, locale)
@@ -72,7 +71,7 @@ func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale st
 }
 
 func (c *SS_MgmntClient) PushPreferenceTranslation(workspace, locale string, translation PreferenceTranslationContent) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/content/%s", c.mgmnt_base_URL, workspace, locale)
 	res, err := client.R().

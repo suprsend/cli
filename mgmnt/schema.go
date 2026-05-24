@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
-	"resty.dev/v3"
 )
 
 type SchemasResponse struct {
@@ -82,7 +79,7 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -151,7 +148,7 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 }
 
 func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*SchemaResponse, error) {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "/")
 	if err != nil {
@@ -187,7 +184,7 @@ func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[str
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "/")
 	if err != nil {
@@ -221,7 +218,7 @@ func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchema
 		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	limit := 50
@@ -273,7 +270,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	limit := 50
@@ -335,7 +332,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 }
 
 func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", schemaSlug, "/")
 	if err != nil {
@@ -370,11 +367,7 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
-	client := resty.New()
-	if c.transport != nil {
-		client.SetTransport(c.transport)
-	}
-	client.SetTimeout(10 * time.Second)
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "commit", "/")

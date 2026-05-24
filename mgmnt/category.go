@@ -7,7 +7,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type PreferenceCategoryResponse struct {
@@ -60,7 +59,7 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
 	if err != nil {
@@ -93,7 +92,7 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 }
 
 func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
 	if err != nil {
@@ -131,7 +130,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 }
 
 func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) error {
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "commit", "/")
 	if err != nil {

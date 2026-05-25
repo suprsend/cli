@@ -16,9 +16,8 @@ import (
 	"errors"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
-	"github.com/olekukonko/tablewriter/renderer"
-	"github.com/olekukonko/tablewriter/tw"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
@@ -273,64 +272,63 @@ func outputTable(data any) {
 	log.Fatal("Input must be a struct or a slice of structs")
 }
 
+// perColumnWidthMax caps each column's rendered width so long cells (e.g. a
+// multi-paragraph tool_description) wrap instead of blowing out the table
+// horizontally.
+const perColumnWidthMax = 60
+
 func printStructAsTable(values []reflect.Value) {
 	if len(values) == 0 {
 		log.Info("No data to display")
 		return
 	}
 
-	table := tablewriter.NewTable(os.Stdout,
-		tablewriter.WithRenderer(renderer.NewBlueprint(tw.Rendition{
-			Borders: tw.Border{
-				Left:   tw.Off,
-				Right:  tw.Off,
-				Top:    tw.Off,
-				Bottom: tw.Off,
-			},
-			Settings: tw.Settings{
-				Separators: tw.Separators{BetweenRows: tw.Off, BetweenColumns: tw.On, ShowHeader: tw.Off, ShowFooter: tw.Off},
-				Lines: tw.Lines{
-					ShowTop:        tw.Off,
-					ShowBottom:     tw.Off,
-					ShowHeaderLine: tw.On,
-					ShowFooterLine: tw.Off,
-				},
-			},
-		})),
-		tablewriter.WithConfig(tablewriter.Config{
-			Header: tw.CellConfig{
-				Formatting: tw.CellFormatting{Alignment: tw.AlignLeft},
-			},
-			Row: tw.CellConfig{
-				Formatting: tw.CellFormatting{
-					MergeMode: tw.MergeNone,
-					Alignment: tw.AlignLeft,
-				},
-			},
-		}),
-	)
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
 
-	// Set headers based on struct field names
+	// Borderless light style with column separators and a header line, to
+	// approximate the previous tablewriter look. Left-align header + rows.
+	style := table.StyleLight
+	style.Options.DrawBorder = false
+	style.Options.SeparateColumns = true
+	style.Options.SeparateRows = false
+	style.Options.SeparateHeader = true
+	style.Options.SeparateFooter = false
+	style.Format.Header = text.FormatDefault
+	t.SetStyle(style)
+	t.Style().Format.Header = text.FormatDefault
+
+	// Set headers based on struct field names.
 	elemType := values[0].Type()
-	var headers []string
+	headerRow := make(table.Row, 0, elemType.NumField())
 	for i := 0; i < elemType.NumField(); i++ {
-		headers = append(headers, elemType.Field(i).Name)
+		headerRow = append(headerRow, elemType.Field(i).Name)
 	}
-	table.Header(headers)
+	t.AppendHeader(headerRow)
 
-	// Add rows
-	var rows [][]any
+	// Cap every column's width and soft-wrap long cells. Left-align.
+	colConfigs := make([]table.ColumnConfig, 0, elemType.NumField())
+	for i := 0; i < elemType.NumField(); i++ {
+		colConfigs = append(colConfigs, table.ColumnConfig{
+			Number:           i + 1,
+			Align:            text.AlignLeft,
+			AlignHeader:      text.AlignLeft,
+			WidthMax:         perColumnWidthMax,
+			WidthMaxEnforcer: text.WrapSoft,
+		})
+	}
+	t.SetColumnConfigs(colConfigs)
+
+	// Add rows based on struct field values.
 	for _, val := range values {
-		var row []any
+		row := make(table.Row, 0, val.NumField())
 		for i := 0; i < val.NumField(); i++ {
-			field := val.Field(i)
-			row = append(row, formatValue(field))
+			row = append(row, formatValue(val.Field(i)))
 		}
-		rows = append(rows, row)
+		t.AppendRow(row)
 	}
-	table.Bulk(rows)
 
-	table.Render()
+	t.Render()
 }
 
 func formatValue(v reflect.Value) string {

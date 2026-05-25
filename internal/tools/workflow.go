@@ -308,7 +308,7 @@ Returns: workflow slug, name, status, category, enabled state, and tags.`,
 			Annotations: mcpsdk.Annotations{
 				ReadOnlyHint:   true,
 				IdempotentHint: true,
-				OpenWorldHint:  true,
+				OpenWorldHint:  mcpsdk.BoolPtr(true),
 			},
 			Handler: listWorkflowsHandler,
 		},

@@ -105,7 +105,7 @@ Tips: use precise technical terms ("workflow trigger conditions", not "the rule 
 			Annotations: mcpsdk.Annotations{
 				ReadOnlyHint:   true,
 				IdempotentHint: true,
-				OpenWorldHint:  true,
+				OpenWorldHint:  mcpsdk.BoolPtr(true),
 			},
 			Handler: searchDocsHandler,
 		},
@@ -134,7 +134,7 @@ Returns: the page contents as markdown.`,
 			Annotations: mcpsdk.Annotations{
 				ReadOnlyHint:   true,
 				IdempotentHint: true,
-				OpenWorldHint:  true,
+				OpenWorldHint:  mcpsdk.BoolPtr(true),
 			},
 			Handler: fetchDocsHandler,
 		},

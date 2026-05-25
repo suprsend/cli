@@ -21,6 +21,12 @@ func argsFromJSON(t *testing.T, raw string) mcpsdk.Args {
 	return a
 }
 
+// boolHint derefs a *bool annotation hint for test comparison. nil ("unset")
+// reads as false, which is the effective hint these tools assert: read-only
+// tools leave DestructiveHint nil rather than emitting an explicit false, so a
+// false expectation in the want maps maps onto either nil or &false.
+func boolHint(p *bool) bool { return p != nil && *p }
+
 // TestGetTenant_MissingTenantID_ReturnsError is the tracer bullet: confirms
 // that the required-argument check fires before any downstream client lookup.
 // This path needs no mocked SuprSend client.
@@ -168,14 +174,14 @@ func TestNewTenantTools_RegistersExpectedSurface(t *testing.T) {
 		if env.Tool.Annotations.ReadOnlyHint != expect.readOnly {
 			t.Errorf("%s: ReadOnlyHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.ReadOnlyHint, expect.readOnly)
 		}
-		if env.Tool.Annotations.DestructiveHint != expect.destructive {
-			t.Errorf("%s: DestructiveHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.DestructiveHint, expect.destructive)
+		if boolHint(env.Tool.Annotations.DestructiveHint) != expect.destructive {
+			t.Errorf("%s: DestructiveHint = %v, want %v", env.Tool.Name, boolHint(env.Tool.Annotations.DestructiveHint), expect.destructive)
 		}
 		if env.Tool.Annotations.IdempotentHint != expect.idempotent {
 			t.Errorf("%s: IdempotentHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.IdempotentHint, expect.idempotent)
 		}
 		// OpenWorldHint is true on every tenant tool — tighten if that ever drifts.
-		if !env.Tool.Annotations.OpenWorldHint {
+		if !boolHint(env.Tool.Annotations.OpenWorldHint) {
 			t.Errorf("%s: OpenWorldHint should be true", env.Tool.Name)
 		}
 		if env.Tool.Handler == nil {

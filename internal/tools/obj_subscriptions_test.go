@@ -134,14 +134,14 @@ func TestNewObjSubscriptionsTools_RegistersExpectedSurface(t *testing.T) {
 		if env.Tool.Annotations.ReadOnlyHint != expect.readOnly {
 			t.Errorf("%s: ReadOnlyHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.ReadOnlyHint, expect.readOnly)
 		}
-		if env.Tool.Annotations.DestructiveHint != expect.destructive {
-			t.Errorf("%s: DestructiveHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.DestructiveHint, expect.destructive)
+		if boolHint(env.Tool.Annotations.DestructiveHint) != expect.destructive {
+			t.Errorf("%s: DestructiveHint = %v, want %v", env.Tool.Name, boolHint(env.Tool.Annotations.DestructiveHint), expect.destructive)
 		}
 		if env.Tool.Annotations.IdempotentHint != expect.idempotent {
 			t.Errorf("%s: IdempotentHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.IdempotentHint, expect.idempotent)
 		}
-		if env.Tool.Annotations.OpenWorldHint != expect.openWorld {
-			t.Errorf("%s: OpenWorldHint = %v, want %v", env.Tool.Name, env.Tool.Annotations.OpenWorldHint, expect.openWorld)
+		if boolHint(env.Tool.Annotations.OpenWorldHint) != expect.openWorld {
+			t.Errorf("%s: OpenWorldHint = %v, want %v", env.Tool.Name, boolHint(env.Tool.Annotations.OpenWorldHint), expect.openWorld)
 		}
 		if env.Tool.Handler == nil {
 			t.Errorf("%s: Handler must be set", env.Tool.Name)

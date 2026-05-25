@@ -35,21 +35,21 @@ func convertAnnotations(a mcpsdk.Annotations) *mcp.ToolAnnotations {
 	if (a == mcpsdk.Annotations{}) {
 		return nil
 	}
-	// Verified mcp/protocol.go:1357-1381:
+	// Verified mcp/protocol.go:1357-1384:
 	//   DestructiveHint *bool, OpenWorldHint *bool  (pointer — nil = unset)
 	//   ReadOnlyHint    bool,  IdempotentHint bool  (value)
-	// boolPtr wraps the bool so we emit either &true or &false (never nil)
-	// once a tool author has set the field on mcpsdk.Annotations.
+	// DestructiveHint/OpenWorldHint are already *bool on mcpsdk.Annotations, so
+	// pass them through directly: nil propagates as "unset" and the consumer
+	// applies the MCP spec default (true) rather than us emitting an explicit
+	// false that would override it.
 	return &mcp.ToolAnnotations{
 		Title:           a.Title,
 		ReadOnlyHint:    a.ReadOnlyHint,
 		IdempotentHint:  a.IdempotentHint,
-		DestructiveHint: boolPtr(a.DestructiveHint),
-		OpenWorldHint:   boolPtr(a.OpenWorldHint),
+		DestructiveHint: a.DestructiveHint,
+		OpenWorldHint:   a.OpenWorldHint,
 	}
 }
-
-func boolPtr(b bool) *bool { return &b }
 
 func toCallToolResult(r mcpsdk.Result) *mcp.CallToolResult {
 	out := &mcp.CallToolResult{

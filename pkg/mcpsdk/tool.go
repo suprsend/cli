@@ -25,13 +25,24 @@ type Tool struct {
 
 // Annotations mirrors the MCP tool annotations vocabulary. Adapters translate
 // these into the runtime-specific annotation type.
+//
+// DestructiveHint and OpenWorldHint are *bool to mirror the MCP spec's
+// tri-state: nil means "unset" and the consumer applies the spec default
+// (both default to true). A plain false would otherwise be indistinguishable
+// from "author left it unset", incorrectly overriding the spec default. Set
+// them via BoolPtr. ReadOnlyHint and IdempotentHint are plain bool because the
+// spec defaults those to false, which matches Go's zero value.
 type Annotations struct {
 	Title           string
 	ReadOnlyHint    bool
 	IdempotentHint  bool
-	DestructiveHint bool
-	OpenWorldHint   bool
+	DestructiveHint *bool // nil = unset (MCP spec default: true)
+	OpenWorldHint   *bool // nil = unset (MCP spec default: true)
 }
+
+// BoolPtr returns a pointer to b. Convenience for setting the *bool annotation
+// hints (DestructiveHint, OpenWorldHint) on a Tool.
+func BoolPtr(b bool) *bool { return &b }
 
 // ToolHandler is the SDK-independent handler signature. The handler receives a
 // context (which carries tenant credentials when the request was authenticated

@@ -169,15 +169,78 @@ type Handler struct {
 	http.Handler // the StreamableHTTPHandler wrapped in the auth middleware
 	opts         Options
 
-	servers        sync.Map // *mcp.Server -> struct{}
+	servers        sync.Map // *mcp.Server -> serverEntry
 	sessionTenants sync.Map // sessionID (string) -> tenantIdentifier (string)
 	sessionInfo    sync.Map // sessionID (string) -> *endHookCtx
 
+	// reconcileGrace is the minimum age a sessionless server must reach before
+	// reconciliation is allowed to evict it (Fix #9). Set in New from the
+	// reconcile interval.
+	reconcileGrace time.Duration
+
+	// closing is an advisory fast-path flag for the auth middleware's 503
+	// check and getServer's early bail. The authoritative shutdown
+	// coordination — gating in-flight tool calls against Shutdown's drain —
+	// lives in inflight, whose mutex makes add() and beginShutdown() mutually
+	// exclusive (Fix #8: no Add-after-Wait race).
 	closing         atomic.Bool
-	activeCalls     sync.WaitGroup
+	inflight        inflight
 	shutdownOnce    sync.Once
 	reconcileStop   chan struct{}
 	reconcileDoneCh chan struct{}
+}
+
+// inflight is a mutex-coordinated in-flight tool-call tracker. It replaces a
+// bare sync.WaitGroup so that incrementing the counter (add) and the
+// closing-check that gates Shutdown's drain (beginShutdown) are mutually
+// exclusive. With a raw WaitGroup, a call that passed the closing fast-path
+// could reach Add(1) AFTER Shutdown's Wait() observed zero and returned,
+// violating the WaitGroup contract. Here add() and beginShutdown() take the
+// same mutex, so once shutdown begins no new call is ever counted.
+type inflight struct {
+	mu      sync.Mutex
+	n       int
+	closing bool
+	drainCh chan struct{} // non-nil only while closing && n>0; closed when drained
+}
+
+// add registers a starting tool call. Returns false if shutdown has already
+// begun, in which case the call is NOT counted and Shutdown will not wait for
+// it (the session is closed in Shutdown's server-walk regardless).
+func (i *inflight) add() bool {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.closing {
+		return false
+	}
+	i.n++
+	return true
+}
+
+// done marks a previously-add()'d call complete.
+func (i *inflight) done() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.n--
+	if i.closing && i.n == 0 && i.drainCh != nil {
+		close(i.drainCh)
+		i.drainCh = nil
+	}
+}
+
+// beginShutdown flips the tracker into closing mode and returns a channel that
+// is closed once all in-flight calls have drained (immediately if none).
+func (i *inflight) beginShutdown() <-chan struct{} {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.closing = true
+	ch := make(chan struct{})
+	if i.n == 0 {
+		close(ch)
+	} else {
+		i.drainCh = ch
+	}
+	return ch
 }
 
 // endHookCtx carries everything OnSessionEnd needs at fire time, captured
@@ -185,6 +248,13 @@ type Handler struct {
 type endHookCtx struct {
 	tenant     *Tenant
 	sessionCtx context.Context
+}
+
+// serverEntry is the value stored in Handler.servers. createdAt records when
+// getServer built the *mcp.Server, so reconciliation can apply a grace window
+// before evicting a sessionless (still-initializing) server (Fix #9).
+type serverEntry struct {
+	createdAt time.Time
 }
 
 // tenantIdentifier returns a stable, log-safe identifier for the tenant
@@ -260,7 +330,11 @@ func New(opts Options) *Handler {
 		perCall := mergeServerOptions(opts.ServerOptions, hostedCapabilityProfile())
 		tenantIdent := tenantIdentifier(t.Credentials)
 
-		sessionCtx := context.Background()
+		// Fix #11: carry the inbound initialize request's context VALUES
+		// (resolved tenant, trace span, auth detail) into the session ctx,
+		// but detach its cancellation so the session correctly outlives the
+		// initialize request. context.WithoutCancel is Go 1.21+.
+		sessionCtx := context.WithoutCancel(r.Context())
 		safeCall("OnSessionStart", h.serverLogger(), func() {
 			if h.opts.OnSessionStart != nil {
 				sessionCtx = h.opts.OnSessionStart(sessionCtx, t)
@@ -281,7 +355,23 @@ func New(opts Options) *Handler {
 		}
 
 		srv := mcp.NewServer(impl, perCall)
-		h.servers.Store(srv, struct{}{})
+		h.servers.Store(srv, serverEntry{createdAt: time.Now()})
+
+		// Fix #10: close the Shutdown TOCTOU window. The early h.closing check
+		// above can pass and then Shutdown's server-walk can complete before we
+		// Store, leaking this server (its session would never be closed). Re-
+		// check after Store: if shutdown began, drop this server and close any
+		// sessions that may already have attached, then refuse the session by
+		// returning nil. Either Shutdown's Range sees the server (closes it) or
+		// this re-check does; ss.Close is idempotent so both running is safe.
+		if h.closing.Load() {
+			h.servers.Delete(srv)
+			for ss := range srv.Sessions() {
+				_ = ss.Close()
+			}
+			return nil
+		}
+
 		installSessionMiddleware(srv, h, t, sessionCtx)
 		for _, tool := range t.Tools {
 			registerTool(srv, tool, h)
@@ -299,7 +389,17 @@ func New(opts Options) *Handler {
 	streamable := mcp.NewStreamableHTTPHandler(getServer, httpOpts)
 	h.Handler = newAuthMiddleware(opts.Resolver, h, streamable)
 
-	go h.runReconciliation(httpOpts.SessionTimeout / 2)
+	reconcileInterval := httpOpts.SessionTimeout / 2
+	if reconcileInterval <= 0 {
+		reconcileInterval = 15 * time.Minute
+	}
+	// Fix #9: grace window for sessionless server eviction == one reconcile
+	// interval. A server stored by getServer but whose session id has not yet
+	// been assigned by the SDK (GetSessionID fires after getServer returns)
+	// must not be evicted by a reconcile tick landing in that gap.
+	h.reconcileGrace = reconcileInterval
+
+	go h.runReconciliation(reconcileInterval)
 
 	return h
 }
@@ -323,7 +423,7 @@ func (h *Handler) runReconciliation(interval time.Duration) {
 
 func (h *Handler) reconcileSessionTenants() {
 	live := map[string]struct{}{}
-	h.servers.Range(func(k, _ any) bool {
+	h.servers.Range(func(k, v any) bool {
 		srv, ok := k.(*mcp.Server)
 		if !ok || srv == nil {
 			return true
@@ -336,6 +436,15 @@ func (h *Handler) reconcileSessionTenants() {
 			}
 		}
 		if !anyLive {
+			// Fix #9: don't evict a server that is younger than the grace
+			// window — it may have been stored by getServer but not yet had
+			// its session id assigned by the SDK (GetSessionID fires after
+			// getServer returns). Evicting it here would leak the server
+			// (never closed on Shutdown) and drop its hijack binding.
+			entry, ok := v.(serverEntry)
+			if ok && time.Since(entry.createdAt) <= h.reconcileGrace {
+				return true
+			}
 			h.servers.Delete(k)
 		}
 		return true

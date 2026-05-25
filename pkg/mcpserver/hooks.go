@@ -71,12 +71,12 @@ func sessionMiddleware(h *Handler, t *Tenant, sessionCtx context.Context, deadFl
 
 			// Tool call — track for graceful shutdown + observability hook.
 			//
-			// Done() runs from a goroutine that waits on the per-call ctx
-			// rather than firing synchronously when middleware returns. The
+			// inflight.done() runs from a goroutine that waits on the per-call
+			// ctx rather than firing synchronously when middleware returns. The
 			// SDK writes the response AFTER this middleware returns
 			// (jsonrpc2.processResult: c.write(response) then req.cancel()).
-			// If activeCalls hit zero the instant middleware returned, a
-			// concurrent Handler.Shutdown could move past its Wait() and
+			// If the in-flight count hit zero the instant middleware returned,
+			// a concurrent Handler.Shutdown could move past its drain wait and
 			// call ServerSession.Close() — which flips connClosing=true and
 			// makes the about-to-happen response write fail with
 			// ErrServerClosing. Clients then see "request terminated without
@@ -84,13 +84,19 @@ func sessionMiddleware(h *Handler, t *Tenant, sessionCtx context.Context, deadFl
 			// Waiting on ctx.Done() (which the SDK cancels right after the
 			// response write) tracks the precise window during which a
 			// premature session close would corrupt the response.
-			h.activeCalls.Add(1)
-			defer func() {
-				go func() {
-					<-ctx.Done()
-					h.activeCalls.Done()
+			//
+			// Fix #8: inflight.add() and Shutdown's beginShutdown() share a
+			// mutex, so a call cannot be counted after Shutdown observed the
+			// counter drained. If add() returns false (shutdown already
+			// underway) the call is not tracked and we do not schedule done().
+			if h.inflight.add() {
+				defer func() {
+					go func() {
+						<-ctx.Done()
+						h.inflight.done()
+					}()
 				}()
-			}()
+			}
 
 			var after func(*mcpsdk.Result, error)
 			if h.opts.OnToolCall != nil {

@@ -35,11 +35,13 @@ func (h *Handler) Shutdown(ctx context.Context) error {
 		close(h.reconcileStop)
 		<-h.reconcileDoneCh
 
-		// 3. Wait for in-flight tool calls to finish.
-		done := make(chan struct{})
-		go func() { h.activeCalls.Wait(); close(done) }()
+		// 3. Wait for in-flight tool calls to finish. beginShutdown flips the
+		//    tracker into closing mode (under the same mutex add() takes, so no
+		//    new call is counted after this point) and returns a channel closed
+		//    when the count drains to zero.
+		drained := h.inflight.beginShutdown()
 		select {
-		case <-done:
+		case <-drained:
 		case <-ctx.Done():
 			shutdownErr = errors.Join(errors.New("mcpserver: shutdown ctx expired with in-flight tool calls"), ctx.Err())
 			// Fall through to step 4 anyway — close what we can.

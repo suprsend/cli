@@ -13,11 +13,10 @@ import (
 )
 
 // NOTE: handlers in this file hit external endpoints (rag.suprsend.com and
-// docs.suprsend.com) rather than the SuprSend management API, so the
-// IsAuthError → MarkSessionDead discipline applied to ported SuprSend-API
-// handlers does not apply here — there is no service-token auth path to
-// invalidate. If a handler is ever rewritten to go through
-// utils.GetSuprSendWorkspaceClient, add the standard auth-check guard.
+// docs.suprsend.com) rather than the SuprSend management API, so there is no
+// service-token auth path to invalidate here. Reactive session-close on a 401
+// is handled centrally by the authExpiryTransport interceptor for the clients
+// that do carry credentials; these handlers don't go through those clients.
 
 func searchDocsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
 	query, err := args.RequireString("query")

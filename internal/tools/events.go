@@ -39,9 +39,6 @@ func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string)
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: fmt.Sprintf("Failed to get suprsend client: %v", err), IsError: true}, nil
 	}
 	event := &suprsend.Event{
@@ -50,9 +47,6 @@ func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string)
 		Properties: eventRequestBody,
 	}
 	if _, err := suprsendClient.TrackEventWithContext(ctx, event); err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: fmt.Sprintf("Failed to trigger event: %v", err), IsError: true}, nil
 	}
 	return mcpsdk.Result{Text: "Event triggered successfully"}, nil

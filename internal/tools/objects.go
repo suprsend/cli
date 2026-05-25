@@ -25,9 +25,6 @@ func getObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 	workspace := args.GetString("workspace", "staging")
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -38,9 +35,6 @@ func getObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 
 	objects_resp, err := suprsend_client.Objects.Get(ctx, obj_identifier)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -71,9 +65,6 @@ func upsertObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -117,9 +108,6 @@ func upsertObjectHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 
 	_, err = suprsend_client.Objects.Edit(ctx, suprsend.ObjectEditRequest{EditInstance: obj_instance})
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	return mcpsdk.Result{Text: out}, nil
@@ -141,9 +129,6 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	workspace := args.GetString("workspace", "staging")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -156,25 +141,16 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	if channel_preferences {
 		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
 		if err != nil {
-			if utils.IsAuthError(err) {
-				markSessionDead(ctx)
-			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
 	} else if category == "" {
 		objPref, err = suprsendClient.Objects.GetFullPreference(ctx, objIdentifier, nil)
 		if err != nil {
-			if utils.IsAuthError(err) {
-				markSessionDead(ctx)
-			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
 	} else {
 		objPref, err = suprsendClient.Objects.GetCategoryPreference(ctx, objIdentifier, category, nil)
 		if err != nil {
-			if utils.IsAuthError(err) {
-				markSessionDead(ctx)
-			}
 			return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 		}
 	}
@@ -242,17 +218,11 @@ func updateObjectCategoryPreference(ctx context.Context, args mcpsdk.Args) (mcps
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	objPref, err := suprsendClient.Objects.UpdateCategoryPreference(ctx, obj, category, prefPayload, nil)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -295,17 +265,11 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, args mcpsdk.Args)
 	workspace := args.GetString("workspace", "staging")
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	objPref, err := suprsendClient.Objects.UpdateGlobalChannelsPreference(ctx, obj, prefPayload, nil)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 

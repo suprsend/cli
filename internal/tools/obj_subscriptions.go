@@ -29,9 +29,6 @@ func getObjectSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (mcpsd
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -42,9 +39,6 @@ func getObjectSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (mcpsd
 
 	obj_subs_resp, err := suprsend_client.Objects.GetSubscriptions(ctx, obj_identifier, &cursor_list_api_opts)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -81,9 +75,6 @@ func addObjectSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (mcpsd
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -99,9 +90,6 @@ func addObjectSubscriptionsHandler(ctx context.Context, args mcpsdk.Args) (mcpsd
 
 	obj_subs_resp, err := suprsend_client.Objects.CreateSubscriptions(ctx, obj_identifier, payload)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 

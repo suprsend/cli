@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,10 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/mgmnt"
 	"github.com/suprsend/cli/pkg/tenant"
-	suprsend "github.com/suprsend/suprsend-go"
 )
 
 // roundTripperFunc lets a test return a canned response from an http.RoundTripper.
@@ -197,34 +194,6 @@ func TestGetSuprSendWorkspaceClient_VariadicWithCtx_UsesCtxClient(t *testing.T) 
 	_, err := GetSuprSendWorkspaceClient("ws", ctx)
 	if err == nil {
 		t.Fatalf("expected workspace key/secret lookup error (unreachable URL), got nil")
-	}
-}
-
-func TestIsAuthError(t *testing.T) {
-	cases := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"nil", nil, false},
-		{"suprsend 401", &suprsend.Error{Code: http.StatusUnauthorized, Message: "denied"}, true},
-		{"suprsend 401 wrapped", fmt.Errorf("call failed: %w", &suprsend.Error{Code: http.StatusUnauthorized}), true},
-		{"suprsend 403", &suprsend.Error{Code: http.StatusForbidden, Message: "forbidden"}, false},
-		{"suprsend 500", &suprsend.Error{Code: http.StatusInternalServerError}, false},
-		{"clierr invalid token", clierr.New("bad token", clierr.CodeAuthInvalidToken), true},
-		{"clierr wrapped", fmt.Errorf("wrap: %w", clierr.New("bad token", clierr.CodeAuthInvalidToken)), true},
-		{"clierr forbidden", clierr.New("forbidden", clierr.CodeAuthForbidden), false},
-		{"clierr not found", clierr.New("missing", clierr.CodeAPINotFound), false},
-		{"heuristic 401 string", errors.New("request failed: 401 Unauthorized"), true},
-		{"heuristic unauthorized string", errors.New("got Unauthorized response"), true},
-		{"unrelated error", errors.New("connection refused"), false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := IsAuthError(tc.err); got != tc.want {
-				t.Fatalf("IsAuthError(%v) = %v, want %v", tc.err, got, tc.want)
-			}
-		})
 	}
 }
 

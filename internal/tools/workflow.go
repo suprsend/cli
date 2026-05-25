@@ -34,9 +34,6 @@ func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug stri
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		log.Error("Error getting workspace client: ", err)
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
@@ -71,9 +68,6 @@ func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug stri
 
 	resp, err := suprsendClient.Workflows.TriggerWithContext(ctx, wf)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -104,9 +98,6 @@ func listWorkflowsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	}
 	workflows, err := mgmntClient.ListWorkflows(ctx, workspace, limit, offset, mode)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	jsonData, err := json.MarshalIndent(workflows, "", "  ")

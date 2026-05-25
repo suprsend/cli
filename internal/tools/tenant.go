@@ -21,17 +21,11 @@ func getTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, err
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 	// todo: rename these
 	user, err := suprsend_client.Tenants.Get(ctx, tenant_id)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -52,9 +46,6 @@ func upsertTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 
 	suprsend_client, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -92,9 +83,6 @@ func upsertTenantHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, 
 	// `tenantResp` (or similar) to avoid shadowing the package name.
 	tenant, err := suprsend_client.Tenants.Upsert(ctx, tenant_id, tenant_payload)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		err_str := err.Error()
 		if strings.Contains(err_str, `{"tenant_name": "missing value"}`) {
 			return mcpsdk.Result{Text: "tenant_name is required when creating a new tenant. Try again with a tenant_name.", IsError: true}, nil
@@ -185,17 +173,11 @@ func updateCategoryPreferenceTenant(ctx context.Context, args mcpsdk.Args) (mcps
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	tenantPref, err := suprsendClient.Tenants.UpdateCategoryPreference(ctx, tenantId, category, prefPayload)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -217,17 +199,11 @@ func getDefaultPreferenceTenant(ctx context.Context, args mcpsdk.Args) (mcpsdk.R
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	tenantPref, err := suprsendClient.Tenants.GetAllCategoriesPreference(ctx, tenantId, nil)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -245,9 +221,6 @@ func getAllTenantsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 
 	suprsendClient, err := utils.GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
@@ -255,9 +228,6 @@ func getAllTenantsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 		Limit: limit,
 	})
 	if err != nil {
-		if utils.IsAuthError(err) {
-			markSessionDead(ctx)
-		}
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 

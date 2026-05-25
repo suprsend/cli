@@ -56,12 +56,16 @@ stability commitment from initial release. Breaking changes to anything under
 - **`github.com/suprsend/suprsend-go`** bumped to v0.10.1, which propagates the
   caller's `context.Context` into its HTTP requests (`NewRequestWithContext`).
   Event-trigger and workflow-trigger handlers now call the `WithContext`
-  method variants, so the request context — carrying cancellation/deadlines and
-  the per-session dead-flag — reaches the SDK's HTTP layer. This makes the
-  `authExpiryTransport` 401 interceptor the primary reactive-session-close path
-  for suprsend-go calls; the per-handler `IsAuthError` check is now a backstop
-  (still load-bearing for the resty-based mgmnt API, which doesn't yet propagate
-  ctx).
+  method variants.
+- **`mgmnt`** management-API client now threads `context.Context` through all
+  44 HTTP methods (`.SetContext(ctx)` on every resty request). Combined with the
+  suprsend-go v0.10.1 bump, **every** SuprSend/mgmnt client now propagates the
+  request context, so the `authExpiryTransport` 401 interceptor sees the
+  per-session dead-flag on `req.Context()` for all calls. This makes the
+  transport interceptor the single reactive-session-close mechanism and the
+  per-handler `utils.IsAuthError → markSessionDead` discipline (≈47 call sites
+  across the tool handlers) was **removed** as redundant; `utils.IsAuthError`
+  is gone. Also enables cancellation/deadline propagation for mgmnt calls.
 
 ### Removed
 

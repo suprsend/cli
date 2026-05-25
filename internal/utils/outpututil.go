@@ -19,13 +19,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"golang.org/x/term"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/termio"
 	"github.com/tidwall/pretty"
 	"github.com/yarlson/pin"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 

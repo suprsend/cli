@@ -2,14 +2,11 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/mgmnt"
 	"github.com/suprsend/cli/pkg/tenant"
 	suprsend "github.com/suprsend/suprsend-go"
@@ -140,61 +137,10 @@ func (t *authExpiryTransport) RoundTrip(req *http.Request) (*http.Response, erro
 // the transport interceptor's call becomes effective.
 var MarkSessionDead func(ctx context.Context)
 
-// IsAuthError reports whether err represents an authentication failure from a
-// SuprSend API call. Used by tool handlers in their error paths to call
-// mcpserver.MarkSessionDead(ctx) when the underlying API returned 401.
-//
-// Two mechanisms close a session on a revoked token; this is the backstop:
-//
-//   - Primary (transport interceptor): authExpiryTransport calls
-//     MarkSessionDead(req.Context()) on any 401. As of suprsend-go v0.10.1 the
-//     SDK propagates the handler's context into its HTTP requests
-//     (prepareHttpRequest now uses http.NewRequestWithContext), so this fires
-//     for every suprsend-go call that threads ctx — i.e. all of them. The same
-//     holds for the mgmnt workspace key/secret lookup, which also builds its
-//     request with NewRequestWithContext.
-//   - Backstop (this function): the resty-based mgmnt management API client
-//     (GetSchema, GetWorkflows, etc.) does NOT yet propagate ctx, so a 401 from
-//     those calls won't reach the transport interceptor. Per-handler IsAuthError
-//     covers that path and provides defense-in-depth for the rest.
-//     MarkSessionDead is idempotent, so the double-signal is harmless.
-//
-// Implementation, in priority order:
-//
-//  1. errors.As against *suprsend.Error (the typed error returned by
-//     suprsend-go's Users/Events/Workflow APIs). Its Code field carries the
-//     HTTP status; Code == 401 is an auth failure.
-//  2. errors.As against *clierr.CLIError (the typed error mgmnt/errors.go
-//     returns). A 401 is classified there as clierr.CodeAuthInvalidToken.
-//  3. Defensive heuristic fallback: if no typed signal is found, match the
-//     error message (case-insensitive) for "401" or "unauthorized". This is
-//     a best-effort guard against errors that lost their type through string
-//     wrapping; it can theoretically false-positive on an unrelated message
-//     mentioning "401", but the cost of a false positive (one needless
-//     session teardown + reconnect) is bounded, while missing a true
-//     revocation is not.
-func IsAuthError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// 1. suprsend-go typed error.
-	var ssErr *suprsend.Error
-	if errors.As(err, &ssErr) && ssErr.Code == http.StatusUnauthorized {
-		return true
-	}
-
-	// 2. mgmnt typed error.
-	var ce *clierr.CLIError
-	if errors.As(err, &ce) && ce.Code == clierr.CodeAuthInvalidToken {
-		return true
-	}
-
-	// 3. Heuristic fallback for untyped/string-wrapped errors.
-	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "401") || strings.Contains(msg, "unauthorized") {
-		return true
-	}
-
-	return false
-}
+// Reactive session close on a revoked token is handled entirely by
+// authExpiryTransport above: it calls MarkSessionDead(req.Context()) on any
+// 401. Every SuprSend (suprsend-go v0.10.1+) and mgmnt client now propagates
+// the request context into its HTTP requests, so the per-session dead-flag on
+// the handler's ctx is visible at the transport — no per-handler auth check is
+// needed. (The earlier IsAuthError discipline was removed once ctx propagation
+// covered every client.)

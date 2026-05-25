@@ -142,12 +142,22 @@ var MarkSessionDead func(ctx context.Context)
 
 // IsAuthError reports whether err represents an authentication failure from a
 // SuprSend API call. Used by tool handlers in their error paths to call
-// mcpserver.MarkSessionDead(ctx) when the underlying API returned 401 — the
-// transport-interceptor approach cannot work because neither mgmnt/client.go
-// nor suprsend-go propagate the handler's context into their HTTP requests
-// (both use http.NewRequest without context). Per-handler discipline is the
-// v1 fallback; long-term fix is an upstream PR to suprsend-go switching to
-// NewRequestWithContext.
+// mcpserver.MarkSessionDead(ctx) when the underlying API returned 401.
+//
+// Two mechanisms close a session on a revoked token; this is the backstop:
+//
+//   - Primary (transport interceptor): authExpiryTransport calls
+//     MarkSessionDead(req.Context()) on any 401. As of suprsend-go v0.10.1 the
+//     SDK propagates the handler's context into its HTTP requests
+//     (prepareHttpRequest now uses http.NewRequestWithContext), so this fires
+//     for every suprsend-go call that threads ctx — i.e. all of them. The same
+//     holds for the mgmnt workspace key/secret lookup, which also builds its
+//     request with NewRequestWithContext.
+//   - Backstop (this function): the resty-based mgmnt management API client
+//     (GetSchema, GetWorkflows, etc.) does NOT yet propagate ctx, so a 401 from
+//     those calls won't reach the transport interceptor. Per-handler IsAuthError
+//     covers that path and provides defense-in-depth for the rest.
+//     MarkSessionDead is idempotent, so the double-signal is harmless.
 //
 // Implementation, in priority order:
 //

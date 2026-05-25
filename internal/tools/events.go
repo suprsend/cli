@@ -49,7 +49,7 @@ func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string)
 		EventName:  name,
 		Properties: eventRequestBody,
 	}
-	if _, err := suprsendClient.TrackEvent(event); err != nil {
+	if _, err := suprsendClient.TrackEventWithContext(ctx, event); err != nil {
 		if utils.IsAuthError(err) {
 			markSessionDead(ctx)
 		}

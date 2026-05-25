@@ -53,6 +53,15 @@ stability commitment from initial release. Breaking changes to anything under
 - **CLI's `start-mcp-server`** — migrated from `github.com/mark3labs/mcp-go`
   to `github.com/modelcontextprotocol/go-sdk`. No user-visible behavior change
   expected. CLI capability profile: recovery + tools (no listChanged).
+- **`github.com/suprsend/suprsend-go`** bumped to v0.10.1, which propagates the
+  caller's `context.Context` into its HTTP requests (`NewRequestWithContext`).
+  Event-trigger and workflow-trigger handlers now call the `WithContext`
+  method variants, so the request context — carrying cancellation/deadlines and
+  the per-session dead-flag — reaches the SDK's HTTP layer. This makes the
+  `authExpiryTransport` 401 interceptor the primary reactive-session-close path
+  for suprsend-go calls; the per-handler `IsAuthError` check is now a backstop
+  (still load-bearing for the resty-based mgmnt API, which doesn't yet propagate
+  ctx).
 
 ### Removed
 

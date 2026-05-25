@@ -69,7 +69,7 @@ func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug stri
 		TenantId:       tenantId,
 	}
 
-	resp, err := suprsendClient.Workflows.Trigger(wf)
+	resp, err := suprsendClient.Workflows.TriggerWithContext(ctx, wf)
 	if err != nil {
 		if utils.IsAuthError(err) {
 			markSessionDead(ctx)

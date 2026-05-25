@@ -2,10 +2,14 @@ package utils
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/mgmnt"
 	"github.com/suprsend/cli/pkg/tenant"
 	suprsend "github.com/suprsend/suprsend-go"
@@ -88,6 +92,15 @@ func GetSuprSendWorkspaceClient(workspace string, ctx ...context.Context) (*supr
 	if len(ctx) > 0 {
 		c = MgmntClientFor(ctx[0])
 	}
+	if c == nil {
+		return nil, fmt.Errorf("no SuprSend client available (no tenant credentials on context and no initialized SDK)")
+	}
+	// Thread the request context into the per-tenant workspace lookup so the
+	// authExpiryTransport's 401 handling and cancellation propagate. Legacy
+	// 1-arg callers fall back to the background-ctx variant.
+	if len(ctx) > 0 {
+		return c.GetWorkspaceClientCtx(ctx[0], workspace)
+	}
 	return c.GetWorkspaceClient(workspace)
 }
 
@@ -136,16 +149,42 @@ var MarkSessionDead func(ctx context.Context)
 // v1 fallback; long-term fix is an upstream PR to suprsend-go switching to
 // NewRequestWithContext.
 //
-// Implementation: inspects the error chain for suprsend.APIError /
-// mgmnt.APIError types whose status code is 401, and for any wrapped error
-// whose Error() message contains "401" (defensive fallback for less-typed
-// libraries).
+// Implementation, in priority order:
+//
+//  1. errors.As against *suprsend.Error (the typed error returned by
+//     suprsend-go's Users/Events/Workflow APIs). Its Code field carries the
+//     HTTP status; Code == 401 is an auth failure.
+//  2. errors.As against *clierr.CLIError (the typed error mgmnt/errors.go
+//     returns). A 401 is classified there as clierr.CodeAuthInvalidToken.
+//  3. Defensive heuristic fallback: if no typed signal is found, match the
+//     error message (case-insensitive) for "401" or "unauthorized". This is
+//     a best-effort guard against errors that lost their type through string
+//     wrapping; it can theoretically false-positive on an unrelated message
+//     mentioning "401", but the cost of a false positive (one needless
+//     session teardown + reconnect) is bounded, while missing a true
+//     revocation is not.
 func IsAuthError(err error) bool {
 	if err == nil {
 		return false
 	}
-	// Real implementation should use errors.As against the concrete
-	// suprsend-go and mgmnt error types. Stubbed here; finalized at
-	// Phase 2.5 review against the actual API surface.
+
+	// 1. suprsend-go typed error.
+	var ssErr *suprsend.Error
+	if errors.As(err, &ssErr) && ssErr.Code == http.StatusUnauthorized {
+		return true
+	}
+
+	// 2. mgmnt typed error.
+	var ce *clierr.CLIError
+	if errors.As(err, &ce) && ce.Code == clierr.CodeAuthInvalidToken {
+		return true
+	}
+
+	// 3. Heuristic fallback for untyped/string-wrapped errors.
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "401") || strings.Contains(msg, "unauthorized") {
+		return true
+	}
+
 	return false
 }

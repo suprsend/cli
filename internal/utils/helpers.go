@@ -327,7 +327,7 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 	var err error
 	var out string
 
-	suprsend_client, err := GetSuprSendWorkspaceClient(workspace)
+	suprsend_client, err := GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		return "", err
 	}
@@ -444,7 +444,7 @@ func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, actio
 	var err error
 	var out string
 
-	suprsend_client, err := GetSuprSendWorkspaceClient(workspace)
+	suprsend_client, err := GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		return "", err
 	}

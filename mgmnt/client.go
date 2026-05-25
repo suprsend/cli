@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -32,8 +33,14 @@ type SS_MgmntClient struct {
 	hub_base_URL     string
 	mgmnt_base_URL   string
 	workspaceClients map[string]*suprsend.Client
-	transport        http.RoundTripper
-	debug            bool
+	// workspaceClientsMu guards workspaceClients. A single *SS_MgmntClient is
+	// cached per tenant by internal/utils.MgmntClientFor and shared across
+	// concurrent MCP sessions, so the lookup-or-create in
+	// GetWorkspaceClientCtx must be serialized to avoid a concurrent map
+	// read/write (a fatal runtime crash).
+	workspaceClientsMu sync.Mutex
+	transport          http.RoundTripper
+	debug              bool
 }
 
 func NewClientWithUrls(serviceToken string, baseURL string, mgmntURL string, debug bool) *SS_MgmntClient {
@@ -122,7 +129,13 @@ func (c *SS_MgmntClient) GetWorkspaceClient(workspace string) (*suprsend.Client,
 // The ctx is propagated to the workspace key/secret lookup; once the
 // workspace client is cached it is reused for the lifetime of c.
 func (c *SS_MgmntClient) GetWorkspaceClientCtx(ctx context.Context, workspace string) (*suprsend.Client, error) {
-	// Store a hashmap of workspaces and their clients, if the client doesn't exist, create it
+	// Store a hashmap of workspaces and their clients, if the client doesn't
+	// exist, create it. The whole lookup-or-create is guarded by a mutex
+	// because a single *SS_MgmntClient is shared across concurrent MCP
+	// sessions; an unguarded check-then-write races the map.
+	c.workspaceClientsMu.Lock()
+	defer c.workspaceClientsMu.Unlock()
+
 	if c.workspaceClients[workspace] == nil {
 		key, secret, err := c.GetWorkspaceKeyAndSecret(ctx, workspace)
 		if err != nil {

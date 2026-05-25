@@ -2,12 +2,18 @@ package utils
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/mgmnt"
 	"github.com/suprsend/cli/pkg/tenant"
+	suprsend "github.com/suprsend/suprsend-go"
 )
 
 // roundTripperFunc lets a test return a canned response from an http.RoundTripper.
@@ -154,21 +160,17 @@ func TestAuthExpiryTransport_NilBase_FallsBackToDefaultTransport(t *testing.T) {
 	_, _ = rt.RoundTrip(req)
 }
 
-func TestGetSuprSendWorkspaceClient_VariadicNoCtx_UsesSingleton(t *testing.T) {
+func TestGetSuprSendWorkspaceClient_VariadicNoCtx_NilSDK_ReturnsError(t *testing.T) {
 	resetSDKGlobals(t)
 
-	// We don't want to hit the management API — but the 0-arg call must
-	// compile and select SDKInstance. We assert selection by making
-	// SDKInstance a nil pointer and observing that the call panics with a
-	// nil-deref. This confirms the legacy branch routed through SDKInstance
-	// (not MgmntClientFor).
+	// With no ctx and a nil SDKInstance there is no client to route through.
+	// The nil-guard must return a clean error rather than panicking on a
+	// nil-pointer deref.
 	SDKInstance = nil
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected nil-pointer panic when SDKInstance is nil and no ctx is supplied")
-		}
-	}()
-	_, _ = GetSuprSendWorkspaceClient("ws")
+	_, err := GetSuprSendWorkspaceClient("ws")
+	if err == nil {
+		t.Fatalf("expected an error when SDKInstance is nil and no ctx is supplied, got nil")
+	}
 }
 
 func TestGetSuprSendWorkspaceClient_VariadicWithCtx_UsesCtxClient(t *testing.T) {
@@ -196,4 +198,64 @@ func TestGetSuprSendWorkspaceClient_VariadicWithCtx_UsesCtxClient(t *testing.T) 
 	if err == nil {
 		t.Fatalf("expected workspace key/secret lookup error (unreachable URL), got nil")
 	}
+}
+
+func TestIsAuthError(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"suprsend 401", &suprsend.Error{Code: http.StatusUnauthorized, Message: "denied"}, true},
+		{"suprsend 401 wrapped", fmt.Errorf("call failed: %w", &suprsend.Error{Code: http.StatusUnauthorized}), true},
+		{"suprsend 403", &suprsend.Error{Code: http.StatusForbidden, Message: "forbidden"}, false},
+		{"suprsend 500", &suprsend.Error{Code: http.StatusInternalServerError}, false},
+		{"clierr invalid token", clierr.New("bad token", clierr.CodeAuthInvalidToken), true},
+		{"clierr wrapped", fmt.Errorf("wrap: %w", clierr.New("bad token", clierr.CodeAuthInvalidToken)), true},
+		{"clierr forbidden", clierr.New("forbidden", clierr.CodeAuthForbidden), false},
+		{"clierr not found", clierr.New("missing", clierr.CodeAPINotFound), false},
+		{"heuristic 401 string", errors.New("request failed: 401 Unauthorized"), true},
+		{"heuristic unauthorized string", errors.New("got Unauthorized response"), true},
+		{"unrelated error", errors.New("connection refused"), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsAuthError(tc.err); got != tc.want {
+				t.Fatalf("IsAuthError(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGetWorkspaceClientCtx_ConcurrentAccess exercises the mutex added in
+// mgmnt/client.go: many goroutines hitting GetWorkspaceClientCtx on one shared
+// *SS_MgmntClient. A local httptest server returns a valid key/secret so the
+// cold path actually creates a workspace client and WRITES the
+// workspaceClients map — the line that races without the mutex. Run with
+// -race to catch a regression of the data race.
+func TestGetWorkspaceClientCtx_ConcurrentAccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"key":"k","secret":"s"}`))
+	}))
+	defer srv.Close()
+
+	// hub URL points at the test server; mgmnt URL is unused on this path.
+	c := mgmnt.NewClientWithUrls("tok", srv.URL, srv.URL, false)
+
+	const n = 32
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			defer wg.Done()
+			// Mix of workspaces to stir both the create and read-cached paths.
+			ws := fmt.Sprintf("ws-%d", i%4)
+			if _, err := c.GetWorkspaceClientCtx(context.Background(), ws); err != nil {
+				t.Errorf("GetWorkspaceClientCtx(%s): %v", ws, err)
+			}
+		}(i)
+	}
+	wg.Wait()
 }

@@ -65,7 +65,7 @@ var schemaPullCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
-			schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
+			schema, err := mgmntClient.GetSchemaBySlug(cmd.Context(), workspace, slug, mode)
 			if err != nil {
 				log.Errorf("Failed to get schema: %v", err)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -82,7 +82,7 @@ var schemaPullCmd = &cobra.Command{
 			log.Infof("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
 			return nil
 		}
-		schemas, err := mgmntClient.GetSchemas(workspace, mode)
+		schemas, err := mgmntClient.GetSchemas(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.Errorf("Failed to get schemas: %v", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

@@ -34,7 +34,7 @@ var worklowEnableCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, true)
+		err := mgmntClient.ChangeStatusWorkflow(cmd.Context(), workspace, slug, true)
 		if err != nil {
 			log.Error(err.Error())
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

@@ -1,6 +1,7 @@
 package translation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,11 +30,11 @@ var translationPullCmd = &cobra.Command{
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 
-		return PullTranslations(workspace, outputDir, force)
+		return PullTranslations(cmd.Context(), workspace, outputDir, force)
 	},
 }
 
-func PullTranslations(workspace, outputDir string, force bool) error {
+func PullTranslations(ctx context.Context, workspace, outputDir string, force bool) error {
 	if workspace == "" {
 		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
@@ -63,7 +64,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 	spinner := utils.NewSpinner("Loading...")
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
-	locales, err := mgmntClient.ListPreferenceTranslations(workspace)
+	locales, err := mgmntClient.ListPreferenceTranslations(ctx, workspace)
 	if err != nil {
 		return fmt.Errorf("couldn't fetch translation locales from workspace '%s': %w", workspace, err)
 	}
@@ -74,7 +75,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 
 	for _, localeResult := range locales.Results {
 		locale := localeResult.Locale
-		translations, err := mgmntClient.GetPreferenceTranslationsForLocale(workspace, locale)
+		translations, err := mgmntClient.GetPreferenceTranslationsForLocale(ctx, workspace, locale)
 		if err != nil {
 			log.WithError(err).Errorf("Couldn't fetch translations for locale '%s' from workspace '%s'", locale, workspace)
 			failedCount++

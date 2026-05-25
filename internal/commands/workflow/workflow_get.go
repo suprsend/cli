@@ -39,7 +39,7 @@ var workflowGetCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting details...")
 
-		workflow, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+		workflow, err := mgmntClient.GetWorkflowDetailBySlug(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting workflow detail")

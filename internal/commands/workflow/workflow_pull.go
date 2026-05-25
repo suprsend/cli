@@ -60,7 +60,7 @@ var workflowPullCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
-			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(cmd.Context(), workspace, slug, mode)
 			if err != nil {
 				log.Errorf("Failed to get workflow detail: %v", err)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -83,7 +83,7 @@ var workflowPullCmd = &cobra.Command{
 			return nil
 		}
 
-		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)
+		workflows_resp, err := mgmntClient.GetWorkflows(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.Errorf("Failed to get workflows: %v", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

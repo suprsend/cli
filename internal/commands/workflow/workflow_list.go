@@ -36,7 +36,7 @@ var workflowListCmd = &cobra.Command{
 		offset, _ := cmd.Flags().GetInt("offset")
 		mode, _ := cmd.Flags().GetString("mode")
 
-		workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
+		workflows, err := mgmntClient.ListWorkflows(cmd.Context(), workspace, limit, offset, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch workflows")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

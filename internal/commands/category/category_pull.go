@@ -59,7 +59,7 @@ var categoryPullCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		categories, err := mgmntClient.ListCategories(workspace, mode)
+		categories, err := mgmntClient.ListCategories(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -86,7 +86,7 @@ var categoryPullCmd = &cobra.Command{
 		log.Infof("Written to: %s", filePath)
 
 		translationDir := filepath.Join(outputDir, "translations")
-		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
+		if err := translation.PullTranslations(cmd.Context(), workspace, translationDir, force); err != nil {
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 

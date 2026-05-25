@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -22,12 +23,13 @@ type ListPreferenceTranslation struct {
 	} `json:"results"`
 }
 
-func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPreferenceTranslation, error) {
+func (c *SS_MgmntClient) ListPreferenceTranslations(ctx context.Context, workspace string) (*ListPreferenceTranslation, error) {
 	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/locale", c.mgmnt_base_URL, workspace)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&ListPreferenceTranslation{}).
@@ -46,12 +48,13 @@ func (c *SS_MgmntClient) ListPreferenceTranslations(workspace string) (*ListPref
 	return translations, nil
 }
 
-func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale string) (*PreferenceTranslationContent, error) {
+func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(ctx context.Context, workspace, locale string) (*PreferenceTranslationContent, error) {
 	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/content/%s", c.mgmnt_base_URL, workspace, locale)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&PreferenceTranslationContent{}).
@@ -70,11 +73,12 @@ func (c *SS_MgmntClient) GetPreferenceTranslationsForLocale(workspace, locale st
 	return translations, nil
 }
 
-func (c *SS_MgmntClient) PushPreferenceTranslation(workspace, locale string, translation PreferenceTranslationContent) error {
+func (c *SS_MgmntClient) PushPreferenceTranslation(ctx context.Context, workspace, locale string, translation PreferenceTranslationContent) error {
 	client := c.restyClient()
 	defer client.Close()
 	url := fmt.Sprintf("%sv1/%s/preference_category/translation/content/%s", c.mgmnt_base_URL, workspace, locale)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").

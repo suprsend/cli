@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -54,7 +55,7 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCategoryResponse, error) {
+func (c *SS_MgmntClient) ListCategories(ctx context.Context, workspace, mode string) (*PreferenceCategoryResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
@@ -74,6 +75,7 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -91,7 +93,7 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	return result, nil
 }
 
-func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushCategories(ctx context.Context, workspace string, categories interface{}, commit bool, commitMessage string) error {
 	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
@@ -108,6 +110,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -129,7 +132,7 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 	return nil
 }
 
-func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeCategories(ctx context.Context, workspace string, commitMessage string) error {
 	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "commit", "/")
@@ -145,6 +148,7 @@ func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage stri
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).

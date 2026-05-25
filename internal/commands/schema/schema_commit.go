@@ -53,7 +53,7 @@ var schemaCommitCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing schema...")
 
-		err := mgmntClient.FinalizeSchema(workspace, slug, commitMessage)
+		err := mgmntClient.FinalizeSchema(cmd.Context(), workspace, slug, commitMessage)
 		if err != nil {
 			log.Error(err.Error())
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

@@ -88,7 +88,7 @@ func RegisterDynamicEventsToolsFor(ctx context.Context, workspace, eventsFlag st
 			continue
 		}
 		g.Go(func() error {
-			payloadSchema, err := mgmntClient.GetSchema(workspace, event.PayloadSchema.Schema, event.PayloadSchema.Version)
+			payloadSchema, err := mgmntClient.GetSchema(ctx, workspace, event.PayloadSchema.Schema, event.PayloadSchema.Version)
 			if err != nil {
 				log.Errorf("event %s: skipping registration — failed to fetch payload schema: %s", event.Name, err)
 				return nil

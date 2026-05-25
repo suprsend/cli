@@ -36,7 +36,7 @@ var translationListCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		translations, err := mgmntClient.ListTranslations(workspace, mode, includeContent, limit, offset)
+		translations, err := mgmntClient.ListTranslations(cmd.Context(), workspace, mode, includeContent, limit, offset)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch translations")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

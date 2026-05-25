@@ -39,7 +39,7 @@ var schemaGetCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting details...")
 
-		schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
+		schema, err := mgmntClient.GetSchemaBySlug(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting schema detail")

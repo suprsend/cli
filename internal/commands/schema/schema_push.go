@@ -97,7 +97,7 @@ var schemaPushCmd = &cobra.Command{
 			}
 
 			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			err := mgmntClient.PushSchema(cmd.Context(), workspace, slug, schema, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
@@ -163,7 +163,7 @@ var schemaPushCmd = &cobra.Command{
 				continue
 			}
 
-			err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			err = mgmntClient.PushSchema(cmd.Context(), workspace, slug, schema, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				hasError = true

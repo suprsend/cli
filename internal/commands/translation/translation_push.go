@@ -73,7 +73,7 @@ var translationPushCmd = &cobra.Command{
 					continue
 				}
 
-				err := mgmntClient.PushTranslation(workspace, filename+".json", map[string]any{"content": content})
+				err := mgmntClient.PushTranslation(cmd.Context(), workspace, filename+".json", map[string]any{"content": content})
 				if err != nil {
 					spinner.Stop("")
 					hasError = true
@@ -139,7 +139,7 @@ var translationPushCmd = &cobra.Command{
 					continue
 				}
 
-				err = mgmntClient.PushTranslation(workspace, file.Name(), map[string]any{"content": content})
+				err = mgmntClient.PushTranslation(cmd.Context(), workspace, file.Name(), map[string]any{"content": content})
 				if err != nil {
 					spinner.Stop("")
 					hasError = true
@@ -180,7 +180,7 @@ var translationPushCmd = &cobra.Command{
 		}
 
 		if commit {
-			if err := mgmntClient.FinalizeTranslation(workspace, commitMessage); err != nil {
+			if err := mgmntClient.FinalizeTranslation(cmd.Context(), workspace, commitMessage); err != nil {
 				log.Errorf("Failed to commit translation: %v", err)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 			}

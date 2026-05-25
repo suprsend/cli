@@ -39,7 +39,7 @@ var eventGetCmd = &cobra.Command{
 		}
 
 		spinner := utils.NewSpinner("Getting details...")
-		event, err := mgmntClient.GetEventDetail(workspace, name)
+		event, err := mgmntClient.GetEventDetail(cmd.Context(), workspace, name)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting event detail")

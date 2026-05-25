@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -27,7 +28,7 @@ type WorkspaceListResponse struct {
 	} `json:"meta"`
 }
 
-func (c *SS_MgmntClient) ListWorkspaces(limit, offset int) (*WorkspaceListResponse, error) {
+func (c *SS_MgmntClient) ListWorkspaces(ctx context.Context, limit, offset int) (*WorkspaceListResponse, error) {
 	httpClient := c.restyClient()
 	defer httpClient.Close()
 
@@ -56,6 +57,7 @@ func (c *SS_MgmntClient) ListWorkspaces(limit, offset int) (*WorkspaceListRespon
 		urlStr = u.String()
 
 		res, err := httpClient.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkspaceListResponse{}).

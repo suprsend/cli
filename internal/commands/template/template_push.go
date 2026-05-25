@@ -4,6 +4,7 @@ Copyright © 2025 SuprSend
 package template
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -31,7 +32,7 @@ func readTemplateJSON(templateDir string) (map[string]any, error) {
 }
 
 
-func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, dryRun bool) error {
+func PushTemplate(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, dryRun bool) error {
 	templateData, err := readTemplateJSON(templateDir)
 	if err != nil {
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template.json for template %s", slug))
@@ -64,13 +65,13 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 			}
 		}
 	}
-	if err := mgmntClient.CreateTemplate(workspace, slug, enabledChannels); err != nil {
+	if err := mgmntClient.CreateTemplate(ctx, workspace, slug, enabledChannels); err != nil {
 		return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to create template %s", slug))
 	}
 
 	var pushErrs []string
 	for _, variant := range variants {
-		if err := mgmntClient.PushTemplateVariant(workspace, slug, variant); err != nil {
+		if err := mgmntClient.PushTemplateVariant(ctx, workspace, slug, variant); err != nil {
 			log.WithError(err).Errorf("templates/%s: failed to push variant", slug)
 			pushErrs = append(pushErrs, err.Error())
 		}
@@ -86,7 +87,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		if err := json.Unmarshal(mockDataBytes, &mockData); err != nil {
 			return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse mock_data.json for template %s", slug))
 		}
-		if err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData); err != nil {
+		if err := mgmntClient.PatchTemplateMockData(ctx, workspace, slug, mockData); err != nil {
 			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push mock data for template %s", slug))
 		}
 	}
@@ -126,14 +127,14 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		for _, ch := range channelMap {
 			variantOrder.Channels = append(variantOrder.Channels, *ch)
 		}
-		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", &variantOrder); err != nil {
+		if err := mgmntClient.PostVariantOrder(ctx, workspace, slug, "draft", &variantOrder); err != nil {
 			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push variant order for template %s", slug))
 		}
 	}
 
 	if commit {
 		if force {
-			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
+			validateResp, err := mgmntClient.PreCommitValidate(ctx, workspace, slug)
 			if err != nil {
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to pre-commit validate template %s", slug))
 			}
@@ -155,11 +156,11 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				return nil
 			}
 
-			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, validVariants); err != nil {
+			if err := mgmntClient.CommitTemplate(ctx, workspace, slug, commitMessage, validVariants); err != nil {
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit template %s", slug))
 			}
 		} else {
-			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, nil); err != nil {
+			if err := mgmntClient.CommitTemplate(ctx, workspace, slug, commitMessage, nil); err != nil {
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit template %s", slug))
 			}
 		}
@@ -229,7 +230,7 @@ var templatePushCmd = &cobra.Command{
 			}
 
 			spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
-			err := PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun)
+			err := PushTemplate(cmd.Context(), mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun)
 			if err != nil {
 				spinner.Stop("")
 				return err
@@ -271,7 +272,7 @@ var templatePushCmd = &cobra.Command{
 				spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
 			}
 
-			if err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun); err != nil {
+			if err := PushTemplate(cmd.Context(), mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun); err != nil {
 				spinner.Stop("")
 				hasError = true
 				log.WithError(err).Errorf("templates/%s: failed to push", templateSlug)

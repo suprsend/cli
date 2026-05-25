@@ -101,7 +101,7 @@ var workflowPushCmd = &cobra.Command{
 			}
 
 			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			err := mgmntClient.PushWorkflow(cmd.Context(), workspace, slug, workflow, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push workflow %s", slug))
@@ -184,7 +184,7 @@ var workflowPushCmd = &cobra.Command{
 				continue
 			}
 
-			err = mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			err = mgmntClient.PushWorkflow(cmd.Context(), workspace, slug, workflow, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				hasError = true

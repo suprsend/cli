@@ -61,7 +61,7 @@ var templateCommitCmd = &cobra.Command{
 		if force {
 			validationSpinner := utils.NewSpinner(fmt.Sprintf("Validating template %s...", slug))
 
-			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
+			validateResp, err := mgmntClient.PreCommitValidate(cmd.Context(), workspace, slug)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to pre-commit validate template %s", slug)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -88,7 +88,7 @@ var templateCommitCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner(fmt.Sprintf("Committing template %s...", slug))
 
-		if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, variants); err != nil {
+		if err := mgmntClient.CommitTemplate(cmd.Context(), workspace, slug, commitMessage, variants); err != nil {
 			log.WithError(err).Errorf("Failed to commit template %s", slug)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}

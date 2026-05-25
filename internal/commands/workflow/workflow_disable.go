@@ -49,7 +49,7 @@ var workflowDisableCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 
-		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, false)
+		err := mgmntClient.ChangeStatusWorkflow(cmd.Context(), workspace, slug, false)
 		if err != nil {
 			log.Error(err.Error())
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

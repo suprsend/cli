@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -35,7 +36,7 @@ type Event struct {
 	CreatedAt     string                 `json:"created_at"`
 }
 
-func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListEventsResponse, error) {
+func (c *SS_MgmntClient) ListEvents(ctx context.Context, workspace string, limit, offset int) (*ListEventsResponse, error) {
 	client := c.restyClient()
 	defer client.Close()
 
@@ -54,6 +55,7 @@ func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListE
 	urlStr = u.String()
 	log.Debugf("Getting Events for workspace: %s", workspace)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&ListEventsResponse{}).
@@ -69,7 +71,7 @@ func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListE
 	return events, nil
 }
 
-func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
+func (c *SS_MgmntClient) GetEvents(ctx context.Context, workspace string) (*EventsResponse, error) {
 	client := c.restyClient()
 	defer client.Close()
 
@@ -94,6 +96,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&EventsResponse{}).
@@ -116,7 +119,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 	return &EventsResponse{Results: allEvents}, nil
 }
 
-func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, error) {
+func (c *SS_MgmntClient) GetEventDetail(ctx context.Context, workspace, eventName string) (*Event, error) {
 	client := c.restyClient()
 	defer client.Close()
 
@@ -126,6 +129,7 @@ func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, er
 	}
 	log.Debugf("Getting event detail for: %s", eventName)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&Event{}).
@@ -139,7 +143,7 @@ func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, er
 	return res.Result().(*Event), nil
 }
 
-func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]any) error {
+func (c *SS_MgmntClient) pushEventsPayload(ctx context.Context, workspace string, events map[string]any) error {
 	client := c.restyClient()
 	defer client.Close()
 
@@ -154,6 +158,7 @@ func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]a
 	urlStr = u.String()
 	log.Debugf("Pushing events to workspace: %s", workspace)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -169,7 +174,7 @@ func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]a
 	return nil
 }
 
-func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
+func (c *SS_MgmntClient) PushEvents(ctx context.Context, workspace, filePath string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Errorf("Error reading event schema mapping file: %s", err)
@@ -180,9 +185,9 @@ func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
 		log.Errorf("Error parsing event_schema_mapping.json: %s", err)
 		return err
 	}
-	return c.pushEventsPayload(workspace, events)
+	return c.pushEventsPayload(ctx, workspace, events)
 }
 
-func (c *SS_MgmntClient) PushEventsFromPayload(workspace string, events map[string]any) error {
-	return c.pushEventsPayload(workspace, events)
+func (c *SS_MgmntClient) PushEventsFromPayload(ctx context.Context, workspace string, events map[string]any) error {
+	return c.pushEventsPayload(ctx, workspace, events)
 }

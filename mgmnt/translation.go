@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -41,12 +42,13 @@ type TranslationResponse struct {
 	} `json:"meta"`
 }
 
-func (c *SS_MgmntClient) ListTranslations(workspace, mode, includeContent string, limit, offset int) (*ListTranslation, error) {
+func (c *SS_MgmntClient) ListTranslations(ctx context.Context, workspace, mode, includeContent string, limit, offset int) (*ListTranslation, error) {
 	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv1/%s/translation/?mode=%s&limit=%d&offset=%d&include_content=%s&include_version_info=true", c.mgmnt_base_URL, workspace, mode, limit, offset, includeContent)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&ListTranslation{}).
@@ -65,7 +67,7 @@ func (c *SS_MgmntClient) ListTranslations(workspace, mode, includeContent string
 	return translations, nil
 }
 
-func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationResponse, error) {
+func (c *SS_MgmntClient) GetTranslations(ctx context.Context, workspace, mode string) (*TranslationResponse, error) {
 	if mode != "live" && mode != "draft" {
 		log.Errorf("%s: invalid mode. Available modes are: draft, live", mode)
 		return nil, nil
@@ -80,6 +82,7 @@ func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationRe
 
 	for {
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&TranslationResponse{}).
@@ -118,11 +121,12 @@ func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationRe
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation map[string]any) error {
+func (c *SS_MgmntClient) PushTranslation(ctx context.Context, workspace, filename string, translation map[string]any) error {
 	client := c.restyClient()
 	defer client.Close()
 	url := fmt.Sprintf("%sv1/%s/translation/content/%s/", c.mgmnt_base_URL, workspace, filename)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetBody(translation).
@@ -137,12 +141,13 @@ func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation
 	return nil
 }
 
-func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeTranslation(ctx context.Context, workspace, commitMessage string) error {
 	client := c.restyClient()
 	defer client.Close()
 	encodedCommitMessage := url.QueryEscape(commitMessage)
 	url := fmt.Sprintf("%sv1/%s/translation/commit/?commit_message=%s", c.mgmnt_base_URL, workspace, encodedCommitMessage)
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).

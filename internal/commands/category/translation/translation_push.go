@@ -1,6 +1,7 @@
 package translation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -45,7 +46,7 @@ var translationPushCmd = &cobra.Command{
 		dir, _ := cmd.Flags().GetString("dir")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-		stats, err := PushTranslations(workspace, locale, dir, dryRun)
+		stats, err := PushTranslations(cmd.Context(), workspace, locale, dir, dryRun)
 		if !dryRun && stats != nil {
 			log.Info("=== Translation Push Summary ===")
 			log.Infof("Total locales processed: %d", stats.Total)
@@ -69,7 +70,7 @@ const englishLocaleFilename = "en.json"
 // PushTranslations uploads non-English locale translation files from dir to
 // the workspace. Returns stats so the caller can render its own end-of-run
 // summary; the helper itself only emits per-locale success/failure logs.
-func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslationStats, error) {
+func PushTranslations(ctx context.Context, workspace, locale, dir string, dryRun bool) (*PushTranslationStats, error) {
 	if workspace == "" {
 		return nil, clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
@@ -181,7 +182,7 @@ func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslat
 			continue
 		}
 
-		if err := mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation); err != nil {
+		if err := mgmntClient.PushPreferenceTranslation(ctx, workspace, fileLocale, translation); err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("preference_categories/translations/%s: failed to push", fileName)
 			stats.Failed++

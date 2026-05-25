@@ -1,6 +1,7 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -75,7 +76,7 @@ type Property struct {
 	Ref  *string `json:"$ref,omitempty"`
 }
 
-func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode string) (*ListSchemaResponse, error) {
+func (c *SS_MgmntClient) ListSchema(ctx context.Context, workspace string, limit, offset int, mode string) (*ListSchemaResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
@@ -108,6 +109,7 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		resp, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetHeader("Content-Type", "application/json").
@@ -147,7 +149,7 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 	}, nil
 }
 
-func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*SchemaResponse, error) {
+func (c *SS_MgmntClient) GetSchema(ctx context.Context, workspace, slug string, version string) (*SchemaResponse, error) {
 	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "/")
@@ -163,6 +165,7 @@ func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*Sch
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&SchemaResponse{}).
@@ -180,7 +183,7 @@ func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*Sch
 	return schema, nil
 }
 
-func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[string]any, error) {
+func (c *SS_MgmntClient) GetSchemaBySlug(ctx context.Context, workspace, slug, mode string) (*map[string]any, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
@@ -199,6 +202,7 @@ func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[str
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&map[string]any{}).
@@ -213,7 +217,7 @@ func (c *SS_MgmntClient) GetSchemaBySlug(workspace, slug, mode string) (*map[str
 	return resp.Result().(*map[string]any), nil
 }
 
-func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchemasResponse, error) {
+func (c *SS_MgmntClient) GetLinkedSchemas(ctx context.Context, workspace, mode string) (*LinkedSchemasResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
 	}
@@ -228,6 +232,7 @@ func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchema
 
 	for {
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&LinkedSchemasResponse{}).
@@ -265,7 +270,7 @@ func (c *SS_MgmntClient) GetLinkedSchemas(workspace, mode string) (*LinkedSchema
 	}, nil
 }
 
-func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, error) {
+func (c *SS_MgmntClient) GetSchemas(ctx context.Context, workspace, mode string) (*SchemasResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
 	}
@@ -294,6 +299,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&SchemasResponse{}).
@@ -331,7 +337,7 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushSchema(ctx context.Context, workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) error {
 	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", schemaSlug, "/")
@@ -349,6 +355,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 	urlStr = u.String()
 
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -363,7 +370,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 	return nil
 }
 
-func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeSchema(ctx context.Context, workspace, slug, commitMessage string) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
@@ -383,6 +390,7 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").

@@ -1,6 +1,7 @@
 package translation
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -27,11 +28,11 @@ var translationListCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputType, _ := cmd.Flags().GetString("output")
 
-		return listTranslations(workspace, outputType)
+		return listTranslations(cmd.Context(), workspace, outputType)
 	},
 }
 
-func listTranslations(workspace, outputType string) error {
+func listTranslations(ctx context.Context, workspace, outputType string) error {
 	if workspace == "" {
 		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
@@ -40,7 +41,7 @@ func listTranslations(workspace, outputType string) error {
 
 	spinner := utils.NewSpinner("Loading...")
 
-	translations, err := mgmntClient.ListPreferenceTranslations(workspace)
+	translations, err := mgmntClient.ListPreferenceTranslations(ctx, workspace)
 	if err != nil {
 		return fmt.Errorf("couldn't fetch translations: %w", err)
 	}

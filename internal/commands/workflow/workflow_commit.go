@@ -54,7 +54,7 @@ var workflowCommitCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing workflow...")
 
-		err := mgmntClient.FinalizeWorkflow(workspace, slug, commitMessage)
+		err := mgmntClient.FinalizeWorkflow(cmd.Context(), workspace, slug, commitMessage)
 		if err != nil {
 			log.Error(err.Error())
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

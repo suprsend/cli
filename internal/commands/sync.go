@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -92,37 +93,37 @@ var syncCmd = &cobra.Command{
 		for _, assetType := range assetsToSync {
 			switch assetType {
 			case "workflow":
-				err := syncWorkflows(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
+				err := syncWorkflows(cmd.Context(), mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync workflows: %v", err)
 					hasErrors = true
 				}
 			case "schema":
-				err := syncSchemas(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
+				err := syncSchemas(cmd.Context(), mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync schemas: %v", err)
 					hasErrors = true
 				}
 			case "event":
-				err := syncEvents(mgmntClient, fromWorkspace, toWorkspace, dirPath, dryRun)
+				err := syncEvents(cmd.Context(), mgmntClient, fromWorkspace, toWorkspace, dirPath, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync events: %v", err)
 					hasErrors = true
 				}
 			case "category":
-				err := syncCategories(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
+				err := syncCategories(cmd.Context(), mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync categories: %v", err)
 					hasErrors = true
 				}
 			case "translation":
-				err := syncTranslation(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
+				err := syncTranslation(cmd.Context(), mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync translations: %v", err)
 					hasErrors = true
 				}
 			case "template":
-				err := syncTemplates(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
+				err := syncTemplates(cmd.Context(), mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync templates: %v", err)
 					hasErrors = true
@@ -151,7 +152,7 @@ func init() {
 	syncCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 }
 
-func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
+func syncWorkflows(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
 	if dirPath == "" {
 		dirPath = filepath.Join(".", "suprsend", "workflows")
 	} else {
@@ -160,7 +161,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling workflows from %s ...", fromWorkspace))
 
-	workflows_resp, err := mgmntClient.GetWorkflows(fromWorkspace, mode)
+	workflows_resp, err := mgmntClient.GetWorkflows(ctx, fromWorkspace, mode)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting workflows")
@@ -210,7 +211,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 			continue
 		}
 
-		err = mgmntClient.PushWorkflow(toWorkspace, slug, wf, commit, commitMessage)
+		err = mgmntClient.PushWorkflow(ctx, toWorkspace, slug, wf, commit, commitMessage)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("workflows/%s: failed to push: %v", slug, err))
 			log.Errorf("workflows/%s: failed to push: %v", slug, err)
@@ -232,7 +233,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	return nil
 }
 
-func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
+func syncSchemas(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
 	if dirPath == "" {
 		dirPath = filepath.Join(".", "suprsend", "schemas")
 	} else {
@@ -241,7 +242,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling schemas from %s ...", fromWorkspace))
 
-	schemas_resp, err := mgmntClient.GetSchemas(fromWorkspace, mode)
+	schemas_resp, err := mgmntClient.GetSchemas(ctx, fromWorkspace, mode)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting schemas")
@@ -282,7 +283,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 			continue
 		}
 
-		err = mgmntClient.PushSchema(toWorkspace, slug, sch, commit, commitMessage)
+		err = mgmntClient.PushSchema(ctx, toWorkspace, slug, sch, commit, commitMessage)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("schemas/%s: failed to push: %v", slug, err))
 			log.Errorf("schemas/%s: failed to push: %v", slug, err)
@@ -304,7 +305,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 	return nil
 }
 
-func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string, dryRun bool) error {
+func syncEvents(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string, dryRun bool) error {
 	if dirPath == "" {
 		dirPath = filepath.Join(".", "suprsend", "events")
 	} else {
@@ -313,7 +314,7 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling events from %s ...", fromWorkspace))
 
-	events_resp, err := mgmntClient.GetEvents(fromWorkspace)
+	events_resp, err := mgmntClient.GetEvents(ctx, fromWorkspace)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting events")
@@ -333,7 +334,7 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 		return nil
 	}
 	spinner.UpdateMessage(fmt.Sprintf("Pushing events to %s ...", toWorkspace))
-	err = mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
+	err = mgmntClient.PushEventsFromPayload(ctx, toWorkspace, map[string]any{"events": events})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing events")
@@ -342,7 +343,7 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 	return nil
 }
 
-func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
+func syncCategories(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
 	if dirPath == "" {
 		dirPath = filepath.Join(".", "suprsend", "preference_categories")
 	} else {
@@ -351,7 +352,7 @@ func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspac
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling categories from %s ...", fromWorkspace))
 
-	categoriesResp, err := mgmntClient.ListCategories(fromWorkspace, mode)
+	categoriesResp, err := mgmntClient.ListCategories(ctx, fromWorkspace, mode)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting categories")
@@ -373,7 +374,7 @@ func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspac
 	}
 
 	spinner.UpdateMessage(fmt.Sprintf("Pushing categories to %s ...", toWorkspace))
-	err = mgmntClient.PushCategories(toWorkspace, categories, commit, commitMessage)
+	err = mgmntClient.PushCategories(ctx, toWorkspace, categories, commit, commitMessage)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing categories")
@@ -381,14 +382,14 @@ func syncCategories(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspac
 	spinner.Stop(fmt.Sprintf("Pushed categories to %s", toWorkspace))
 
 	// Sync category translations
-	if err := syncCategoryTranslations(mgmntClient, fromWorkspace, toWorkspace, dirPath); err != nil {
+	if err := syncCategoryTranslations(ctx, mgmntClient, fromWorkspace, toWorkspace, dirPath); err != nil {
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error syncing category translations")
 	}
 
 	return nil
 }
 
-func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string) error {
+func syncCategoryTranslations(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, dirPath string) error {
 	dirPath = filepath.Join(dirPath, "translations")
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "failed to create translations directory")
@@ -396,7 +397,7 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling category translations from %s ...", fromWorkspace))
 
-	locales, err := mgmntClient.ListPreferenceTranslations(fromWorkspace)
+	locales, err := mgmntClient.ListPreferenceTranslations(ctx, fromWorkspace)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting preference translation locales")
@@ -413,7 +414,7 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 			continue
 		}
 
-		translations, err := mgmntClient.GetPreferenceTranslationsForLocale(fromWorkspace, locale)
+		translations, err := mgmntClient.GetPreferenceTranslationsForLocale(ctx, fromWorkspace, locale)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to fetch translations for locale %s: %v", locale, err))
 			log.Errorf("Failed to fetch translations for locale %s: %v", locale, err)
@@ -436,7 +437,7 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 		}
 
 		// Push translation to destination workspace
-		err = mgmntClient.PushPreferenceTranslation(toWorkspace, locale, *translations)
+		err = mgmntClient.PushPreferenceTranslation(ctx, toWorkspace, locale, *translations)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("preference_categories/translations/%s.json: failed to push: %v", locale, err))
 			log.Errorf("preference_categories/translations/%s.json: failed to push: %v", locale, err)
@@ -461,7 +462,7 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 	return nil
 }
 
-func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
+func syncTranslation(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
 	if dirPath == "" {
 		dirPath = filepath.Join(".", "suprsend", "translations")
 	} else {
@@ -470,7 +471,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling translations from %s ...", fromWorkspace))
 
-	translations_resp, err := mgmntClient.GetTranslations(fromWorkspace, mode)
+	translations_resp, err := mgmntClient.GetTranslations(ctx, fromWorkspace, mode)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting translations")
@@ -513,7 +514,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 			continue
 		}
 
-		err = mgmntClient.PushTranslation(toWorkspace, file.Name(), map[string]any{"content": translation})
+		err = mgmntClient.PushTranslation(ctx, toWorkspace, file.Name(), map[string]any{"content": translation})
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("translations/%s: failed to push: %v", file.Name(), err))
 			log.Errorf("translations/%s: failed to push: %v", file.Name(), err)
@@ -530,7 +531,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 
 	if commit && !dryRun {
 		spinner.UpdateMessage(fmt.Sprintf("Committing translations on %s ...", toWorkspace))
-		if err := mgmntClient.FinalizeTranslation(toWorkspace, commitMessage); err != nil {
+		if err := mgmntClient.FinalizeTranslation(ctx, toWorkspace, commitMessage); err != nil {
 			spinner.Stop("")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit translations on %s", toWorkspace))
 		}
@@ -546,7 +547,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	return nil
 }
 
-func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
+func syncTemplates(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, mode, dirPath string, commit bool, commitMessage string, dryRun bool) error {
 	if dirPath == "" {
 		dirPath = filepath.Join(".", "suprsend", "templates")
 	} else {
@@ -555,7 +556,7 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling templates from %s ...", fromWorkspace))
 
-	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{})
+	results, err := template.FetchTemplates(ctx, mgmntClient, fromWorkspace, mode, "", template.FetchOptions{})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting templates")
@@ -584,7 +585,7 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		pushStats.Total++
 		slug := entry.Name()
 		templateDir := filepath.Join(dirPath, slug)
-		if err := template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun); err != nil {
+		if err := template.PushTemplate(ctx, mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun); err != nil {
 			log.Errorf("templates/%s: failed to push: %v", slug, err)
 			pushStats.Failed++
 			pushStats.Errors = append(pushStats.Errors, fmt.Sprintf("templates/%s: failed to push: %v", slug, err))

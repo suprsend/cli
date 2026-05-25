@@ -44,21 +44,21 @@ var templateGetCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner("Getting template...")
 
-		template, err := mgmntClient.GetTemplate(workspace, slug, mode)
+		template, err := mgmntClient.GetTemplate(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		variants, err := mgmntClient.GetTemplateVariants(workspace, slug, mode)
+		variants, err := mgmntClient.GetTemplateVariants(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template variants")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		mockData, err := mgmntClient.GetTemplateMockData(workspace, slug)
+		mockData, err := mgmntClient.GetTemplateMockData(cmd.Context(), workspace, slug)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}

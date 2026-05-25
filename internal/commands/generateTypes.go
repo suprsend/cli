@@ -81,7 +81,7 @@ var generateTypesJavaCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Generating Java types...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
+		schemasResp, err := mgmntClient.GetLinkedSchemas(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
 			return
@@ -250,7 +250,7 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 		spinner := utils.NewSpinner(fmt.Sprintf("Generating %s types...", cases.Title(language.English).String(targetLang)))
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
+		schemasResp, err := mgmntClient.GetLinkedSchemas(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
 			return

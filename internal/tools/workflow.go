@@ -102,7 +102,7 @@ func listWorkflowsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 	if mgmntClient == nil {
 		return mcpsdk.Result{Text: "no mgmnt client available", IsError: true}, nil
 	}
-	workflows, err := mgmntClient.ListWorkflows(workspace, limit, offset, mode)
+	workflows, err := mgmntClient.ListWorkflows(ctx, workspace, limit, offset, mode)
 	if err != nil {
 		if utils.IsAuthError(err) {
 			markSessionDead(ctx)
@@ -175,7 +175,7 @@ func registerDynamicWorkflowTools(ctx context.Context, workspace string, workflo
 		}
 		g.Go(func() error {
 			log.Debugf("Getting schema for workflow %s, schema: %s, version: %s", workflow.Slug, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
-			payloadSchema, err := mgmntClient.GetSchema(workspace, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
+			payloadSchema, err := mgmntClient.GetSchema(ctx, workspace, workflow.PayloadSchema.Schema, workflow.PayloadSchema.Version)
 			if err != nil {
 				log.Errorf("workflow %s: skipping registration — failed to fetch payload schema: %s", workflow.Slug, err)
 				return nil
@@ -256,7 +256,7 @@ func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
 	// boot error) and the actual tool registration. Previously this called
 	// FetchWorkflowsMcp here AND RegisterDynamicWorkflowToolsFor re-fetched via
 	// FetchWorkflowsMcpFor — two identical GetWorkflows round-trips on boot.
-	workflows := utils.FetchWorkflowsMcp(workspace, workflowsFlag)
+	workflows := utils.FetchWorkflowsMcp(ctx, workspace, workflowsFlag)
 	if len(workflows) == 0 {
 		return fmt.Errorf("no workflows present in %s workspace", workspace)
 	}

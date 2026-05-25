@@ -341,7 +341,7 @@ func New(opts Options) *Handler {
 			return nil
 		}
 
-		perCall := mergeServerOptions(opts.ServerOptions, hostedCapabilityProfile())
+		perCall := mergeServerOptions(opts.ServerOptions, defaultCapabilityProfile())
 		tenantIdent := tenantIdentifier(t.Credentials)
 
 		// Fix #11: carry the inbound initialize request's context VALUES
@@ -519,10 +519,10 @@ func randSessionID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// hostedCapabilityProfile returns the default *mcp.ServerOptions applied to
+// defaultCapabilityProfile returns the default *mcp.ServerOptions applied to
 // every per-tenant server. Logging capability is advertised; tools/resources
 // capabilities are merged in on top of any base options supplied by the caller.
-func hostedCapabilityProfile() *mcp.ServerOptions {
+func defaultCapabilityProfile() *mcp.ServerOptions {
 	return &mcp.ServerOptions{
 		Capabilities: &mcp.ServerCapabilities{
 			Logging: &mcp.LoggingCapabilities{},

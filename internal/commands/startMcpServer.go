@@ -211,7 +211,7 @@ func init() {
 //   - tools: listChanged OFF (CLI registers all tools at startup, never changes mid-session).
 //   - resources/prompts: not advertised (we register none).
 //   - logging: advertised, matching the pre-migration server which used
-//     server.WithLogging(). Mirrors pkg/mcpserver's hostedCapabilityProfile.
+//     server.WithLogging(). Mirrors pkg/mcpserver's defaultCapabilityProfile.
 //   - recovery: the SDK has no automatic recovery, so the caller installs
 //     official.RecoveryMiddleware on the server (OUTERMOST) — a panic in a
 //     tool handler is converted to a JSON-RPC error and the process survives.

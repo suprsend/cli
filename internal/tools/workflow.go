@@ -123,6 +123,15 @@ func listWorkflowsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 // workflows are selected — callers decide whether absence is fatal.
 func RegisterDynamicWorkflowToolsFor(ctx context.Context, workspace, workflowsFlag string) ([]*Tool, error) {
 	workflows := utils.FetchWorkflowsMcpFor(ctx, workspace, workflowsFlag)
+	return registerDynamicWorkflowTools(ctx, workspace, workflows)
+}
+
+// registerDynamicWorkflowtools builds the workflow-trigger tools from an
+// already-fetched workflow list. Split out from RegisterDynamicWorkflowToolsFor
+// so callers that need the workflow list for their own checks (e.g. the CLI's
+// "no workflows present" fatal-boot guard) can fetch once and pass the result
+// through, avoiding a second GetWorkflows round-trip.
+func registerDynamicWorkflowTools(ctx context.Context, workspace string, workflows []utils.WorkflowInfo) ([]*Tool, error) {
 	mgmntClient := utils.MgmntClientFor(ctx)
 	if mgmntClient == nil {
 		return nil, fmt.Errorf("tools: RegisterDynamicWorkflowToolsFor: no mgmnt client on ctx")
@@ -241,13 +250,17 @@ func RegisterDynamicWorkflowToolsFor(ctx context.Context, workspace, workflowsFl
 // MgmntClientFor's fallback) and appends to the package-level
 // workflowRegistry.
 func RegisterDynamicWorkflowTools(workspace, workflowsFlag string) error {
-	// Preserve the legacy "no workflows in workspace" guard — the CLI path
-	// surfaces this as a fatal error during boot.
+	ctx := context.Background()
+	// Fetch the workflow list ONCE and reuse it for both the legacy
+	// "no workflows in workspace" guard (which the CLI surfaces as a fatal
+	// boot error) and the actual tool registration. Previously this called
+	// FetchWorkflowsMcp here AND RegisterDynamicWorkflowToolsFor re-fetched via
+	// FetchWorkflowsMcpFor — two identical GetWorkflows round-trips on boot.
 	workflows := utils.FetchWorkflowsMcp(workspace, workflowsFlag)
 	if len(workflows) == 0 {
 		return fmt.Errorf("no workflows present in %s workspace", workspace)
 	}
-	out, err := RegisterDynamicWorkflowToolsFor(context.Background(), workspace, workflowsFlag)
+	out, err := registerDynamicWorkflowTools(ctx, workspace, workflows)
 	if err != nil {
 		return err
 	}

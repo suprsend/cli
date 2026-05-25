@@ -111,7 +111,12 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		// CLI capability profile: tools no listChanged. The multi-tenant
 		// profile lives in pkg/mcpserver. The CLI doesn't change its tool
 		// list mid-session so listChanged wastes advertising here.
-		mcpServer := mcp.NewServer(&mcp.Implementation{Name: "SuprSend", Version: info.Version}, cliCapabilityProfile())
+		profile := cliCapabilityProfile()
+		mcpServer := mcp.NewServer(&mcp.Implementation{Name: "SuprSend", Version: info.Version}, profile)
+		// Recovery middleware (OUTERMOST) so a panic in any tool handler
+		// becomes a JSON-RPC error instead of crashing the stdio process.
+		// Mirrors pkg/mcpserver's recoveryMiddleware for the single-tenant CLI.
+		mcpServer.AddReceivingMiddleware(official.RecoveryMiddleware(profile.Logger))
 		for _, t := range selectedTools {
 			official.Register(mcpServer, t.Tool)
 		}
@@ -185,19 +190,21 @@ func init() {
 // CLI transport:
 //   - tools: listChanged OFF (CLI registers all tools at startup, never changes mid-session).
 //   - resources/prompts: not advertised (we register none).
-//   - logging: off for the CLI (logs go to stderr via logrus, not via MCP).
-//   - recovery: the SDK has no automatic recovery; pkg/mcpserver installs
-//     its own recoveryMiddleware in the multi-tenant path, but the CLI does
-//     NOT install it — a panic in a tool handler should still surface to the
-//     CLI user via the normal Go panic flow rather than be silently logged.
+//   - logging: advertised, matching the pre-migration server which used
+//     server.WithLogging(). Mirrors pkg/mcpserver's hostedCapabilityProfile.
+//   - recovery: the SDK has no automatic recovery, so the caller installs
+//     official.RecoveryMiddleware on the server (OUTERMOST) — a panic in a
+//     tool handler is converted to a JSON-RPC error and the process survives.
 //
-// Logger: bridges to logrus so handler log messages from the SDK end up in
-// the same stream as the rest of the CLI output.
+// Logger: writes to stderr so handler log messages from the SDK end up in the
+// same stream as the rest of the CLI output, and is reused by the recovery
+// middleware to record panics + stacks.
 func cliCapabilityProfile() *mcp.ServerOptions {
 	return &mcp.ServerOptions{
 		Logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
 		Capabilities: &mcp.ServerCapabilities{
-			Tools: &mcp.ToolCapabilities{ListChanged: false}, // explicit override of inferred default
+			Tools:   &mcp.ToolCapabilities{ListChanged: false}, // explicit override of inferred default
+			Logging: &mcp.LoggingCapabilities{},
 		},
 	}
 }

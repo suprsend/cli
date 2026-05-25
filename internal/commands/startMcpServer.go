@@ -156,8 +156,18 @@ var listToolsCmd = &cobra.Command{
 			Tool_Name        string `json:"tool_name"`
 			Tool_Description string `json:"tool_description"`
 		}
+		outputType, _ := cmd.Flags().GetString("output")
+		// Tool descriptions are multi-paragraph prose. In the table (pretty)
+		// view that buries the tool list under walls of text, so collapse each
+		// to its first non-empty line for scannability. json/yaml consumers
+		// get the full description.
+		pretty := outputType != "json" && outputType != "yaml"
 		describe := func(t *toolset.Tool) toolListResponse {
-			return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.Description}
+			desc := t.Description
+			if pretty {
+				desc = firstLine(desc)
+			}
+			return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: desc}
 		}
 		var resp []toolListResponse
 		for _, t := range toolset.GetAllTools() {
@@ -169,9 +179,19 @@ var listToolsCmd = &cobra.Command{
 		for _, t := range toolset.GetAllWorkflows() {
 			resp = append(resp, describe(t))
 		}
-		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(resp, outputType)
 	},
+}
+
+// firstLine returns the first non-empty, trimmed line of s. Used to collapse a
+// multi-paragraph tool description to a single scannable line in table output.
+func firstLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func init() {

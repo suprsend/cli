@@ -12,12 +12,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"errors"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"golang.org/x/term"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
@@ -272,10 +274,98 @@ func outputTable(data any) {
 	log.Fatal("Input must be a struct or a slice of structs")
 }
 
-// perColumnWidthMax caps each column's rendered width so long cells (e.g. a
-// multi-paragraph tool_description) wrap instead of blowing out the table
-// horizontally.
-const perColumnWidthMax = 60
+const (
+	// defaultTerminalWidth is assumed when stdout is not a TTY (piped,
+	// redirected, or under test) and $COLUMNS is unset.
+	defaultTerminalWidth = 120
+	// minTerminalWidth floors the detected width so a tiny/garbage value
+	// can't collapse every column to nothing.
+	minTerminalWidth = 40
+	// maxColumnWidth caps any single column even when the terminal is very
+	// wide, so long prose (e.g. a tool_description) wraps into readable
+	// line lengths instead of one 250-char line.
+	maxColumnWidth = 100
+)
+
+// terminalWidth reports the usable output width: the real terminal size when
+// stdout is a TTY, else $COLUMNS, else defaultTerminalWidth. Floored at
+// minTerminalWidth.
+func terminalWidth() int {
+	w := 0
+	if cols, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && cols > 0 {
+		w = cols
+	} else if env := os.Getenv("COLUMNS"); env != "" {
+		if parsed, err := strconv.Atoi(env); err == nil && parsed > 0 {
+			w = parsed
+		}
+	}
+	if w <= 0 {
+		w = defaultTerminalWidth
+	}
+	if w < minTerminalWidth {
+		w = minTerminalWidth
+	}
+	return w
+}
+
+// cellDisplayWidth is the width of the longest single line in a (possibly
+// multi-line) cell, measured in runes so multibyte glyphs like "—" count as 1.
+func cellDisplayWidth(s string) int {
+	max := 0
+	for _, line := range strings.Split(s, "\n") {
+		if n := utf8.RuneCountInString(line); n > max {
+			max = n
+		}
+	}
+	return max
+}
+
+// allocateColumnWidths distributes a content-width budget across columns using
+// max-min (water-filling) fairness: columns narrower than their fair share keep
+// their natural width, and the freed space is redistributed to the wider
+// columns. When everything fits in the budget, each column gets its natural
+// width (no wrapping). Otherwise the widest columns absorb the squeeze.
+func allocateColumnWidths(natural []int, budget int) []int {
+	n := len(natural)
+	w := make([]int, n)
+	settled := make([]bool, n)
+	remaining, left := budget, n
+	for left > 0 {
+		share := remaining / left
+		if share < 1 {
+			share = 1
+		}
+		progressed := false
+		for i := 0; i < n; i++ {
+			if !settled[i] && natural[i] <= share {
+				w[i] = natural[i]
+				remaining -= natural[i]
+				settled[i] = true
+				left--
+				progressed = true
+			}
+		}
+		if !progressed {
+			// Every unsettled column wants more than its share: give each the
+			// share, then hand any integer-division remainder to the widest.
+			widest := -1
+			for i := 0; i < n; i++ {
+				if !settled[i] {
+					w[i] = share
+					remaining -= share
+					if widest < 0 || natural[i] > natural[widest] {
+						widest = i
+					}
+				}
+			}
+			if widest >= 0 && remaining > 0 {
+				w[widest] += remaining
+			}
+			break
+		}
+	}
+	return w
+}
 
 func printStructAsTable(values []reflect.Value) {
 	if len(values) == 0 {
@@ -298,35 +388,58 @@ func printStructAsTable(values []reflect.Value) {
 	t.SetStyle(style)
 	t.Style().Format.Header = text.FormatDefault
 
-	// Set headers based on struct field names.
 	elemType := values[0].Type()
-	headerRow := make(table.Row, 0, elemType.NumField())
-	for i := 0; i < elemType.NumField(); i++ {
-		headerRow = append(headerRow, elemType.Field(i).Name)
+	numFields := elemType.NumField()
+
+	// Set headers based on struct field names, and seed each column's natural
+	// width with its header width.
+	headerRow := make(table.Row, 0, numFields)
+	natural := make([]int, numFields)
+	for i := 0; i < numFields; i++ {
+		name := elemType.Field(i).Name
+		headerRow = append(headerRow, name)
+		natural[i] = cellDisplayWidth(name)
 	}
 	t.AppendHeader(headerRow)
 
-	// Cap every column's width and soft-wrap long cells. Left-align.
-	colConfigs := make([]table.ColumnConfig, 0, elemType.NumField())
-	for i := 0; i < elemType.NumField(); i++ {
+	// Add rows, tracking each column's natural (unwrapped) width as we go.
+	for _, val := range values {
+		row := make(table.Row, 0, numFields)
+		for i := 0; i < numFields; i++ {
+			cell := formatValue(val.Field(i))
+			row = append(row, cell)
+			if w := cellDisplayWidth(cell); w > natural[i] {
+				natural[i] = w
+			}
+		}
+		t.AppendRow(row)
+	}
+
+	// Clamp natural widths to an absolute per-column ceiling, then fit the
+	// total to the terminal. Overhead per column is 2 padding spaces plus a
+	// separator; budget is the remaining width available to content.
+	for i := range natural {
+		if natural[i] > maxColumnWidth {
+			natural[i] = maxColumnWidth
+		}
+	}
+	budget := terminalWidth() - 3*numFields
+	if budget < numFields {
+		budget = numFields // degenerate terminal; let go-pretty wrap hard
+	}
+	widths := allocateColumnWidths(natural, budget)
+
+	colConfigs := make([]table.ColumnConfig, 0, numFields)
+	for i := 0; i < numFields; i++ {
 		colConfigs = append(colConfigs, table.ColumnConfig{
 			Number:           i + 1,
 			Align:            text.AlignLeft,
 			AlignHeader:      text.AlignLeft,
-			WidthMax:         perColumnWidthMax,
+			WidthMax:         widths[i],
 			WidthMaxEnforcer: text.WrapSoft,
 		})
 	}
 	t.SetColumnConfigs(colConfigs)
-
-	// Add rows based on struct field values.
-	for _, val := range values {
-		row := make(table.Row, 0, val.NumField())
-		for i := 0; i < val.NumField(); i++ {
-			row = append(row, formatValue(val.Field(i)))
-		}
-		t.AppendRow(row)
-	}
 
 	t.Render()
 }

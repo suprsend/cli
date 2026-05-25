@@ -160,6 +160,20 @@ type Options struct {
 	// after the handler with the result + error. Either return value may be
 	// nil/no-op. May be nil.
 	OnToolCall func(ctx context.Context, toolName string) (context.Context, func(result *mcpsdk.Result, err error))
+
+	// UnauthorizedChallenge returns the WWW-Authenticate header value sent on
+	// 401 responses. `missing` is true when no credential was presented (the
+	// resolver returned no tenant) and false when a credential was present but
+	// rejected (the resolver returned ErrUnauthorized), so embedders can add
+	// error="invalid_token" per RFC 9728. Embedders fronting the server with an
+	// OAuth 2.1 authorization server use this to point clients at their
+	// protected-resource metadata, e.g.:
+	//
+	//	Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource", error="invalid_token"
+	//
+	// Returning "" suppresses the header. Defaults to Bearer realm="suprsend"
+	// when nil.
+	UnauthorizedChallenge func(missing bool) string
 }
 
 // Handler is the http.Handler returned by New. Embeds http.Handler so callers

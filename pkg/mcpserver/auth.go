@@ -16,6 +16,20 @@ import (
 // prevents Mcp-Session-Id theft: an attacker presenting a stolen session ID
 // with a different valid bearer token gets HTTP 403 because the bearer's
 // resolved tenant identifier does not match the session's original.
+// writeUnauthorized sends a 401 with a WWW-Authenticate challenge. The
+// challenge is Options.UnauthorizedChallenge(missing) when set (skipped if it
+// returns ""), else the default Bearer realm="suprsend".
+func (h *Handler) writeUnauthorized(w http.ResponseWriter, missing bool) {
+	challenge := `Bearer realm="suprsend"`
+	if h.opts.UnauthorizedChallenge != nil {
+		challenge = h.opts.UnauthorizedChallenge(missing)
+	}
+	if challenge != "" {
+		w.Header().Set("WWW-Authenticate", challenge)
+	}
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+}
+
 func newAuthMiddleware(resolver TenantResolver, h *Handler, next http.Handler) http.Handler {
 	const sessionIDHeader = "Mcp-Session-Id"
 
@@ -32,8 +46,8 @@ func newAuthMiddleware(resolver TenantResolver, h *Handler, next http.Handler) h
 		if err != nil {
 			switch {
 			case errors.Is(err, ErrUnauthorized):
-				w.Header().Set("WWW-Authenticate", `Bearer realm="suprsend"`)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				// A credential was presented but rejected: missing=false.
+				h.writeUnauthorized(w, false)
 			case errors.Is(err, ErrForbidden):
 				http.Error(w, "Forbidden", http.StatusForbidden)
 			default:
@@ -42,9 +56,9 @@ func newAuthMiddleware(resolver TenantResolver, h *Handler, next http.Handler) h
 			return
 		}
 		if tenantRec == nil {
-			// Resolver returned (nil, nil) — treat as unauthorized.
-			w.Header().Set("WWW-Authenticate", `Bearer realm="suprsend"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			// Resolver returned (nil, nil) — no tenant resolved, treat as
+			// unauthorized with missing=true (no credential resolved).
+			h.writeUnauthorized(w, true)
 			return
 		}
 

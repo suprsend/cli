@@ -182,6 +182,114 @@ func (alwaysForbiddenResolver) Resolve(_ context.Context, _ *http.Request) (*mcp
 	return nil, fmt.Errorf("policy says no: %w", mcpserver.ErrForbidden)
 }
 
+// nilTenantResolver returns (nil, nil) — the "no tenant resolved" branch that
+// maps to UnauthorizedChallenge(missing=true).
+type nilTenantResolver struct{}
+
+func (nilTenantResolver) Resolve(_ context.Context, _ *http.Request) (*mcpserver.Tenant, error) {
+	return nil, nil
+}
+
+// post401 sends an initialize POST and returns the response's status and
+// WWW-Authenticate header.
+func post401(t *testing.T, handler http.Handler) (int, string) {
+	t.Helper()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	req, _ := http.NewRequest(http.MethodPost, srv.URL, http.NoBody)
+	req.Header.Set("Authorization", "Bearer some-token")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode, resp.Header.Get("WWW-Authenticate")
+}
+
+func TestUnauthorizedChallengeConfigurable(t *testing.T) {
+	// nil default: today's Bearer realm="suprsend" is preserved.
+	t.Run("nil default", func(t *testing.T) {
+		handler := mcpserver.New(mcpserver.Options{Resolver: mcpserver.NewFakeResolver()})
+		status, challenge := post401(t, handler)
+		if status != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", status)
+		}
+		if challenge != `Bearer realm="suprsend"` {
+			t.Errorf("challenge = %q, want default Bearer realm=\"suprsend\"", challenge)
+		}
+	})
+
+	// Custom challenge, invalid token: resolver returns ErrUnauthorized, so the
+	// middleware passes missing=false.
+	t.Run("custom challenge invalid token", func(t *testing.T) {
+		var gotMissing bool
+		var called bool
+		handler := mcpserver.New(mcpserver.Options{
+			Resolver: mcpserver.NewFakeResolver(), // unknown token -> ErrUnauthorized
+			UnauthorizedChallenge: func(missing bool) string {
+				called, gotMissing = true, missing
+				if missing {
+					return `Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"`
+				}
+				return `Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource", error="invalid_token"`
+			},
+		})
+		status, challenge := post401(t, handler)
+		if status != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", status)
+		}
+		if !called {
+			t.Fatal("UnauthorizedChallenge was not called")
+		}
+		if gotMissing {
+			t.Error("missing = true, want false for a presented-but-invalid token")
+		}
+		if !strings.Contains(challenge, `error="invalid_token"`) {
+			t.Errorf("challenge = %q, want error=\"invalid_token\" present", challenge)
+		}
+	})
+
+	// Custom challenge, no tenant resolved: resolver returns (nil, nil), so the
+	// middleware passes missing=true.
+	t.Run("custom challenge missing credential", func(t *testing.T) {
+		var gotMissing bool
+		handler := mcpserver.New(mcpserver.Options{
+			Resolver: nilTenantResolver{},
+			UnauthorizedChallenge: func(missing bool) string {
+				gotMissing = missing
+				return `Bearer realm="custom"`
+			},
+		})
+		status, challenge := post401(t, handler)
+		if status != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", status)
+		}
+		if !gotMissing {
+			t.Error("missing = false, want true when no tenant is resolved")
+		}
+		if challenge != `Bearer realm="custom"` {
+			t.Errorf("challenge = %q, want Bearer realm=\"custom\"", challenge)
+		}
+	})
+
+	// Returning "" suppresses the header entirely.
+	t.Run("empty challenge suppresses header", func(t *testing.T) {
+		handler := mcpserver.New(mcpserver.Options{
+			Resolver:              mcpserver.NewFakeResolver(),
+			UnauthorizedChallenge: func(bool) string { return "" },
+		})
+		status, challenge := post401(t, handler)
+		if status != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", status)
+		}
+		if challenge != "" {
+			t.Errorf("challenge = %q, want empty (header suppressed)", challenge)
+		}
+	})
+}
+
 func TestReactiveSessionCloseOn401InHandler(t *testing.T) {
 	// Tool handler that immediately marks the session dead, simulating a
 	// downstream API returning 401 mid-call.

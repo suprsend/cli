@@ -29,6 +29,13 @@ stability commitment from initial release. Breaking changes to anything under
   + resources(listChanged) + logging). Outer auth middleware enforces
   session-tenant binding to prevent stolen-session-ID reuse across tenants.
   Background reconciliation goroutine bounds memory.
+- **`pkg/mcpserver.Options.UnauthorizedChallenge`** — optional
+  `func(missing bool) string` to override the `WWW-Authenticate` header sent on
+  401 responses. `missing` is true when no credential was resolved and false
+  when a credential was presented but rejected, so embedders can emit
+  `error="invalid_token"` and a `resource_metadata` pointer per RFC 9728 for
+  MCP OAuth discovery. Returning `""` suppresses the header. Defaults to
+  `Bearer realm="suprsend"` when nil (unchanged behavior).
 
 ### Changed
 

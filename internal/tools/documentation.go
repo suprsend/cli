@@ -94,10 +94,10 @@ Tips: use precise technical terms ("workflow trigger conditions", not "the rule 
 					"query": {
 						Type: "string",
 						Description: `Search query. The query should:
-						- Identify the core concepts and intent
-						- Add relevant synonyms and related terms
-						- Structure the query to emphasize key terms
-						- Include technical or domain-specific terminology if applicable`,
+- Identify the core concepts and intent
+- Add relevant synonyms and related terms
+- Structure the query to emphasize key terms
+- Include technical or domain-specific terminology if applicable`,
 					},
 				},
 				Required: []string{"query"},

@@ -7,16 +7,20 @@ import (
 	"testing"
 )
 
-func TestFakeResolver_NoAuthHeader_ReturnsErrUnauthorized(t *testing.T) {
+// A request with no Authorization header carries NO credential, so Resolve
+// must return (nil, nil) — the signal the auth middleware maps to missing=true
+// (RFC 9728 discovery). Returning ErrUnauthorized here would wrongly report
+// missing=false ("credential presented but rejected").
+func TestFakeResolver_NoAuthHeader_ResolvesNilNil(t *testing.T) {
 	r := NewFakeResolver()
 	req := httptest.NewRequest("GET", "/", nil)
 
-	_, err := r.Resolve(context.Background(), req)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
+	tenant, err := r.Resolve(context.Background(), req)
+	if err != nil {
+		t.Fatalf("missing header should resolve to (nil, nil); got err = %v", err)
 	}
-	if !errors.Is(err, ErrUnauthorized) {
-		t.Fatalf("expected error to wrap ErrUnauthorized, got: %v", err)
+	if tenant != nil {
+		t.Fatalf("missing header should resolve to a nil tenant; got %+v", tenant)
 	}
 }
 

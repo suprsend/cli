@@ -24,9 +24,9 @@ const dynamicRegistrationConcurrency = 10
 // registered `trigger_<slug>_workflow` tool. It builds the workflow trigger
 // payload from args (peeling off tenant_id / actor / recipient as
 // first-class routing fields and slotting everything under "data") and calls
-// the workspace suprsend client's Workflows.Trigger. Auth failures call
-// MarkSessionDead so MCP sessions get torn down instead of looping on a
-// revoked token.
+// the workspace suprsend client's Workflows.Trigger. A revoked token (HTTP 401)
+// is handled centrally by the authExpiryTransport interceptor (internal/utils),
+// which marks the MCP session dead — no per-handler auth check is needed here.
 func triggerWorkflow(ctx context.Context, args mcpsdk.Args, workspace, slug string) (mcpsdk.Result, error) {
 	tenantId := args.GetString("tenant_id", "")
 	actorDistinctId := args.GetString("actor_distinct_id", "")

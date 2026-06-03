@@ -67,6 +67,22 @@ stability commitment from initial release. Breaking changes to anything under
   across the tool handlers) was **removed** as redundant; `utils.IsAuthError`
   is gone. Also enables cancellation/deadline propagation for mgmnt calls.
 
+### Fixed
+
+- **`start-mcp-server --tools` exact-name selectors** — the official-SDK
+  migration renamed every tool's protocol name (`users.get` →
+  `get_suprsend_user`, etc.), which silently broke `--tools=users.get`-style
+  selectors (they matched nothing and registered zero tools). The selector
+  grammar now resolves the stable legacy names (advertised in the command help)
+  to the new protocol names via a decoupled `Selector` field, so existing
+  `--tools=users.get,tenants.get_all` invocations work again. Category
+  wildcards (`--tools=users.*`) were unaffected.
+- **`pkg/mcpserver.FakeResolver`** now returns `(nil, nil)` for a request with
+  no `Authorization` header (previously `ErrUnauthorized`). A missing header
+  carries no credential, so the auth middleware now reports `missing=true`
+  (RFC 9728 discovery) instead of `missing=false` ("credential rejected").
+  A present-but-unknown token still returns `ErrUnauthorized`.
+
 ### Removed
 
 - **`github.com/mark3labs/mcp-go`** dependency dropped after all tool files

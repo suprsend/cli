@@ -28,12 +28,15 @@ func (f *FakeResolver) Add(token string, t *Tenant) {
 	f.tenants[token] = t
 }
 
-// Resolve implements TenantResolver. Returns ErrUnauthorized if the request
-// has no Authorization header or the bearer token is unknown.
+// Resolve implements TenantResolver. A request with no Authorization header
+// carries no credential, so it resolves to (nil, nil) — the middleware maps
+// that to a 401 with missing=true (RFC 9728 discovery). A bearer token that is
+// present but unknown returns ErrUnauthorized (missing=false, credential
+// rejected).
 func (f *FakeResolver) Resolve(_ context.Context, r *http.Request) (*Tenant, error) {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
-		return nil, fmt.Errorf("missing Authorization header: %w", ErrUnauthorized)
+		return nil, nil
 	}
 	token := strings.TrimPrefix(auth, "Bearer ")
 	f.mu.RLock()

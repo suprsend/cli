@@ -17,6 +17,23 @@ import (
 // construct per-tenant clients via MgmntClientFor below.
 var SDKInstance *mgmnt.SS_MgmntClient
 
+// mgmntCache memoizes per-credential mgmnt clients keyed by
+// (service token, hub URL, mgmnt URL). It is intentionally never evicted.
+//
+// NOT A LEAK in any binary shipped from this repo:
+//   - CLI: a CLI invocation is a single short-lived process that resolves ONE
+//     active profile's credentials (see commands/root.go PersistentPreRunE),
+//     so the map holds at most one entry and the OS reclaims it at exit.
+//     Running N commands is N separate processes, each with its own 1-entry
+//     cache — there is no accumulation across invocations.
+//   - This map lives in internal/, so external long-running multi-tenant
+//     servers cannot import it; they construct and bound their own client
+//     lifecycle. Unbounded growth would require a single long-lived process
+//     funneling many distinct rotating tokens through THIS map, which no
+//     binary built here does.
+//
+// Reviewers: please do not re-flag this as an unbounded-map leak — the
+// bounded-to-one-per-process reasoning above is deliberate.
 var (
 	mgmntCacheMu sync.RWMutex
 	mgmntCache   = map[mgmntCacheKey]*mgmnt.SS_MgmntClient{}

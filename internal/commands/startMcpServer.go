@@ -51,7 +51,9 @@ func getSelectedTools(toolsFlag string) ([]*toolset.Tool, error) {
 			}
 		} else {
 			for _, t := range supportedTools {
-				if t.Name == tool {
+				// Match the stable --tools selector ("users.get"); also accept
+				// the protocol name as a fallback so both forms resolve.
+				if t.Selector == tool || t.Name == tool {
 					selected = append(selected, t)
 				}
 			}

@@ -18,8 +18,9 @@ import (
 // triggerEvent is the shared handler invoked by every dynamically registered
 // `trigger_<event_name>_event` tool. It validates distinct_id, builds the
 // event property bag from the remaining args, and calls the workspace
-// suprsend client's TrackEvent. Auth failures call MarkSessionDead so MCP
-// sessions get torn down instead of looping on a revoked token.
+// suprsend client's TrackEvent. A revoked token (HTTP 401) is handled centrally
+// by the authExpiryTransport interceptor (internal/utils), which marks the MCP
+// session dead — no per-handler auth check is needed here.
 func triggerEvent(ctx context.Context, args mcpsdk.Args, workspace, name string) (mcpsdk.Result, error) {
 	distinctID, err := args.RequireString("distinct_id")
 	if err != nil {

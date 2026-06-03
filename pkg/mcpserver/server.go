@@ -129,9 +129,12 @@ type Options struct {
 	// Defaults to {Name: "suprsend", Version: "dev"} when nil.
 	Implementation *mcp.Implementation
 
-	// ServerOptions is the BASE *mcp.ServerOptions. The library merges in
-	// its default capability profile (recovery + tools(listChanged) +
-	// resources(listChanged) + logging) on top of whatever is set here.
+	// ServerOptions is the BASE *mcp.ServerOptions. The library's default
+	// capability profile (Capabilities: logging) REPLACES base.Capabilities
+	// (see mergeServerOptions); all other base fields are preserved. The
+	// official SDK additionally infers tools.listChanged from the AddTool
+	// calls the library makes. Resources and prompts are NOT advertised.
+	// Recovery is installed as outermost middleware, not via Capabilities.
 	// Pass nil for "use only the default profile".
 	ServerOptions *mcp.ServerOptions
 
@@ -312,11 +315,11 @@ type resolvedTenantKey struct{}
 // New returns a *Handler that serves MCP over streamable HTTP. Panics if
 // opts.Resolver is nil.
 //
-// Capability profile applied to every per-tenant server: tools/list_changed
-// notifications, resources subscribe + list_changed notifications, and
-// protocol-level logging. Prompts capability is NOT advertised. Recovery is
-// installed as outermost middleware by installSessionMiddleware (the SDK
-// has no automatic recovery).
+// Capability profile applied to every per-tenant server: protocol-level
+// logging is advertised explicitly, and the official SDK infers
+// tools/list_changed from the AddTool calls the library makes. Resources and
+// prompts capabilities are NOT advertised. Recovery is installed as outermost
+// middleware by installSessionMiddleware (the SDK has no automatic recovery).
 func New(opts Options) *Handler {
 	if opts.Resolver == nil {
 		panic("mcpserver.New: Resolver is required")
@@ -520,8 +523,9 @@ func randSessionID() string {
 }
 
 // defaultCapabilityProfile returns the default *mcp.ServerOptions applied to
-// every per-tenant server. Logging capability is advertised; tools/resources
-// capabilities are merged in on top of any base options supplied by the caller.
+// every per-tenant server. Only logging capability is set here; tools.listChanged
+// is inferred by the official SDK from the library's AddTool calls. This profile's
+// Capabilities replaces base.Capabilities in mergeServerOptions.
 func defaultCapabilityProfile() *mcp.ServerOptions {
 	return &mcp.ServerOptions{
 		Capabilities: &mcp.ServerCapabilities{

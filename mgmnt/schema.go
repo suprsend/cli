@@ -64,11 +64,11 @@ type SchemaPayload struct {
 }
 
 type JSONSchema struct {
-	Type       string                 `json:"type"`
-	Defs       map[string]interface{} `json:"$defs"`
-	Title      string                 `json:"title"`
-	Required   *[]string              `json:"required,omitempty"`
-	Properties map[string]interface{} `json:"properties"`
+	Type       string         `json:"type"`
+	Defs       map[string]any `json:"$defs"`
+	Title      string         `json:"title"`
+	Required   *[]string      `json:"required,omitempty"`
+	Properties map[string]any `json:"properties"`
 }
 
 type Property struct {
@@ -89,10 +89,7 @@ func (c *SS_MgmntClient) ListSchema(ctx context.Context, workspace string, limit
 	remainingLimit := limit
 
 	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
+		currentLimit := min(remainingLimit, apiLimit)
 
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", "/")
 		if err != nil {

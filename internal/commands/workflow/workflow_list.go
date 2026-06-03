@@ -49,7 +49,7 @@ var workflowListCmd = &cobra.Command{
 		}
 
 		if len(workflows.Results) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 		utils.OutputData(workflows.Results, outputType)

@@ -67,10 +67,7 @@ func (c *SS_MgmntClient) ListWorkflows(ctx context.Context, workspace string, li
 	currentOffset := offset
 	remainingLimit := limit
 	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
+		currentLimit := min(remainingLimit, apiLimit)
 
 		log.Debugf("Getting workflows for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", "/")
@@ -360,7 +357,7 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(ctx context.Context, workspace, sl
 	}
 	urlStr = u.String()
 	log.Debugf("workflow status URL: %s", urlStr)
-	body := map[string]interface{}{
+	body := map[string]any{
 		"is_enabled": enabled,
 	}
 

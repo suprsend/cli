@@ -45,7 +45,7 @@ var schemaListCmd = &cobra.Command{
 			return err
 		}
 		if len(schemas.Results) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 		filteredSchemas := filterSchemaData(schemas.Results)

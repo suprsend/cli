@@ -24,7 +24,7 @@ type ConfigString struct {
 	Source ConfigSource
 }
 
-func (p ConfigString) MarshalYAML() (interface{}, error) {
+func (p ConfigString) MarshalYAML() (any, error) {
 	return p.Value, nil
 }
 
@@ -43,7 +43,7 @@ type ConfigBool struct {
 	Source   ConfigSource
 }
 
-func (p ConfigBool) MarshalYAML() (interface{}, error) {
+func (p ConfigBool) MarshalYAML() (any, error) {
 	return p.Value, nil
 }
 

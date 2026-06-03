@@ -43,7 +43,7 @@ var templateListCmd = &cobra.Command{
 		}
 
 		if len(templates.Results) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 		utils.OutputData(templates.Results, outputType)

@@ -129,7 +129,7 @@ var generateTypesJavaCmd = &cobra.Command{
 				}
 			}
 
-			schemaJSON := map[string]interface{}{
+			schemaJSON := map[string]any{
 				"type":       targetSchema.JSONSchema.Type,
 				"properties": targetSchema.JSONSchema.Properties,
 			}
@@ -297,7 +297,7 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 			schemaName := targetSchema.TriggerName
 			log.Debugf("Processing TargetSchema: %v", targetSchema)
 
-			schemaJSON := map[string]interface{}{
+			schemaJSON := map[string]any{
 				"type":       targetSchema.JSONSchema.Type,
 				"properties": targetSchema.JSONSchema.Properties,
 			}

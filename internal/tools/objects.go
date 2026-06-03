@@ -137,7 +137,7 @@ func getObjectPreferences(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result,
 		ObjectType: objType,
 	}
 
-	var objPref interface{}
+	var objPref any
 	if channel_preferences {
 		objPref, err = suprsendClient.Objects.GetGlobalChannelsPreference(ctx, objIdentifier, nil)
 		if err != nil {

@@ -61,7 +61,7 @@ func promptForOutputDirectory() (string, bool) {
 	return input, true
 }
 
-func WriteToFileWithPath(data interface{}, filePath string) error {
+func WriteToFileWithPath(data any, filePath string) error {
 	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 		return fmt.Errorf("failed to ensure directory %s: %w", filepath.Dir(filePath), err)
 	}
@@ -73,7 +73,7 @@ func WriteToFileWithPath(data interface{}, filePath string) error {
 	return os.WriteFile(filePath, jsonData, 0644)
 }
 
-func WriteToFile(data interface{}, filePath string) error {
+func WriteToFile(data any, filePath string) error {
 	return WriteToFileWithPath(data, filePath)
 }
 

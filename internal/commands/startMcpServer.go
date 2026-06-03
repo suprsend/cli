@@ -38,10 +38,10 @@ func getSelectedTools(toolsFlag string) ([]*toolset.Tool, error) {
 		return supportedTools, nil
 	}
 	// get the tools mentioned in toolsFlag
-	tools := strings.Split(toolsFlag, ",")
+	tools := strings.SplitSeq(toolsFlag, ",")
 
 	// if tool name is `type`.* include all the tools that have same type
-	for _, tool := range tools {
+	for tool := range tools {
 		if strings.Contains(tool, ".*") {
 			toolType := strings.Split(tool, ".*")[0]
 			for _, t := range supportedTools {
@@ -186,7 +186,7 @@ var listToolsCmd = &cobra.Command{
 // firstLine returns the first non-empty, trimmed line of s. Used to collapse a
 // multi-paragraph tool description to a single scannable line in table output.
 func firstLine(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if trimmed := strings.TrimSpace(line); trimmed != "" {
 			return trimmed
 		}

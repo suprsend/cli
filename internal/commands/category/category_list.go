@@ -68,7 +68,7 @@ var categoryListCmd = &cobra.Command{
 		spinner.Stop(fmt.Sprintf("Listed %d categories from %s", len(tableRows), workspace))
 
 		if len(tableRows) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 

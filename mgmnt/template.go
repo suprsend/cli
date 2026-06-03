@@ -143,10 +143,10 @@ func (c *SS_MgmntClient) PushTemplateVariant(ctx context.Context, workspace, slu
 }
 
 type PreCommitVariant struct {
-	Channel string                `json:"channel"`
-	ID      string                `json:"id"`
-	HasDiff bool                  `json:"has_diff"`
-	Errors  map[string][]string   `json:"errors"`
+	Channel string              `json:"channel"`
+	ID      string              `json:"id"`
+	HasDiff bool                `json:"has_diff"`
+	Errors  map[string][]string `json:"errors"`
 }
 
 type PreCommitValidateResponse struct {
@@ -308,10 +308,7 @@ func (c *SS_MgmntClient) ListTemplates(ctx context.Context, workspace string, li
 	currentOffset := offset
 	remainingLimit := limit
 	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
+		currentLimit := min(remainingLimit, apiLimit)
 
 		log.Debugf("Getting templates for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
 		res, err := client.R().

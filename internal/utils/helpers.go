@@ -55,7 +55,7 @@ func parseSelector(flag string) (all bool, none bool, slugs []string, tags []str
 	if flag == "all" {
 		return true, false, nil, nil
 	}
-	for _, raw := range strings.Split(flag, ",") {
+	for raw := range strings.SplitSeq(flag, ",") {
 		entry := strings.TrimSpace(raw)
 		if entry == "" {
 			continue
@@ -323,7 +323,7 @@ func RequiresValue(action string) bool {
 	return actions[action]
 }
 
-func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
+func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]any, ms_teams_details map[string]any, webpush_details map[string]any, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
 	var err error
 	var out string
 
@@ -440,7 +440,7 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 	return out, err
 }
 
-func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, distinct_id string, workspace string) (string, error) {
+func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]any, ms_teams_details map[string]any, webpush_details map[string]any, distinct_id string, workspace string) (string, error) {
 	var err error
 	var out string
 

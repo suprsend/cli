@@ -49,7 +49,7 @@ func listTranslations(ctx context.Context, workspace, outputType string) error {
 	spinner.Stop(fmt.Sprintf("Listed %d translation locales from %s", len(translations.Results), workspace))
 
 	if len(translations.Results) == 0 && utils.IsOutputPiped() {
-		utils.OutputData([]interface{}{}, outputType)
+		utils.OutputData([]any{}, outputType)
 		return nil
 	}
 	utils.OutputData(translations.Results, outputType)

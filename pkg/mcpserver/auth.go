@@ -77,10 +77,7 @@ func newAuthMiddleware(resolver TenantResolver, h *Handler, next http.Handler) h
 					// Log the security event so embedders can alert. Log a
 					// PREFIX of the session ID only (full ID is sensitive).
 					if logger := h.serverLogger(); logger != nil {
-						prefixLen := 8
-						if len(sessID) < prefixLen {
-							prefixLen = len(sessID)
-						}
+						prefixLen := min(len(sessID), 8)
 						logger.Warn("mcpserver: session-hijack attempt rejected",
 							"session_id_prefix", sessID[:prefixLen]+"...",
 							"client_addr", r.RemoteAddr,

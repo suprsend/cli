@@ -93,7 +93,7 @@ func (c *SS_MgmntClient) ListCategories(ctx context.Context, workspace, mode str
 	return result, nil
 }
 
-func (c *SS_MgmntClient) PushCategories(ctx context.Context, workspace string, categories interface{}, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushCategories(ctx context.Context, workspace string, categories any, commit bool, commitMessage string) error {
 	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")

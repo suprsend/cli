@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -150,10 +151,8 @@ func supportsColor() bool {
 
 // ValidateOutputType returns a clierr if format is not one of the allowed values.
 func ValidateOutputType(format string, allowed ...string) error {
-	for _, a := range allowed {
-		if format == a {
-			return nil
-		}
+	if slices.Contains(allowed, format) {
+		return nil
 	}
 	return clierr.New(
 		fmt.Sprintf("invalid output format %q: must be one of %v", format, allowed),
@@ -191,7 +190,7 @@ func outputJSON(data any) {
 
 func colorizeYAML(yamlString string) string {
 	lines := []string{}
-	for _, line := range strings.Split(yamlString, "\n") {
+	for line := range strings.SplitSeq(yamlString, "\n") {
 		if idx := strings.Index(line, ":"); idx != -1 {
 			// Preserve leading spaces (indentation)
 			leading := line[:idx]
@@ -242,7 +241,7 @@ func outputTable(data any) {
 	val := reflect.ValueOf(data)
 
 	// If the input is a pointer, get the underlying element
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 
@@ -312,7 +311,7 @@ func terminalWidth() int {
 // multi-line) cell, measured in runes so multibyte glyphs like "—" count as 1.
 func cellDisplayWidth(s string) int {
 	max := 0
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if n := utf8.RuneCountInString(line); n > max {
 			max = n
 		}
@@ -331,12 +330,9 @@ func allocateColumnWidths(natural []int, budget int) []int {
 	settled := make([]bool, n)
 	remaining, left := budget, n
 	for left > 0 {
-		share := remaining / left
-		if share < 1 {
-			share = 1
-		}
+		share := max(remaining/left, 1)
 		progressed := false
-		for i := 0; i < n; i++ {
+		for i := range n {
 			if !settled[i] && natural[i] <= share {
 				w[i] = natural[i]
 				remaining -= natural[i]
@@ -349,7 +345,7 @@ func allocateColumnWidths(natural []int, budget int) []int {
 			// Every unsettled column wants more than its share: give each the
 			// share, then hand any integer-division remainder to the widest.
 			widest := -1
-			for i := 0; i < n; i++ {
+			for i := range n {
 				if !settled[i] {
 					w[i] = share
 					remaining -= share
@@ -395,7 +391,7 @@ func printStructAsTable(values []reflect.Value) {
 	// width with its header width.
 	headerRow := make(table.Row, 0, numFields)
 	natural := make([]int, numFields)
-	for i := 0; i < numFields; i++ {
+	for i := range numFields {
 		name := elemType.Field(i).Name
 		headerRow = append(headerRow, name)
 		natural[i] = cellDisplayWidth(name)
@@ -405,7 +401,7 @@ func printStructAsTable(values []reflect.Value) {
 	// Add rows, tracking each column's natural (unwrapped) width as we go.
 	for _, val := range values {
 		row := make(table.Row, 0, numFields)
-		for i := 0; i < numFields; i++ {
+		for i := range numFields {
 			cell := formatValue(val.Field(i))
 			row = append(row, cell)
 			if w := cellDisplayWidth(cell); w > natural[i] {
@@ -423,14 +419,13 @@ func printStructAsTable(values []reflect.Value) {
 			natural[i] = maxColumnWidth
 		}
 	}
-	budget := terminalWidth() - 3*numFields
-	if budget < numFields {
-		budget = numFields // degenerate terminal; let go-pretty wrap hard
-	}
+	budget := max(terminalWidth()-3*numFields,
+		// degenerate terminal; let go-pretty wrap hard
+		numFields)
 	widths := allocateColumnWidths(natural, budget)
 
 	colConfigs := make([]table.ColumnConfig, 0, numFields)
-	for i := 0; i < numFields; i++ {
+	for i := range numFields {
 		colConfigs = append(colConfigs, table.ColumnConfig{
 			Number:           i + 1,
 			Align:            text.AlignLeft,
@@ -446,7 +441,7 @@ func printStructAsTable(values []reflect.Value) {
 
 func formatValue(v reflect.Value) string {
 	switch v.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v.IsNil() {
 			return "null"
 		}

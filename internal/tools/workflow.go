@@ -160,7 +160,6 @@ func registerDynamicWorkflowTools(ctx context.Context, workspace string, workflo
 	g := new(errgroup.Group)
 	g.SetLimit(dynamicRegistrationConcurrency)
 	for i, workflow := range workflows {
-		i, workflow := i, workflow
 		if workflow.Slug == "" || workflow.PayloadSchema.Schema == "" {
 			continue
 		}

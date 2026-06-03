@@ -77,7 +77,6 @@ func RegisterDynamicEventsToolsFor(ctx context.Context, workspace, eventsFlag st
 	g := new(errgroup.Group)
 	g.SetLimit(dynamicRegistrationConcurrency)
 	for i, event := range events {
-		i, event := i, event
 		if event.Name == "" || event.PayloadSchema.Schema == "" {
 			continue
 		}

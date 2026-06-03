@@ -111,7 +111,7 @@ func getUserPreferencesHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Re
 		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
-	var userPref interface{}
+	var userPref any
 	if category == "" {
 		userPref, err = suprsendClient.Users.GetFullPreference(ctx, distinctId, &suprsend.UserFullPreferencesOptions{TenantId: tenantId})
 		if err != nil {

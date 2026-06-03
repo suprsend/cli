@@ -30,10 +30,10 @@ type ListEventsResponse struct {
 }
 
 type Event struct {
-	Name          string                 `json:"name"`
-	Description   string                 `json:"description"`
-	PayloadSchema map[string]interface{} `json:"payload_schema"`
-	CreatedAt     string                 `json:"created_at"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	PayloadSchema map[string]any `json:"payload_schema"`
+	CreatedAt     string         `json:"created_at"`
 }
 
 func (c *SS_MgmntClient) ListEvents(ctx context.Context, workspace string, limit, offset int) (*ListEventsResponse, error) {

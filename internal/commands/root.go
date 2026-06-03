@@ -24,6 +24,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/workspace"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/pkg/tenant"
 	"go.szostok.io/version/extension"
 )
 
@@ -208,12 +209,24 @@ func init() {
 			return resolveErr
 		}
 
+		serviceToken := config.Cfg.ServiceToken.String()
+		hubURL := config.Cfg.BaseUrl.String()
+		mgmntURL := config.Cfg.MgmntUrl.String()
+
 		utils.InitSDKWithUrls(
-			config.Cfg.ServiceToken.String(),
-			config.Cfg.BaseUrl.String(),
-			config.Cfg.MgmntUrl.String(),
+			serviceToken,
+			hubURL,
+			mgmntURL,
 			config.Cfg.Debug.Value,
 		)
+
+		ctx := tenant.WithCredentials(cmd.Context(), tenant.Credentials{
+			ServiceToken: serviceToken,
+			Workspace:    config.Cfg.Workspace.Value,
+			HubBaseURL:   hubURL,
+			MgmntBaseURL: mgmntURL,
+		})
+		cmd.SetContext(ctx)
 
 		return nil
 	}

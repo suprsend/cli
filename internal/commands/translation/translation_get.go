@@ -48,7 +48,7 @@ var translationGetCmd = &cobra.Command{
 		// endpoint, so we list with include_content=true and filter
 		// client-side. Pull a wide page so any plausible workspace fits;
 		// the response is bounded by the workspace's translation count.
-		translations, err := mgmntClient.ListTranslations(workspace, mode, "true", 1000, 0)
+		translations, err := mgmntClient.ListTranslations(cmd.Context(), workspace, mode, "true", 1000, 0)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting translations")

@@ -58,10 +58,10 @@ var categoryCommitCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner("Loading...")
 
-		_, _ = translation.PushTranslations(workspace, "", translationDir, false)
+		_, _ = translation.PushTranslations(cmd.Context(), workspace, "", translationDir, false)
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		err := mgmntClient.FinalizeCategories(workspace, commitMsg)
+		err := mgmntClient.FinalizeCategories(cmd.Context(), workspace, commitMsg)
 		if err != nil {
 			log.WithError(err).Error("Couldn't commit categories")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

@@ -19,7 +19,7 @@ var worklowEnableCmd = &cobra.Command{
 
   # Dry run: see what would change without making changes
   suprsend workflow enable welcome --dry-run`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := utils.ResolveSlug(cmd, args)
@@ -34,7 +34,7 @@ var worklowEnableCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, true)
+		err := mgmntClient.ChangeStatusWorkflow(cmd.Context(), workspace, slug, true)
 		if err != nil {
 			log.Error(err.Error())
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

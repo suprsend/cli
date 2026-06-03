@@ -21,7 +21,7 @@ var schemaGetCmd = &cobra.Command{
 
   # Get the draft version
   suprsend schema get order-placed --mode draft`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
 	},
@@ -39,7 +39,7 @@ var schemaGetCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting details...")
 
-		schema, err := mgmntClient.GetSchemaBySlug(workspace, slug, mode)
+		schema, err := mgmntClient.GetSchemaBySlug(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting schema detail")

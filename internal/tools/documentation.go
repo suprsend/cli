@@ -8,67 +8,74 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/suprsend/cli/pkg/mcpsdk"
 )
 
-func searchDocsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	query, err := request.RequireString("query")
+// NOTE: handlers in this file hit external endpoints (rag.suprsend.com and
+// docs.suprsend.com) rather than the SuprSend management API, so there is no
+// service-token auth path to invalidate here. Reactive session-close on a 401
+// is handled centrally by the authExpiryTransport interceptor for the clients
+// that do carry credentials; these handlers don't go through those clients.
+
+func searchDocsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	query, err := args.RequireString("query")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	encodedQuery := url.QueryEscape(query)
 	response, err := http.Get(fmt.Sprintf("https://rag.suprsend.com/?query=%s", encodedQuery))
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{}, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
+		return mcpsdk.Result{}, fmt.Errorf("unexpected status code: %d", response.StatusCode)
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{}, err
 	}
 
-	return mcp.NewToolResultText(string(body)), nil
+	return mcpsdk.Result{Text: string(body)}, nil
 }
 
-func fetchDocsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	uri, err := request.RequireString("uri")
+func fetchDocsHandler(ctx context.Context, args mcpsdk.Args) (mcpsdk.Result, error) {
+	uri, err := args.RequireString("uri")
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return mcpsdk.Result{Text: err.Error(), IsError: true}, nil
 	}
 
 	if !strings.HasSuffix(uri, ".md") {
 		uri = uri + ".md"
 	}
-	url := fmt.Sprintf("https://docs.suprsend.com/%s", uri)
-	response, err := http.Get(url)
+	docURL := fmt.Sprintf("https://docs.suprsend.com/%s", uri)
+	response, err := http.Get(docURL)
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{}, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
+		return mcpsdk.Result{}, fmt.Errorf("unexpected status code: %d", response.StatusCode)
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return mcpsdk.Result{}, err
 	}
 
-	return mcp.NewToolResultText(string(body)), nil
+	return mcpsdk.Result{Text: string(body)}, nil
 }
 
 func newDocumentationTools() []*Tool {
 	searchDoc := &Tool{
-		Name:        "documentation.search",
-		MCPTool: mcp.NewTool("search_suprsend_documentation",
-			mcp.WithDescription(`Search SuprSend's product documentation for technical guidance — APIs, SDKs, workflows, templates, tenants, lists, vendors, and connectors.
+		Tool: &mcpsdk.Tool{
+			Name: "search_suprsend_documentation",
+			Description: `Search SuprSend's product documentation for technical guidance — APIs, SDKs, workflows, templates, tenants, lists, vendors, and connectors.
 
 When to use:
 - The user asks how a SuprSend feature works or how to integrate one.
@@ -79,41 +86,57 @@ When NOT to use: for runtime operations on SuprSend resources (users, objects, t
 
 Returns: a JSON array of {uri, snippet}. Snippets are excerpts; if a snippet doesn't fully answer, follow up with fetch_suprsend_documentation on the relevant uri.
 
-Tips: use precise technical terms ("workflow trigger conditions", not "the rule thing"); add synonyms if the first query returns nothing.`),
-			mcp.WithString("query",
-				mcp.Description(`Search query. The query should: 
-					- Identify the core concepts and intent 
-					- Add relevant synonyms and related terms 
-					- Structure the query to emphasize key terms 
-					- Include technical or domain-specific terminology if applicable`),
-				mcp.Required(),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: searchDocsHandler,
+Tips: use precise technical terms ("workflow trigger conditions", not "the rule thing"); add synonyms if the first query returns nothing.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"query": {
+						Type: "string",
+						Description: `Search query. The query should:
+- Identify the core concepts and intent
+- Add relevant synonyms and related terms
+- Structure the query to emphasize key terms
+- Include technical or domain-specific terminology if applicable`,
+					},
+				},
+				Required: []string{"query"},
+			},
+			Annotations: mcpsdk.Annotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+				OpenWorldHint:  mcpsdk.BoolPtr(true),
+			},
+			Handler: searchDocsHandler,
+		},
 	}
 
 	fetchDoc := &Tool{
-		Name:        "documentation.fetch",
-		MCPTool: mcp.NewTool("fetch_suprsend_documentation",
-			mcp.WithDescription(`Fetch the full content of a SuprSend documentation page when a snippet from search_suprsend_documentation is insufficient.
+		Tool: &mcpsdk.Tool{
+			Name: "fetch_suprsend_documentation",
+			Description: `Fetch the full content of a SuprSend documentation page when a snippet from search_suprsend_documentation is insufficient.
 
 When to use: after search_suprsend_documentation, when the snippet excerpt doesn't fully answer and you need surrounding context, code examples, or full reference material.
 
 When NOT to use: to discover documentation — search first; don't construct uris yourself.
 
-Returns: the page contents as markdown.`),
-			mcp.WithString("uri",
-				mcp.Description(`The uri of the documentation to fetch.`),
-				mcp.Required(),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithOpenWorldHintAnnotation(true),
-		),
-		Handler: fetchDocsHandler,
+Returns: the page contents as markdown.`,
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"uri": {
+						Type:        "string",
+						Description: `The uri of the documentation to fetch.`,
+					},
+				},
+				Required: []string{"uri"},
+			},
+			Annotations: mcpsdk.Annotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+				OpenWorldHint:  mcpsdk.BoolPtr(true),
+			},
+			Handler: fetchDocsHandler,
+		},
 	}
 
 	return []*Tool{searchDoc, fetchDoc}

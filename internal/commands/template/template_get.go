@@ -24,7 +24,7 @@ var templateGetCmd = &cobra.Command{
 
   # Get the draft version
   suprsend template get welcome-email --mode draft`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o json` outputs the full template with variants.",
 	},
@@ -44,21 +44,21 @@ var templateGetCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner("Getting template...")
 
-		template, err := mgmntClient.GetTemplate(workspace, slug, mode)
+		template, err := mgmntClient.GetTemplate(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		variants, err := mgmntClient.GetTemplateVariants(workspace, slug, mode)
+		variants, err := mgmntClient.GetTemplateVariants(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting template variants")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		mockData, err := mgmntClient.GetTemplateMockData(workspace, slug)
+		mockData, err := mgmntClient.GetTemplateMockData(cmd.Context(), workspace, slug)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}

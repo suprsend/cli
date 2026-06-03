@@ -43,7 +43,7 @@ var translationCommitCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing translation...")
-		err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
+		err := mgmntClient.FinalizeTranslation(cmd.Context(), workspace, commitMessage)
 		if err != nil {
 			log.Errorf("%s", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

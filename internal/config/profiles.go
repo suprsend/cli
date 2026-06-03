@@ -57,4 +57,3 @@ func SaveProfileConfig(cfg *ProfileConfig, path string) error {
 	}
 	return os.WriteFile(path, data, 0o644)
 }
-

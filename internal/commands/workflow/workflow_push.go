@@ -28,7 +28,7 @@ var workflowPushCmd = &cobra.Command{
 		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live.",
 		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the workflow server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
@@ -101,7 +101,7 @@ var workflowPushCmd = &cobra.Command{
 			}
 
 			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			err := mgmntClient.PushWorkflow(cmd.Context(), workspace, slug, workflow, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push workflow %s", slug))
@@ -184,7 +184,7 @@ var workflowPushCmd = &cobra.Command{
 				continue
 			}
 
-			err = mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			err = mgmntClient.PushWorkflow(cmd.Context(), workspace, slug, workflow, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				hasError = true

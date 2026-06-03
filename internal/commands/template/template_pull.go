@@ -4,6 +4,7 @@ Copyright © 2025 SuprSend
 package template
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -57,23 +58,23 @@ type FetchOptions struct {
 // or fetching a specifically requested slug are returned.
 //
 // opts is optional; pass FetchOptions{} when no streaming signal is needed.
-func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, opts FetchOptions) ([]TemplateResult, error) {
+func FetchTemplates(ctx context.Context, client *mgmnt.SS_MgmntClient, workspace, mode, slug string, opts FetchOptions) ([]TemplateResult, error) {
 	var results []TemplateResult
 
 	if slug != "" {
-		tmpl, err := client.GetTemplate(workspace, slug, mode)
+		tmpl, err := client.GetTemplate(ctx, workspace, slug, mode)
 		if err != nil {
 			return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch template %s", slug))
 		}
-		variants, err := client.GetTemplateVariants(workspace, slug, mode)
+		variants, err := client.GetTemplateVariants(ctx, workspace, slug, mode)
 		if err != nil {
 			return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variants for template %s", slug))
 		}
-		mockData, err := client.GetTemplateMockData(workspace, slug)
+		mockData, err := client.GetTemplateMockData(ctx, workspace, slug)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}
-		variantOrder, err := client.GetVariantOrder(workspace, slug, mode)
+		variantOrder, err := client.GetVariantOrder(ctx, workspace, slug, mode)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", slug)
 		}
@@ -95,7 +96,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 		return results, nil
 	}
 
-	templates, err := client.ListTemplates(workspace, math.MaxInt32, 0, mode)
+	templates, err := client.ListTemplates(ctx, workspace, math.MaxInt32, 0, mode)
 	if err != nil {
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
 	}
@@ -111,18 +112,17 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 	g := new(errgroup.Group)
 	g.SetLimit(templateFetchConcurrency)
 	for i, t := range templates.Results {
-		i, t := i, t
 		g.Go(func() error {
-			variants, err := client.GetTemplateVariants(workspace, t.Slug, mode)
+			variants, err := client.GetTemplateVariants(ctx, workspace, t.Slug, mode)
 			if err != nil {
 				log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
 				return nil
 			}
-			mockData, err := client.GetTemplateMockData(workspace, t.Slug)
+			mockData, err := client.GetTemplateMockData(ctx, workspace, t.Slug)
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
 			}
-			variantOrder, err := client.GetVariantOrder(workspace, t.Slug, mode)
+			variantOrder, err := client.GetVariantOrder(ctx, workspace, t.Slug, mode)
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch variant order for template: %s", t.Slug)
 			}
@@ -167,7 +167,7 @@ var templatePullCmd = &cobra.Command{
 		"skills:tip.a-overwrite": "Pull overwrites local template files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -214,7 +214,7 @@ var templatePullCmd = &cobra.Command{
 		var total atomic.Int32
 		var totalVariants atomic.Int32
 
-		results, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
+		results, fetchErr := FetchTemplates(cmd.Context(), mgmntClient, workspace, mode, slug, FetchOptions{
 			OnListed: func(n int) {
 				total.Store(int32(n))
 				stats.Total = n

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/suprsend/cli/mgmnt"
 	suprsend "github.com/suprsend/suprsend-go"
 )
 
@@ -54,7 +55,7 @@ func parseSelector(flag string) (all bool, none bool, slugs []string, tags []str
 	if flag == "all" {
 		return true, false, nil, nil
 	}
-	for _, raw := range strings.Split(flag, ",") {
+	for raw := range strings.SplitSeq(flag, ",") {
 		entry := strings.TrimSpace(raw)
 		if entry == "" {
 			continue
@@ -78,7 +79,7 @@ func GenerateUUID() string {
 	return uuid.New().String()
 }
 
-func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
+func FetchWorkflowsMcp(ctx context.Context, workspace, workflowsFlag string) []WorkflowInfo {
 	all, none, slugs, tags := parseSelector(workflowsFlag)
 	if none {
 		return nil
@@ -88,7 +89,32 @@ func FetchWorkflowsMcp(workspace, workflowsFlag string) []WorkflowInfo {
 	if mgmntClient == nil {
 		return nil
 	}
-	workflowsResp, err := mgmntClient.GetWorkflows(workspace, "live")
+	return fetchWorkflowsBody(ctx, mgmntClient, workspace, all, slugs, tags)
+}
+
+// FetchWorkflowsMcpFor mirrors FetchWorkflowsMcp but uses the per-tenant mgmnt
+// client from ctx (via MgmntClientFor). Returns nil if ctx has no tenant
+// credentials AND the singleton SDKInstance is nil. Required for
+// multi-tenant MCP servers' per-tenant dynamic tool registration — that path
+// runs with SDKInstance == nil and must resolve the client from ctx instead.
+func FetchWorkflowsMcpFor(ctx context.Context, workspace, workflowsFlag string) []WorkflowInfo {
+	all, none, slugs, tags := parseSelector(workflowsFlag)
+	if none {
+		return nil
+	}
+	mgmntClient := MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return nil
+	}
+	return fetchWorkflowsBody(ctx, mgmntClient, workspace, all, slugs, tags)
+}
+
+// fetchWorkflowsBody contains the post-client-resolution logic shared by
+// FetchWorkflowsMcp and FetchWorkflowsMcpFor. Pure code-motion extraction; the
+// behavior is identical to the inlined version that lived in FetchWorkflowsMcp
+// prior to the per-tenant variant being added.
+func fetchWorkflowsBody(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, workspace string, all bool, slugs, tags []string) []WorkflowInfo {
+	workflowsResp, err := mgmntClient.GetWorkflows(ctx, workspace, "live")
 	if err != nil {
 		return nil
 	}
@@ -162,7 +188,7 @@ type EventInfo struct {
 	PayloadSchema EventPayloadSchema
 }
 
-func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
+func FetchEventsMcp(ctx context.Context, workspace string, eventsFlag string) []EventInfo {
 	// Selector accepts `none`, `all`, comma-separated names, and (for forward
 	// compatibility) `tag:<tag>` entries — events don't yet expose tags from
 	// the API, so tag selectors will simply match nothing today.
@@ -175,7 +201,32 @@ func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
 	if mgmntClient == nil {
 		return nil
 	}
-	eventsResp, err := mgmntClient.GetEvents(workspace)
+	return fetchEventsBody(ctx, mgmntClient, workspace, all, names, tags)
+}
+
+// FetchEventsMcpFor mirrors FetchEventsMcp but uses the per-tenant mgmnt
+// client from ctx (via MgmntClientFor). Returns nil if ctx has no tenant
+// credentials AND the singleton SDKInstance is nil. Required for
+// multi-tenant MCP servers' per-tenant dynamic tool registration — that path
+// runs with SDKInstance == nil and must resolve the client from ctx instead.
+func FetchEventsMcpFor(ctx context.Context, workspace, eventsFlag string) []EventInfo {
+	all, none, names, tags := parseSelector(eventsFlag)
+	if none {
+		return nil
+	}
+	mgmntClient := MgmntClientFor(ctx)
+	if mgmntClient == nil {
+		return nil
+	}
+	return fetchEventsBody(ctx, mgmntClient, workspace, all, names, tags)
+}
+
+// fetchEventsBody contains the post-client-resolution logic shared by
+// FetchEventsMcp and FetchEventsMcpFor. Pure code-motion extraction; the
+// behavior is identical to the inlined version that lived in FetchEventsMcp
+// prior to the per-tenant variant being added.
+func fetchEventsBody(ctx context.Context, mgmntClient *mgmnt.SS_MgmntClient, workspace string, all bool, names, tags []string) []EventInfo {
+	eventsResp, err := mgmntClient.GetEvents(ctx, workspace)
 	if err != nil {
 		return nil
 	}
@@ -272,11 +323,11 @@ func RequiresValue(action string) bool {
 	return actions[action]
 }
 
-func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
+func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit, action, key, value string, slack_details map[string]any, ms_teams_details map[string]any, webpush_details map[string]any, objectIdentifier suprsend.ObjectIdentifier, workspace string) (string, error) {
 	var err error
 	var out string
 
-	suprsend_client, err := GetSuprSendWorkspaceClient(workspace)
+	suprsend_client, err := GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		return "", err
 	}
@@ -389,11 +440,11 @@ func HandleObjectAction(ctx context.Context, objectInstance suprsend.ObjectEdit,
 	return out, err
 }
 
-func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]interface{}, ms_teams_details map[string]interface{}, webpush_details map[string]interface{}, distinct_id string, workspace string) (string, error) {
+func HandleUserAction(ctx context.Context, userInstance suprsend.UserEdit, action, key, value string, slack_details map[string]any, ms_teams_details map[string]any, webpush_details map[string]any, distinct_id string, workspace string) (string, error) {
 	var err error
 	var out string
 
-	suprsend_client, err := GetSuprSendWorkspaceClient(workspace)
+	suprsend_client, err := GetSuprSendWorkspaceClient(workspace, ctx)
 	if err != nil {
 		return "", err
 	}

@@ -28,7 +28,7 @@ var workflowPullCmd = &cobra.Command{
 		"skills:tip.a-overwrite": "Pull overwrites local workflow JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -60,7 +60,7 @@ var workflowPullCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
-			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(cmd.Context(), workspace, slug, mode)
 			if err != nil {
 				log.Errorf("Failed to get workflow detail: %v", err)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -83,7 +83,7 @@ var workflowPullCmd = &cobra.Command{
 			return nil
 		}
 
-		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)
+		workflows_resp, err := mgmntClient.GetWorkflows(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.Errorf("Failed to get workflows: %v", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

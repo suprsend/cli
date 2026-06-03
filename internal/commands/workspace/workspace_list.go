@@ -39,7 +39,7 @@ var workspaceListCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
 
-		workspaces, err := mgmntClient.ListWorkspaces(limit, offset)
+		workspaces, err := mgmntClient.ListWorkspaces(cmd.Context(), limit, offset)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch workspaces")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

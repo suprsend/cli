@@ -25,7 +25,7 @@ var workflowCommitCmd = &cobra.Command{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, and live workflows immediately begin executing the new definition for new trigger events.",
 		"skills:tip.b-inspect":      "If you didn't author the draft locally, run `suprsend workflow get --slug <slug> --mode draft` first to inspect what will become live.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
@@ -54,7 +54,7 @@ var workflowCommitCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing workflow...")
 
-		err := mgmntClient.FinalizeWorkflow(workspace, slug, commitMessage)
+		err := mgmntClient.FinalizeWorkflow(cmd.Context(), workspace, slug, commitMessage)
 		if err != nil {
 			log.Error(err.Error())
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

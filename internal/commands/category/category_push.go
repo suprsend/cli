@@ -108,7 +108,7 @@ var categoryPushCmd = &cobra.Command{
 					continue
 				}
 				spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s.json...", locale))
-				if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
+				if err := mgmntClient.PushPreferenceTranslation(cmd.Context(), workspace, locale, t); err != nil {
 					spinner.Stop("")
 					log.WithError(err).Errorf("preference_categories/translations/%s.json: failed to push", locale)
 					translationStats.Failed++
@@ -120,7 +120,7 @@ var categoryPushCmd = &cobra.Command{
 			}
 
 			catSpinner := utils.NewSpinner("Pushing categories...")
-			if err := mgmntClient.PushCategories(workspace, input.Categories, commit, commitMessage); err != nil {
+			if err := mgmntClient.PushCategories(cmd.Context(), workspace, input.Categories, commit, commitMessage); err != nil {
 				catSpinner.Stop("")
 				log.WithError(err).Error("preference_categories/categories.json: failed to push")
 				categoryFailErr = err.Error()
@@ -164,7 +164,7 @@ var categoryPushCmd = &cobra.Command{
 		// draft/live model, so any local change should land immediately.
 		// English-only / no-files cases get demoted from error to debug log so
 		// they don't fail the broader category push.
-		ts, terr := translation.PushTranslations(workspace, "", translationDir, dryRun)
+		ts, terr := translation.PushTranslations(cmd.Context(), workspace, "", translationDir, dryRun)
 		if ts != nil {
 			translationStats = ts
 		}
@@ -191,7 +191,7 @@ var categoryPushCmd = &cobra.Command{
 
 		spinner2 := utils.NewSpinner("Pushing categories...")
 		mgmnt_client := utils.GetSuprSendMgmntClient()
-		err = mgmnt_client.PushCategories(workspace, categories, commit, commitMessage)
+		err = mgmnt_client.PushCategories(cmd.Context(), workspace, categories, commit, commitMessage)
 		if err != nil {
 			spinner2.Stop("")
 			log.WithError(err).Error("preference_categories/categories.json: failed to push")

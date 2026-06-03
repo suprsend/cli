@@ -28,7 +28,7 @@ var templateCommitCmd = &cobra.Command{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, overwriting the previous live version. Affected workflows immediately render the new content.",
 		"skills:tip.b-inspect":      "If you didn't author the draft locally, run `suprsend template get --slug <slug> --mode draft` first to inspect what will become live.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
@@ -61,7 +61,7 @@ var templateCommitCmd = &cobra.Command{
 		if force {
 			validationSpinner := utils.NewSpinner(fmt.Sprintf("Validating template %s...", slug))
 
-			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
+			validateResp, err := mgmntClient.PreCommitValidate(cmd.Context(), workspace, slug)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to pre-commit validate template %s", slug)
 				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -88,7 +88,7 @@ var templateCommitCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner(fmt.Sprintf("Committing template %s...", slug))
 
-		if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, variants); err != nil {
+		if err := mgmntClient.CommitTemplate(cmd.Context(), workspace, slug, commitMessage, variants); err != nil {
 			log.WithError(err).Errorf("Failed to commit template %s", slug)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}

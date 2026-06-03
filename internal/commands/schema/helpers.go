@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +36,6 @@ type FilteredSchema struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
-
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
@@ -443,9 +443,7 @@ func compileSchema(schemaBytes []byte) error {
 // --- Merge logic (preserves addlProps:false, unions required, recursive) ---
 func MergeJSONSchemas(base, add map[string]any) map[string]any {
 	out := make(map[string]any, len(base)+len(add))
-	for k, v := range base {
-		out[k] = v
-	}
+	maps.Copy(out, base)
 	for k, vAdd := range add {
 		switch k {
 		case "properties", "patternProperties", "$defs":
@@ -505,9 +503,7 @@ func pruneNulls(v any) any {
 
 func mergeStringKeyedSchemas(a, b map[string]any) map[string]any {
 	out := make(map[string]any, len(a)+len(b))
-	for k, v := range a {
-		out[k] = v
-	}
+	maps.Copy(out, a)
 	for k, v := range b {
 		if va, oka := v.(map[string]any); oka {
 			if vb, okb := out[k].(map[string]any); okb {

@@ -40,7 +40,7 @@ var categoryListCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		categories, err := mgmntClient.ListCategories(workspace, mode)
+		categories, err := mgmntClient.ListCategories(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch categories")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -68,7 +68,7 @@ var categoryListCmd = &cobra.Command{
 		spinner.Stop(fmt.Sprintf("Listed %d categories from %s", len(tableRows), workspace))
 
 		if len(tableRows) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 

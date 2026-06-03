@@ -51,7 +51,7 @@ var eventPullCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		eventsResp, err := mgmntClient.GetEvents(workspace)
+		eventsResp, err := mgmntClient.GetEvents(cmd.Context(), workspace)
 		if err != nil {
 			log.Errorf("Failed to get events: %v", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

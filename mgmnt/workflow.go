@@ -1,12 +1,12 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type Workflow struct {
@@ -54,12 +54,12 @@ type WorkflowDetailResponse struct {
 	LastExecutedAt string `json:"last_executed_at"`
 }
 
-func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, mode string) (*WorkflowAPIResponse, error) {
+func (c *SS_MgmntClient) ListWorkflows(ctx context.Context, workspace string, limit int, offset int, mode string) (*WorkflowAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -67,10 +67,7 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 	currentOffset := offset
 	remainingLimit := limit
 	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
+		currentLimit := min(remainingLimit, apiLimit)
 
 		log.Debugf("Getting workflows for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", "/")
@@ -88,6 +85,7 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkflowAPIResponse{}).
@@ -127,8 +125,8 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 	}, nil
 }
 
-func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (*map[string]any, error) {
-	client := client.NewHTTPClient()
+func (c *SS_MgmntClient) GetWorkflowDetailBySlug(ctx context.Context, workspace, slug, mode string) (*map[string]any, error) {
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
 	if err != nil {
@@ -144,6 +142,7 @@ func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (
 	urlStr = u.String()
 
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&map[string]any{}).
@@ -157,8 +156,8 @@ func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (
 	return resp.Result().(*map[string]any), nil
 }
 
-func (c *SS_MgmntClient) GetWorkflowDetail(workspace, slug, mode string) (*WorkflowDetailResponse, error) {
-	client := client.NewHTTPClient()
+func (c *SS_MgmntClient) GetWorkflowDetail(ctx context.Context, workspace, slug, mode string) (*WorkflowDetailResponse, error) {
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
@@ -175,6 +174,7 @@ func (c *SS_MgmntClient) GetWorkflowDetail(workspace, slug, mode string) (*Workf
 	urlStr = u.String()
 
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&WorkflowDetailResponse{}).
@@ -190,12 +190,12 @@ func (c *SS_MgmntClient) GetWorkflowDetail(workspace, slug, mode string) (*Workf
 	return workflowResp, nil
 }
 
-func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsResponse, error) {
+func (c *SS_MgmntClient) GetWorkflows(ctx context.Context, workspace, mode string) (*WorkflowsResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s, Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	limit := 50
@@ -219,6 +219,7 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkflowsResponse{}).
@@ -257,12 +258,12 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[string]any, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushWorkflow(ctx context.Context, workspace, slug string, workflow map[string]any, commit bool, commitMessage string) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
@@ -281,6 +282,7 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	log.Debugf("Pushing workflow to: %s", urlStr)
 
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -303,11 +305,11 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	return nil
 }
 
-func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeWorkflow(ctx context.Context, workspace, slug, commitMessage string) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "commit", "/")
@@ -324,6 +326,7 @@ func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string)
 	urlStr = u.String()
 
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -337,12 +340,12 @@ func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string)
 	return nil
 }
 
-func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bool) error {
+func (c *SS_MgmntClient) ChangeStatusWorkflow(ctx context.Context, workspace, slug string, enabled bool) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "enable", "/")
 	if err != nil {
@@ -354,7 +357,7 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 	}
 	urlStr = u.String()
 	log.Debugf("workflow status URL: %s", urlStr)
-	body := map[string]interface{}{
+	body := map[string]any{
 		"is_enabled": enabled,
 	}
 
@@ -366,6 +369,7 @@ func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bo
 	log.Debugf("Finalizing workflow (slug: %s) by %s", slug, action)
 
 	res, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").

@@ -76,7 +76,7 @@ var eventPushCmd = &cobra.Command{
 		// (hundreds of events) hit an unacceptable cliff.
 		spinner := utils.NewSpinner("Pushing events...")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		if err := mgmntClient.PushEventsFromPayload(workspace, payload); err != nil {
+		if err := mgmntClient.PushEventsFromPayload(cmd.Context(), workspace, payload); err != nil {
 			spinner.Stop("")
 			log.WithError(err).Error("Failed to push events")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

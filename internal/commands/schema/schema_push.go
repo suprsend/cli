@@ -25,11 +25,11 @@ var schemaPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.",
-		"skills:tip.b-dryrun":  "Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
-		"skills:tip.c-regen":   "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.",
+		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.c-regen":  "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := utils.ResolveSlug(cmd, args)
@@ -97,7 +97,7 @@ var schemaPushCmd = &cobra.Command{
 			}
 
 			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			err := mgmntClient.PushSchema(cmd.Context(), workspace, slug, schema, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
@@ -163,7 +163,7 @@ var schemaPushCmd = &cobra.Command{
 				continue
 			}
 
-			err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			err = mgmntClient.PushSchema(cmd.Context(), workspace, slug, schema, commit, commitMessage)
 			if err != nil {
 				spinner.Stop("")
 				hasError = true

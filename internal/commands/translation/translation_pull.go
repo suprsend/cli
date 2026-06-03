@@ -49,7 +49,7 @@ var translationPullCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()
-		translationResp, err := mgmnt_client.GetTranslations(workspace, mode)
+		translationResp, err := mgmnt_client.GetTranslations(cmd.Context(), workspace, mode)
 		if err != nil {
 			log.Errorf("Failed to get translations: %v", err)
 			return

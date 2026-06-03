@@ -1,12 +1,12 @@
 package mgmnt
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type Workspace struct {
@@ -28,8 +28,8 @@ type WorkspaceListResponse struct {
 	} `json:"meta"`
 }
 
-func (c *SS_MgmntClient) ListWorkspaces(limit, offset int) (*WorkspaceListResponse, error) {
-	httpClient := client.NewHTTPClient()
+func (c *SS_MgmntClient) ListWorkspaces(ctx context.Context, limit, offset int) (*WorkspaceListResponse, error) {
+	httpClient := c.restyClient()
 	defer httpClient.Close()
 
 	apiLimit := 50
@@ -57,6 +57,7 @@ func (c *SS_MgmntClient) ListWorkspaces(limit, offset int) (*WorkspaceListRespon
 		urlStr = u.String()
 
 		res, err := httpClient.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkspaceListResponse{}).

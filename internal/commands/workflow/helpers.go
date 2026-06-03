@@ -27,7 +27,6 @@ type WorkflowPushStats struct {
 	Errors  []string
 }
 
-
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
 		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
@@ -80,7 +79,6 @@ func validateInputDirectory(dirPath string) error {
 	}
 	return nil
 }
-
 
 func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*WorkflowWriteStats, error) {
 	stats := &WorkflowWriteStats{

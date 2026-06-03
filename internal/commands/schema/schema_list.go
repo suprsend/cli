@@ -33,7 +33,7 @@ var schemaListCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		schemas, err := mgmntClient.ListSchema(workspace, limit, offset, mode)
+		schemas, err := mgmntClient.ListSchema(cmd.Context(), workspace, limit, offset, mode)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch schemas")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -45,7 +45,7 @@ var schemaListCmd = &cobra.Command{
 			return err
 		}
 		if len(schemas.Results) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 		filteredSchemas := filterSchemaData(schemas.Results)

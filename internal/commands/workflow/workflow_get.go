@@ -21,7 +21,7 @@ var workflowGetCmd = &cobra.Command{
 
   # Get the draft version
   suprsend workflow get welcome --mode draft`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
@@ -39,7 +39,7 @@ var workflowGetCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Getting details...")
 
-		workflow, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+		workflow, err := mgmntClient.GetWorkflowDetailBySlug(cmd.Context(), workspace, slug, mode)
 		if err != nil {
 			spinner.Stop("")
 			log.WithError(err).Errorf("Error getting workflow detail")

@@ -22,7 +22,7 @@ var eventListCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		events, err := mgmntClient.ListEvents(workspace, limit, offset)
+		events, err := mgmntClient.ListEvents(cmd.Context(), workspace, limit, offset)
 		if err != nil {
 			log.WithError(err).Error("Couldn't fetch events")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")

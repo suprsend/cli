@@ -31,7 +31,7 @@ var templateListCmd = &cobra.Command{
 		offset, _ := cmd.Flags().GetInt("offset")
 		mode, _ := cmd.Flags().GetString("mode")
 
-		templates, err := mgmntClient.ListTemplates(workspace, limit, offset, mode)
+		templates, err := mgmntClient.ListTemplates(cmd.Context(), workspace, limit, offset, mode)
 		if err != nil {
 			return err
 		}
@@ -43,7 +43,7 @@ var templateListCmd = &cobra.Command{
 		}
 
 		if len(templates.Results) == 0 && utils.IsOutputPiped() {
-			utils.OutputData([]interface{}{}, outputType)
+			utils.OutputData([]any{}, outputType)
 			return nil
 		}
 		utils.OutputData(templates.Results, outputType)

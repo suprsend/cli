@@ -1,13 +1,13 @@
 package mgmnt
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/suprsend/cli/internal/client"
 )
 
 type Template struct {
@@ -37,12 +37,12 @@ type TemplateVariantResponse struct {
 	} `json:"meta"`
 }
 
-func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]map[string]any, error) {
+func (c *SS_MgmntClient) GetTemplateVariants(ctx context.Context, workspace, slug, mode string) ([]map[string]any, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -54,6 +54,7 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 
 		log.Debugf("Getting template variants for slug: %s, workspace: %s, mode: %s, limit: %d, offset: %d", slug, workspace, mode, apiLimit, currentOffset)
 		resp, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&TemplateVariantResponse{}).
@@ -78,12 +79,12 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 	return allVariants, nil
 }
 
-func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels []string) error {
+func (c *SS_MgmntClient) CreateTemplate(ctx context.Context, workspace, slug string, enabledChannels []string) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/", c.mgmnt_base_URL, workspace, slug)
@@ -91,6 +92,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 	// The API is an upsert — POSTing to an existing slug updates it rather than returning 409.
 	log.Debugf("Creating template %s in workspace %s", slug, workspace)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -107,7 +109,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 	return nil
 }
 
-func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map[string]any) error {
+func (c *SS_MgmntClient) PushTemplateVariant(ctx context.Context, workspace, slug string, variant map[string]any) error {
 	channel, _ := variant["channel"].(string)
 	variantID, _ := variant["id"].(string)
 	if channel == "" || variantID == "" {
@@ -119,13 +121,14 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 	var body map[string]any
 	json.Unmarshal(b, &body)
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv2/%s/template/%s/channel/%s/variant/%s/", c.mgmnt_base_URL, workspace, slug, channel, variantID)
 
 	log.Debugf("Pushing variant %s/%s for template %s in workspace %s", channel, variantID, slug, workspace)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetBody(body).
@@ -140,10 +143,10 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 }
 
 type PreCommitVariant struct {
-	Channel string                `json:"channel"`
-	ID      string                `json:"id"`
-	HasDiff bool                  `json:"has_diff"`
-	Errors  map[string][]string   `json:"errors"`
+	Channel string              `json:"channel"`
+	ID      string              `json:"id"`
+	HasDiff bool                `json:"has_diff"`
+	Errors  map[string][]string `json:"errors"`
 }
 
 type PreCommitValidateResponse struct {
@@ -152,18 +155,19 @@ type PreCommitValidateResponse struct {
 	Variants   []PreCommitVariant `json:"variants"`
 }
 
-func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitValidateResponse, error) {
+func (c *SS_MgmntClient) PreCommitValidate(ctx context.Context, workspace, slug string) (*PreCommitValidateResponse, error) {
 	if slug == "" {
 		return nil, fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/pre_commit_validate/", c.mgmnt_base_URL, workspace, slug)
 
 	log.Debugf("Pre-commit validating template %s in workspace %s", slug, workspace)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -178,12 +182,12 @@ func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitVa
 	return resp.Result().(*PreCommitValidateResponse), nil
 }
 
-func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, variants []map[string]any) error {
+func (c *SS_MgmntClient) CommitTemplate(ctx context.Context, workspace, slug, commitMessage string, variants []map[string]any) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlEncodedCommitMessage := url.QueryEscape(commitMessage)
@@ -191,6 +195,7 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 
 	log.Debugf("Committing template %s in workspace %s", slug, workspace)
 	req := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json")
@@ -211,14 +216,15 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 	return nil
 }
 
-func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string]any, error) {
-	client := client.NewHTTPClient()
+func (c *SS_MgmntClient) GetTemplateMockData(ctx context.Context, workspace, slug string) (map[string]any, error) {
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
 
 	log.Debugf("Getting mock data for template: %s, workspace: %s", slug, workspace)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		Get(url)
@@ -240,14 +246,15 @@ func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string
 	return data, nil
 }
 
-func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) error {
-	client := client.NewHTTPClient()
+func (c *SS_MgmntClient) PatchTemplateMockData(ctx context.Context, workspace, slug string, mockData map[string]any) error {
+	client := c.restyClient()
 	defer client.Close()
 
 	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
 
 	log.Debugf("Patching mock data for template: %s, workspace: %s", slug, workspace)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
@@ -262,18 +269,19 @@ func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData 
 	return nil
 }
 
-func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, error) {
+func (c *SS_MgmntClient) GetTemplate(ctx context.Context, workspace, slug, mode string) (*Template, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
 
 	log.Debugf("Getting template: %s, workspace: %s, mode: %s", slug, workspace, mode)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&Template{}).
@@ -287,12 +295,12 @@ func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, e
 	return resp.Result().(*Template), nil
 }
 
-func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
+func (c *SS_MgmntClient) ListTemplates(ctx context.Context, workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	apiLimit := 50
@@ -300,13 +308,11 @@ func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, 
 	currentOffset := offset
 	remainingLimit := limit
 	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
+		currentLimit := min(remainingLimit, apiLimit)
 
 		log.Debugf("Getting templates for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
 		res, err := client.R().
+			SetContext(ctx).
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&TemplateAPIResponse{}).
@@ -360,18 +366,19 @@ type VariantOrderResponse struct {
 	Channels []VariantOrderChannel `json:"channels"`
 }
 
-func (c *SS_MgmntClient) GetVariantOrder(workspace, slug, mode string) (*VariantOrderResponse, error) {
+func (c *SS_MgmntClient) GetVariantOrder(ctx context.Context, workspace, slug, mode string) (*VariantOrderResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/order/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
 
 	log.Debugf("Getting variant order for template: %s, workspace: %s, mode: %s", slug, workspace, mode)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetResult(&VariantOrderResponse{}).
@@ -385,18 +392,19 @@ func (c *SS_MgmntClient) GetVariantOrder(workspace, slug, mode string) (*Variant
 	return resp.Result().(*VariantOrderResponse), nil
 }
 
-func (c *SS_MgmntClient) PostVariantOrder(workspace, slug, mode string, order *VariantOrderResponse) error {
+func (c *SS_MgmntClient) PostVariantOrder(ctx context.Context, workspace, slug, mode string, order *VariantOrderResponse) error {
 	if mode != "live" && mode != "draft" {
 		return fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
 	}
 
-	client := client.NewHTTPClient()
+	client := c.restyClient()
 	defer client.Close()
 
 	urlStr := fmt.Sprintf("%sv2/%s/template/%s/variant/order/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
 
 	log.Debugf("Posting variant order for template: %s, workspace: %s, mode: %s", slug, workspace, mode)
 	resp, err := client.R().
+		SetContext(ctx).
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").

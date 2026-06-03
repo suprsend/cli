@@ -4,12 +4,16 @@ Copyright © 2025 SuprSend
 package commands
 
 import (
+	"log/slog"
+	"net/http"
+	"os"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/config"
+	"github.com/suprsend/cli/internal/mcpsdk/official"
 	toolset "github.com/suprsend/cli/internal/tools"
 	"github.com/suprsend/cli/internal/utils"
 	"go.szostok.io/version"
@@ -34,10 +38,10 @@ func getSelectedTools(toolsFlag string) ([]*toolset.Tool, error) {
 		return supportedTools, nil
 	}
 	// get the tools mentioned in toolsFlag
-	tools := strings.Split(toolsFlag, ",")
+	tools := strings.SplitSeq(toolsFlag, ",")
 
 	// if tool name is `type`.* include all the tools that have same type
-	for _, tool := range tools {
+	for tool := range tools {
 		if strings.Contains(tool, ".*") {
 			toolType := strings.Split(tool, ".*")[0]
 			for _, t := range supportedTools {
@@ -47,7 +51,9 @@ func getSelectedTools(toolsFlag string) ([]*toolset.Tool, error) {
 			}
 		} else {
 			for _, t := range supportedTools {
-				if t.Name == tool {
+				// Match the stable --tools selector ("users.get"); also accept
+				// the protocol name as a fallback so both forms resolve.
+				if t.Selector == tool || t.Name == tool {
 					selected = append(selected, t)
 				}
 			}
@@ -94,13 +100,9 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
-		selectedEvents := toolset.GetAllEvents()
-		selectedWorkflows := toolset.GetAllWorkflows()
+		selectedTools = append(selectedTools, toolset.GetAllEvents()...)
+		selectedTools = append(selectedTools, toolset.GetAllWorkflows()...)
 
-		selectedTools = append(selectedTools, selectedEvents...)
-		selectedTools = append(selectedTools, selectedWorkflows...)
-
-		// Print a readable string representation of selectedTools
 		var toolStrs []string
 		for _, t := range selectedTools {
 			toolStrs = append(toolStrs, t.Type+":"+t.Name)
@@ -108,37 +110,36 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 		log.Infof("Selected tools: [%s]", strings.Join(toolStrs, ", "))
 		info := version.Get()
 
-		mcpServer := server.NewMCPServer(
-			"SuprSend",
-			info.Version,
-			server.WithResourceCapabilities(true, true),
-			server.WithPromptCapabilities(true),
-			server.WithToolCapabilities(true),
-			server.WithLogging(),
-			server.WithRecovery(),
-		)
-
+		// CLI capability profile: tools no listChanged. The multi-tenant
+		// profile lives in pkg/mcpserver. The CLI doesn't change its tool
+		// list mid-session so listChanged wastes advertising here.
+		profile := cliCapabilityProfile()
+		mcpServer := mcp.NewServer(&mcp.Implementation{Name: "SuprSend", Version: info.Version}, profile)
+		// Recovery middleware (OUTERMOST) so a panic in any tool handler
+		// becomes a JSON-RPC error instead of crashing the stdio process.
+		// Mirrors pkg/mcpserver's recoveryMiddleware for the single-tenant CLI.
+		mcpServer.AddReceivingMiddleware(official.RecoveryMiddleware(profile.Logger))
 		for _, t := range selectedTools {
-			mcpServer.AddTool(t.MCPTool, t.Handler)
+			official.Register(mcpServer, t.Tool)
 		}
 
 		switch transport {
 		case "stdio":
-			if err := server.ServeStdio(mcpServer); err != nil {
+			if err := mcpServer.Run(cmd.Context(), &mcp.StdioTransport{}); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
 		case "sse":
 			utils.Banner(info.Version)
-			sseServer := server.NewSSEServer(mcpServer)
+			handler := mcp.NewSSEHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)
 			log.Printf("SSE server listening on :8080/sse")
-			if err := sseServer.Start(":8080"); err != nil {
+			if err := http.ListenAndServe(":8080", handler); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
 		case "http":
 			utils.Banner(info.Version)
-			httpServer := server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/"))
+			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)
 			log.Printf("HTTP server listening on :8080/")
-			if err := httpServer.Start(":8080"); err != nil {
+			if err := http.ListenAndServe(":8080", handler); err != nil {
 				log.Fatalf("Server error: %v", err)
 			}
 		default:
@@ -157,19 +158,42 @@ var listToolsCmd = &cobra.Command{
 			Tool_Name        string `json:"tool_name"`
 			Tool_Description string `json:"tool_description"`
 		}
+		outputType, _ := cmd.Flags().GetString("output")
+		// Tool descriptions are multi-paragraph prose. In the table (pretty)
+		// view that buries the tool list under walls of text, so collapse each
+		// to its first non-empty line for scannability. json/yaml consumers
+		// get the full description.
+		pretty := outputType != "json" && outputType != "yaml"
+		describe := func(t *toolset.Tool) toolListResponse {
+			desc := t.Description
+			if pretty {
+				desc = firstLine(desc)
+			}
+			return toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: desc}
+		}
 		var resp []toolListResponse
 		for _, t := range toolset.GetAllTools() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
+			resp = append(resp, describe(t))
 		}
 		for _, t := range toolset.GetAllEvents() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
+			resp = append(resp, describe(t))
 		}
 		for _, t := range toolset.GetAllWorkflows() {
-			resp = append(resp, toolListResponse{Tool_Type: t.Type, Tool_Name: t.Name, Tool_Description: t.MCPTool.Description})
+			resp = append(resp, describe(t))
 		}
-		outputType, _ := cmd.Flags().GetString("output")
 		utils.OutputData(resp, outputType)
 	},
+}
+
+// firstLine returns the first non-empty, trimmed line of s. Used to collapse a
+// multi-paragraph tool description to a single scannable line in table output.
+func firstLine(s string) string {
+	for line := range strings.SplitSeq(s, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func init() {
@@ -182,4 +206,27 @@ func init() {
 	startMcpServerCmd.PersistentFlags().StringVarP(&workflows, "workflows", "W", "none", "Workflow tools to register: all, none, comma-separated slugs, or tag:<tag> entries (e.g. tag:onboarding,tag:transactional)")
 
 	listToolsCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
+}
+
+// cliCapabilityProfile returns the *mcp.ServerOptions for the single-tenant
+// CLI transport:
+//   - tools: listChanged OFF (CLI registers all tools at startup, never changes mid-session).
+//   - resources/prompts: not advertised (we register none).
+//   - logging: advertised, matching the pre-migration server which used
+//     server.WithLogging(). Mirrors pkg/mcpserver's defaultCapabilityProfile.
+//   - recovery: the SDK has no automatic recovery, so the caller installs
+//     official.RecoveryMiddleware on the server (OUTERMOST) — a panic in a
+//     tool handler is converted to a JSON-RPC error and the process survives.
+//
+// Logger: writes to stderr so handler log messages from the SDK end up in the
+// same stream as the rest of the CLI output, and is reused by the recovery
+// middleware to record panics + stacks.
+func cliCapabilityProfile() *mcp.ServerOptions {
+	return &mcp.ServerOptions{
+		Logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		Capabilities: &mcp.ServerCapabilities{
+			Tools:   &mcp.ToolCapabilities{ListChanged: false}, // explicit override of inferred default
+			Logging: &mcp.LoggingCapabilities{},
+		},
+	}
 }

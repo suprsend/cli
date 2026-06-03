@@ -10,21 +10,23 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"errors"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
-	"github.com/olekukonko/tablewriter/renderer"
-	"github.com/olekukonko/tablewriter/tw"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/termio"
 	"github.com/tidwall/pretty"
 	"github.com/yarlson/pin"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -149,10 +151,8 @@ func supportsColor() bool {
 
 // ValidateOutputType returns a clierr if format is not one of the allowed values.
 func ValidateOutputType(format string, allowed ...string) error {
-	for _, a := range allowed {
-		if format == a {
-			return nil
-		}
+	if slices.Contains(allowed, format) {
+		return nil
 	}
 	return clierr.New(
 		fmt.Sprintf("invalid output format %q: must be one of %v", format, allowed),
@@ -190,7 +190,7 @@ func outputJSON(data any) {
 
 func colorizeYAML(yamlString string) string {
 	lines := []string{}
-	for _, line := range strings.Split(yamlString, "\n") {
+	for line := range strings.SplitSeq(yamlString, "\n") {
 		if idx := strings.Index(line, ":"); idx != -1 {
 			// Preserve leading spaces (indentation)
 			leading := line[:idx]
@@ -241,7 +241,7 @@ func outputTable(data any) {
 	val := reflect.ValueOf(data)
 
 	// If the input is a pointer, get the underlying element
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 
@@ -273,69 +273,175 @@ func outputTable(data any) {
 	log.Fatal("Input must be a struct or a slice of structs")
 }
 
+const (
+	// defaultTerminalWidth is assumed when stdout is not a TTY (piped,
+	// redirected, or under test) and $COLUMNS is unset.
+	defaultTerminalWidth = 120
+	// minTerminalWidth floors the detected width so a tiny/garbage value
+	// can't collapse every column to nothing.
+	minTerminalWidth = 40
+	// maxColumnWidth caps any single column even when the terminal is very
+	// wide, so long prose (e.g. a tool_description) wraps into readable
+	// line lengths instead of one 250-char line.
+	maxColumnWidth = 100
+)
+
+// terminalWidth reports the usable output width: the real terminal size when
+// stdout is a TTY, else $COLUMNS, else defaultTerminalWidth. Floored at
+// minTerminalWidth.
+func terminalWidth() int {
+	w := 0
+	if cols, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && cols > 0 {
+		w = cols
+	} else if env := os.Getenv("COLUMNS"); env != "" {
+		if parsed, err := strconv.Atoi(env); err == nil && parsed > 0 {
+			w = parsed
+		}
+	}
+	if w <= 0 {
+		w = defaultTerminalWidth
+	}
+	if w < minTerminalWidth {
+		w = minTerminalWidth
+	}
+	return w
+}
+
+// cellDisplayWidth is the width of the longest single line in a (possibly
+// multi-line) cell, measured in runes so multibyte glyphs like "—" count as 1.
+func cellDisplayWidth(s string) int {
+	max := 0
+	for line := range strings.SplitSeq(s, "\n") {
+		if n := utf8.RuneCountInString(line); n > max {
+			max = n
+		}
+	}
+	return max
+}
+
+// allocateColumnWidths distributes a content-width budget across columns using
+// max-min (water-filling) fairness: columns narrower than their fair share keep
+// their natural width, and the freed space is redistributed to the wider
+// columns. When everything fits in the budget, each column gets its natural
+// width (no wrapping). Otherwise the widest columns absorb the squeeze.
+func allocateColumnWidths(natural []int, budget int) []int {
+	n := len(natural)
+	w := make([]int, n)
+	settled := make([]bool, n)
+	remaining, left := budget, n
+	for left > 0 {
+		share := max(remaining/left, 1)
+		progressed := false
+		for i := range n {
+			if !settled[i] && natural[i] <= share {
+				w[i] = natural[i]
+				remaining -= natural[i]
+				settled[i] = true
+				left--
+				progressed = true
+			}
+		}
+		if !progressed {
+			// Every unsettled column wants more than its share: give each the
+			// share, then hand any integer-division remainder to the widest.
+			widest := -1
+			for i := range n {
+				if !settled[i] {
+					w[i] = share
+					remaining -= share
+					if widest < 0 || natural[i] > natural[widest] {
+						widest = i
+					}
+				}
+			}
+			if widest >= 0 && remaining > 0 {
+				w[widest] += remaining
+			}
+			break
+		}
+	}
+	return w
+}
+
 func printStructAsTable(values []reflect.Value) {
 	if len(values) == 0 {
 		log.Info("No data to display")
 		return
 	}
 
-	table := tablewriter.NewTable(os.Stdout,
-		tablewriter.WithRenderer(renderer.NewBlueprint(tw.Rendition{
-			Borders: tw.Border{
-				Left:   tw.Off,
-				Right:  tw.Off,
-				Top:    tw.Off,
-				Bottom: tw.Off,
-			},
-			Settings: tw.Settings{
-				Separators: tw.Separators{BetweenRows: tw.Off, BetweenColumns: tw.On, ShowHeader: tw.Off, ShowFooter: tw.Off},
-				Lines: tw.Lines{
-					ShowTop:        tw.Off,
-					ShowBottom:     tw.Off,
-					ShowHeaderLine: tw.On,
-					ShowFooterLine: tw.Off,
-				},
-			},
-		})),
-		tablewriter.WithConfig(tablewriter.Config{
-			Header: tw.CellConfig{
-				Formatting: tw.CellFormatting{Alignment: tw.AlignLeft},
-			},
-			Row: tw.CellConfig{
-				Formatting: tw.CellFormatting{
-					MergeMode: tw.MergeNone,
-					Alignment: tw.AlignLeft,
-				},
-			},
-		}),
-	)
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
 
-	// Set headers based on struct field names
+	// Borderless light style with column separators and a header line, to
+	// approximate the previous tablewriter look. Left-align header + rows.
+	style := table.StyleLight
+	style.Options.DrawBorder = false
+	style.Options.SeparateColumns = true
+	style.Options.SeparateRows = false
+	style.Options.SeparateHeader = true
+	style.Options.SeparateFooter = false
+	style.Format.Header = text.FormatDefault
+	t.SetStyle(style)
+	t.Style().Format.Header = text.FormatDefault
+
 	elemType := values[0].Type()
-	var headers []string
-	for i := 0; i < elemType.NumField(); i++ {
-		headers = append(headers, elemType.Field(i).Name)
-	}
-	table.Header(headers)
+	numFields := elemType.NumField()
 
-	// Add rows
-	var rows [][]any
+	// Set headers based on struct field names, and seed each column's natural
+	// width with its header width.
+	headerRow := make(table.Row, 0, numFields)
+	natural := make([]int, numFields)
+	for i := range numFields {
+		name := elemType.Field(i).Name
+		headerRow = append(headerRow, name)
+		natural[i] = cellDisplayWidth(name)
+	}
+	t.AppendHeader(headerRow)
+
+	// Add rows, tracking each column's natural (unwrapped) width as we go.
 	for _, val := range values {
-		var row []any
-		for i := 0; i < val.NumField(); i++ {
-			field := val.Field(i)
-			row = append(row, formatValue(field))
+		row := make(table.Row, 0, numFields)
+		for i := range numFields {
+			cell := formatValue(val.Field(i))
+			row = append(row, cell)
+			if w := cellDisplayWidth(cell); w > natural[i] {
+				natural[i] = w
+			}
 		}
-		rows = append(rows, row)
+		t.AppendRow(row)
 	}
-	table.Bulk(rows)
 
-	table.Render()
+	// Clamp natural widths to an absolute per-column ceiling, then fit the
+	// total to the terminal. Overhead per column is 2 padding spaces plus a
+	// separator; budget is the remaining width available to content.
+	for i := range natural {
+		if natural[i] > maxColumnWidth {
+			natural[i] = maxColumnWidth
+		}
+	}
+	budget := max(terminalWidth()-3*numFields,
+		// degenerate terminal; let go-pretty wrap hard
+		numFields)
+	widths := allocateColumnWidths(natural, budget)
+
+	colConfigs := make([]table.ColumnConfig, 0, numFields)
+	for i := range numFields {
+		colConfigs = append(colConfigs, table.ColumnConfig{
+			Number:           i + 1,
+			Align:            text.AlignLeft,
+			AlignHeader:      text.AlignLeft,
+			WidthMax:         widths[i],
+			WidthMaxEnforcer: text.WrapSoft,
+		})
+	}
+	t.SetColumnConfigs(colConfigs)
+
+	t.Render()
 }
 
 func formatValue(v reflect.Value) string {
 	switch v.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v.IsNil() {
 			return "null"
 		}

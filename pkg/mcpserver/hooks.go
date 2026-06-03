@@ -203,7 +203,7 @@ func mergeContextValues(child, parent context.Context) context.Context {
 }
 
 type mergedContext struct {
-	context.Context        // child — provides Deadline, Done, Err
+	context.Context // child — provides Deadline, Done, Err
 	parent          context.Context
 }
 
@@ -267,7 +267,7 @@ func closeSessionAfterResponse(ctx context.Context, req mcp.Request) {
 	}
 	ss := r.Session
 	go func() {
-		<-ctx.Done()                 // wait until processResult cancels per-call ctx
-		_ = ss.Close()               // idempotent + concurrency-safe per SDK
+		<-ctx.Done()   // wait until processResult cancels per-call ctx
+		_ = ss.Close() // idempotent + concurrency-safe per SDK
 	}()
 }

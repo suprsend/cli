@@ -25,7 +25,6 @@ var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 var leadingNonAlphanumRe = regexp.MustCompile(`^[^a-zA-Z0-9]+`)
 var trailingNonAlphanumRe = regexp.MustCompile(`[^a-zA-Z0-9]+$`)
 
-
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
 		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")

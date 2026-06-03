@@ -28,7 +28,7 @@ var templateCommitCmd = &cobra.Command{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, overwriting the previous live version. Affected workflows immediately render the new content.",
 		"skills:tip.b-inspect":      "If you didn't author the draft locally, run `suprsend template get --slug <slug> --mode draft` first to inspect what will become live.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {

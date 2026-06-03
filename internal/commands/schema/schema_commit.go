@@ -25,7 +25,7 @@ var schemaCommitCmd = &cobra.Command{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, and new workflow triggers immediately validate against the new schema.",
 		"skills:tip.b-regen":        "After commit, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync with the live schema.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {

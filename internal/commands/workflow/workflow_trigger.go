@@ -24,7 +24,7 @@ var workflowTrigger = &cobra.Command{
 
   # Trigger with a custom payload from a file
   suprsend workflow trigger welcome --path ./payload.json`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {

@@ -9,7 +9,6 @@ import (
 	"github.com/suprsend/cli/internal/utils"
 )
 
-
 var workflowDisableCmd = &cobra.Command{
 	Use:   "disable [<slug>]",
 	Short: "Disable a workflow",
@@ -22,7 +21,7 @@ var workflowDisableCmd = &cobra.Command{
 
   # Dry run: see what would change without making changes
   suprsend workflow disable welcome --dry-run`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 

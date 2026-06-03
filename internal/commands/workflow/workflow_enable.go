@@ -19,7 +19,7 @@ var worklowEnableCmd = &cobra.Command{
 
   # Dry run: see what would change without making changes
   suprsend workflow enable welcome --dry-run`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := utils.ResolveSlug(cmd, args)

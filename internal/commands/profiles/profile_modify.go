@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -43,20 +44,20 @@ var profilesModifyCmd = &cobra.Command{
 				if err != nil {
 					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --base-url")
 				}
-				selectedProfile.BaseUrl = normalized
+				selectedProfile.BaseUrl.Value = normalized
 			}
 			if modifyMgmntUrl != "" {
 				normalized, err := validateAndNormalizeUrl(modifyMgmntUrl)
 				if err != nil {
 					return clierr.Wrap(err, clierr.CodeInvalidUsage, "invalid --mgmnt-url")
 				}
-				selectedProfile.MgmntUrl = normalized
+				selectedProfile.MgmntUrl.Value = normalized
 			}
-			selectedProfile.ServiceToken = modifyServiceToken
+			selectedProfile.ServiceToken.Value = modifyServiceToken
 
 			cfg.Profiles[modifyName] = selectedProfile
 
-			err := SaveConfig(cfg, path)
+			err := config.SaveProfileConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
 				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
@@ -75,13 +76,13 @@ var profilesModifyCmd = &cobra.Command{
 
 func init() {
 	profilesModifyCmd.Flags().StringVar(&modifyName, "name", "", "Name of the profile to modify")
-	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: "+DefaultBaseUrl+")")
-	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: "+DefaultMgmntUrl+")")
+	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: "+config.DefaultBaseUrl+")")
+	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: "+config.DefaultMgmntUrl+")")
 	profilesModifyCmd.Flags().StringVar(&modifyServiceToken, "service-token", "", "Service Token")
 	ProfileCmd.AddCommand(profilesModifyCmd)
 }
 
-func runModifyInteractive(cfg *Config, path string) {
+func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	ui := cobra_ui.New()
 
 	var profileNames []string
@@ -120,7 +121,7 @@ func runModifyInteractive(cfg *Config, path string) {
 	var questions []cobra_ui.Question
 
 	if modifyServiceToken == "" {
-		currentToken := selectedProfile.ServiceToken
+		currentToken := selectedProfile.ServiceToken.Value
 		maskedToken := MaskServiceToken(currentToken)
 		questions = append(questions, cobra_ui.Question{
 			Text: fmt.Sprintf("Service Token (current: %s, press Enter to keep): ", maskedToken),
@@ -129,7 +130,7 @@ func runModifyInteractive(cfg *Config, path string) {
 				if s != "" {
 					modifyServiceToken = s
 				} else {
-					modifyServiceToken = selectedProfile.ServiceToken
+					modifyServiceToken = selectedProfile.ServiceToken.Value
 				}
 				return nil
 			},
@@ -142,9 +143,9 @@ func runModifyInteractive(cfg *Config, path string) {
 	// the field empty and clobber the stored URL on save. The handler
 	// overwrites the value when the user types a new URL.
 	if modifyBaseUrl == "" {
-		current := selectedProfile.BaseUrl
+		current := selectedProfile.BaseUrl.Value
 		if current == "" {
-			current = DefaultBaseUrl
+			current = config.DefaultBaseUrl
 		}
 		modifyBaseUrl = current
 		questions = append(questions, cobra_ui.Question{
@@ -164,9 +165,9 @@ func runModifyInteractive(cfg *Config, path string) {
 		})
 	}
 	if modifyMgmntUrl == "" {
-		current := selectedProfile.MgmntUrl
+		current := selectedProfile.MgmntUrl.Value
 		if current == "" {
-			current = DefaultMgmntUrl
+			current = config.DefaultMgmntUrl
 		}
 		modifyMgmntUrl = current
 		questions = append(questions, cobra_ui.Question{
@@ -200,15 +201,15 @@ func runModifyInteractive(cfg *Config, path string) {
 		return
 	}
 
-	updatedProfile := Profile{
-		BaseUrl:      modifyBaseUrl,
-		MgmntUrl:     modifyMgmntUrl,
-		ServiceToken: modifyServiceToken,
+	updatedProfile := config.Profile{
+		BaseUrl:      config.ConfigString{Value: modifyBaseUrl},
+		MgmntUrl:     config.ConfigString{Value: modifyMgmntUrl},
+		ServiceToken: config.ConfigString{Value: modifyServiceToken},
 	}
 
 	cfg.Profiles[modifyName] = updatedProfile
 
-	err := SaveConfig(cfg, path)
+	err := config.SaveProfileConfig(cfg, path)
 	if err != nil {
 		log.WithError(err).Error("Failed to save config")
 		return

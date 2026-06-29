@@ -24,6 +24,11 @@ var schemaPushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.",
+		"skills:tip.b-dryrun":  "Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.c-regen":   "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -33,10 +38,24 @@ var schemaPushCmd = &cobra.Command{
 		path, _ := cmd.Flags().GetString("dir")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
 		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
 			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
+		}
+
+		if commit && !dryRun && !force {
+			target := "all schemas"
+			if slug != "" {
+				target = fmt.Sprintf("schema '%s'", slug)
+			}
+			msg := fmt.Sprintf("This will push and promote %s to live in workspace \"%s\". Continue?", target, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -193,5 +212,6 @@ func init() {
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")
 	schemaPushCmd.PersistentFlags().StringP("json", "j", "", `Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'`)
 	schemaPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	schemaPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	SchemaCmd.AddCommand(schemaPushCmd)
 }

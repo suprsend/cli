@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 )
 
 var removeName string
@@ -50,7 +51,7 @@ var profileRemoveCmd = &cobra.Command{
 			}
 		}
 
-		if err := SaveConfig(cfg, path); err != nil {
+		if err := config.SaveProfileConfig(cfg, path); err != nil {
 			log.WithError(err).Error("Failed to save")
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}

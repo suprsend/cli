@@ -21,6 +21,11 @@ suprsend workflow pull [<slug>] [flags]
   suprsend workflow pull --slug welcome --dir ./my-workflows
 ```
 
+### Tips
+
+- Pull overwrites local workflow JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
+
 ### Options
 
 ```

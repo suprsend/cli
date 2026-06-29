@@ -14,7 +14,6 @@ suprsend category [flags]
 
 ```
   suprsend category list
-  suprsend category get --output json
   suprsend category pull --dir ./suprsend/categories
   suprsend category push --commit
 ```
@@ -41,7 +40,6 @@ suprsend category [flags]
 
 * [suprsend](suprsend.md)	 - CLI to interact with SuprSend, a Notification Infrastructure
 * [suprsend category commit](suprsend_category_commit.md)	 - Commit categories
-* [suprsend category get](suprsend_category_get.md)	 - Get categories and translations
 * [suprsend category list](suprsend_category_list.md)	 - List categories
 * [suprsend category pull](suprsend_category_pull.md)	 - Pull categories from a workspace
 * [suprsend category push](suprsend_category_push.md)	 - Push categories to a workspace

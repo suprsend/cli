@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -43,7 +44,7 @@ var profilesAddCmd = &cobra.Command{
 				}
 				addBaseUrl = normalized
 			} else {
-				addBaseUrl = DefaultBaseUrl
+				addBaseUrl = config.DefaultBaseUrl
 			}
 			if addMgmntUrl != "" {
 				normalized, err := validateAndNormalizeUrl(addMgmntUrl)
@@ -52,16 +53,16 @@ var profilesAddCmd = &cobra.Command{
 				}
 				addMgmntUrl = normalized
 			} else {
-				addMgmntUrl = DefaultMgmntUrl
+				addMgmntUrl = config.DefaultMgmntUrl
 			}
 
-			cfg.Profiles[addName] = Profile{
-				BaseUrl:      addBaseUrl,
-				MgmntUrl:     addMgmntUrl,
-				ServiceToken: addServiceToken,
+			cfg.Profiles[addName] = config.Profile{
+				BaseUrl:      config.ConfigString{Value: addBaseUrl},
+				MgmntUrl:     config.ConfigString{Value: addMgmntUrl},
+				ServiceToken: config.ConfigString{Value: addServiceToken},
 			}
 
-			err := SaveConfig(cfg, path)
+			err := config.SaveProfileConfig(cfg, path)
 			if err != nil {
 				log.WithError(err).Error("Failed to save config")
 				return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
@@ -80,13 +81,13 @@ var profilesAddCmd = &cobra.Command{
 
 func init() {
 	profilesAddCmd.Flags().StringVar(&addName, "name", "", "Name of the profile (required)")
-	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: "+DefaultBaseUrl+")")
-	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: "+DefaultMgmntUrl+")")
+	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: "+config.DefaultBaseUrl+")")
+	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: "+config.DefaultMgmntUrl+")")
 	profilesAddCmd.Flags().StringVar(&addServiceToken, "service-token", "", "Service token (required)")
 	ProfileCmd.AddCommand(profilesAddCmd)
 }
 
-func runAddInteractive(cfg *Config, path string) {
+func runAddInteractive(cfg *config.ProfileConfig, path string) {
 	ui := cobra_ui.New()
 	var questions []cobra_ui.Question
 
@@ -128,11 +129,11 @@ func runAddInteractive(cfg *Config, path string) {
 	// non-default endpoint works the same way.
 	if addBaseUrl == "" {
 		questions = append(questions, cobra_ui.Question{
-			Text: fmt.Sprintf("Base URL [%s]: ", DefaultBaseUrl),
+			Text: fmt.Sprintf("Base URL [%s]: ", config.DefaultBaseUrl),
 			Handler: func(s string) error {
 				s = cleanInput(s)
 				if s == "" {
-					addBaseUrl = DefaultBaseUrl
+					addBaseUrl = config.DefaultBaseUrl
 					return nil
 				}
 				normalized, err := validateAndNormalizeUrl(s)
@@ -146,11 +147,11 @@ func runAddInteractive(cfg *Config, path string) {
 	}
 	if addMgmntUrl == "" {
 		questions = append(questions, cobra_ui.Question{
-			Text: fmt.Sprintf("Management URL [%s]: ", DefaultMgmntUrl),
+			Text: fmt.Sprintf("Management URL [%s]: ", config.DefaultMgmntUrl),
 			Handler: func(s string) error {
 				s = cleanInput(s)
 				if s == "" {
-					addMgmntUrl = DefaultMgmntUrl
+					addMgmntUrl = config.DefaultMgmntUrl
 					return nil
 				}
 				normalized, err := validateAndNormalizeUrl(s)
@@ -209,13 +210,13 @@ func runAddInteractive(cfg *Config, path string) {
 		log.Infof("Set '%s' as the active profile", addName)
 	}
 
-	cfg.Profiles[addName] = Profile{
-		BaseUrl:      addBaseUrl,
-		MgmntUrl:     addMgmntUrl,
-		ServiceToken: addServiceToken,
+	cfg.Profiles[addName] = config.Profile{
+		BaseUrl:      config.ConfigString{Value: addBaseUrl},
+		MgmntUrl:     config.ConfigString{Value: addMgmntUrl},
+		ServiceToken: config.ConfigString{Value: addServiceToken},
 	}
 
-	err := SaveConfig(cfg, path)
+	err := config.SaveProfileConfig(cfg, path)
 	if err != nil {
 		log.WithError(err).Error("Failed to save config")
 		return

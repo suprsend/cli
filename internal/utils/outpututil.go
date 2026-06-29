@@ -20,9 +20,9 @@ import (
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
+	"github.com/suprsend/cli/internal/termio"
 	"github.com/tidwall/pretty"
 	"github.com/yarlson/pin"
 	"gopkg.in/yaml.v3"
@@ -62,7 +62,7 @@ func IsOutputPiped() bool {
 		return false
 	}
 	// return true if --no-color is set to be true
-	if viper.GetBool("NO_COLOR") {
+	if config.Cfg.NoColorOutput.Value {
 		return true
 	}
 
@@ -73,7 +73,7 @@ func IsOutputPiped() bool {
 
 // ShowSpinner returns true when a spinner should be displayed — i.e. output is not piped, quiet mode is off, and output format is not JSON.
 func ShowSpinner() bool {
-	return !IsOutputPiped() && !config.Cfg.Quiet && config.Cfg.OutputType != "json"
+	return !IsOutputPiped() && !config.Cfg.Quiet.Value && config.Cfg.OutputType.Value != "json"
 }
 
 // Spinner is a thin wrapper around pin.Pin that is nil-safe and no-ops when quiet/piped.
@@ -86,10 +86,16 @@ type Spinner struct {
 func NewSpinner(text string) *Spinner {
 	s := &Spinner{}
 	if ShowSpinner() {
+		// Wrapping pin's writer breaks its internal TTY detection (it checks for
+		// *os.File). ShowSpinner has already verified stdout is a TTY, so it's
+		// safe to force the interactive code path here.
+		pin.ForceInteractive = true
 		s.p = pin.New(text,
 			pin.WithSpinnerColor(pin.ColorCyan),
 			pin.WithTextColor(pin.ColorYellow),
+			pin.WithWriter(termio.SpinnerWriter(os.Stdout)),
 		)
+		termio.MarkSpinnerStart()
 		s.cancel = s.p.Start(context.Background())
 	}
 	return s
@@ -101,6 +107,7 @@ func (s *Spinner) Stop(msg string) {
 		s.p.Stop(msg)
 		s.cancel()
 		s.p = nil
+		termio.MarkSpinnerStop()
 	}
 }
 
@@ -113,8 +120,10 @@ func (s *Spinner) UpdateMessage(msg string) {
 }
 
 // WriteError writes err to stderr as a structured JSON CLIError when in JSON errors mode.
-func WriteError(err error) {
-	if err == nil || !config.ShouldJSONErrors() {
+// Pass outputType when the call site runs before Resolve has populated Cfg.OutputType
+// (e.g. flag-parse-time errors); pass "" otherwise.
+func WriteError(err error, outputType string) {
+	if err == nil || !config.ShouldJSONErrors(outputType) {
 		return
 	}
 	var ce *clierr.CLIError
@@ -131,7 +140,7 @@ func supportsColor() bool {
 		return false
 	}
 
-	if viper.GetBool("NO_COLOR") {
+	if config.Cfg.NoColorOutput.Value {
 		return false
 	}
 

@@ -24,6 +24,11 @@ suprsend category push [flags]
   suprsend category push --json '{"categories": {...}}'
 ```
 
+### Tips
+
+- Push writes to the **draft** state. Run `suprsend category commit` to promote draft → live.
+- Pair with `--dry-run` to validate the categories server-side without writing to the draft. Pair with `--commit` to push + commit in one step.
+
 ### Options
 
 ```
@@ -31,6 +36,7 @@ suprsend category push [flags]
       --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing category files (default: ./suprsend/preference_categories)
   -n, --dry-run                 Print what would be pushed without making any changes
+  -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
   -j, --json string             Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'
 ```

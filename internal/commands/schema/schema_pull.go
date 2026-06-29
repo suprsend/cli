@@ -23,6 +23,10 @@ var schemaPullCmd = &cobra.Command{
 
   # Pull to a custom directory using the flag form
   suprsend schema pull --slug order-placed --dir ./my-schemas`,
+	Annotations: map[string]string{
+		"skills:tip.a-overwrite": "Pull overwrites local schema JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir, _ := cmd.Flags().GetString("dir")

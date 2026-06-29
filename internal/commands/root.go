@@ -10,10 +10,9 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/commands/category"
 	"github.com/suprsend/cli/internal/commands/event"
@@ -44,17 +43,24 @@ var rootCmd = &cobra.Command{
 	This CLI lets you interact with your SuprSend workspace and do actions like fetching/modifying template, workflows etc.`),
 }
 
+// earlyConfig captures state detected before cobra has parsed flags. Threaded
+// from Execute to WriteError so early errors render in the right format.
+type earlyConfig struct {
+	OutputType string
+}
+
 // Execute runs the root command and handles structured error output.
 func Execute() error {
 	// Run early setup so flag-parse errors (unknown flags) also get proper
 	// silencing and log formatting — PersistentPreRunE won't fire in that case.
-	earlySetup()
+	early := earlySetup()
+	warnSingleDashLongFlags(os.Args[1:])
 	err := rootCmd.Execute()
 	if err != nil {
 		if isCobraUsageError(err) {
 			err = clierr.Wrap(err, clierr.CodeInvalidUsage, "")
 		}
-		utils.WriteError(err)
+		utils.WriteError(err, early.OutputType)
 	}
 	return err
 }
@@ -71,41 +77,74 @@ func isCobraUsageError(err error) bool {
 		strings.Contains(err.Error(), "unknown command")
 }
 
+// warnSingleDashLongFlags scans raw args for tokens like `-slug` where the
+// suffix matches a registered long-flag name. In pflag, a single dash starts a
+// chain of *short* flags, so `-slug` parses as `-s lug` (or four bool shorts),
+// silently corrupting whatever `-s` is bound to. The classic case: `-s` is the
+// shorthand for `--service-token`, so `-slug foo` quietly overrides the token
+// with "lug" and the API returns 401 "invalid service token". We warn before
+// cobra parses so the user sees the hint even when parsing itself succeeds.
+func warnSingleDashLongFlags(args []string) {
+	longFlags := map[string]struct{}{}
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) { longFlags[f.Name] = struct{}{} })
+		c.PersistentFlags().VisitAll(func(f *pflag.Flag) { longFlags[f.Name] = struct{}{} })
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(rootCmd)
+
+	for _, arg := range args {
+		if len(arg) < 3 || !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") {
+			continue
+		}
+		name := strings.TrimPrefix(arg, "-")
+		if eq := strings.Index(name, "="); eq != -1 {
+			name = name[:eq]
+		}
+		if _, ok := longFlags[name]; ok {
+			fmt.Fprintf(os.Stderr,
+				"warning: %q looks like a typo for \"--%s\" — a single dash starts short flags, long flags need two dashes\n",
+				arg, name)
+		}
+	}
+}
+
 // earlySetup scans raw os.Args to apply critical initialization before Cobra
 // parses flags. This ensures correct behavior even when flag parsing fails.
-func earlySetup() {
-	conf := config.Cfg
+// Returns the detected state so the caller can thread it into error rendering,
+// since Cfg is not populated until Resolve runs.
+func earlySetup() earlyConfig {
+	var ec earlyConfig
 	args := os.Args[1:]
 	for i, arg := range args {
 		switch {
 		case arg == "--output=json" || arg == "-o=json":
-			conf.OutputType = "json"
+			ec.OutputType = "json"
 		case (arg == "--output" || arg == "-o") && i+1 < len(args) && args[i+1] == "json":
-			conf.OutputType = "json"
+			ec.OutputType = "json"
 		}
 	}
-	if config.ShouldJSONErrors() {
+	if config.ShouldJSONErrors(ec.OutputType) {
 		rootCmd.SilenceErrors = true
 		rootCmd.SilenceUsage = true
 	}
+	return ec
 }
 
 func init() {
-	conf := config.Cfg
-	rootCmd.Flags().StringVarP(&conf.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
-	rootCmd.PersistentFlags().StringVar(&conf.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
-	rootCmd.PersistentFlags().StringVarP(&conf.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
-	rootCmd.PersistentFlags().StringVarP(&conf.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
-	rootCmd.PersistentFlags().StringVarP(&conf.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
-	rootCmd.PersistentFlags().BoolVar(&conf.NoColorOutput, "no-color", false, "Disable color output (default: $NO_COLOR)")
-	rootCmd.PersistentFlags().BoolVarP(&conf.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
+	var flags config.FlagValues
 
-	viper.BindPFlag("service_token", rootCmd.PersistentFlags().Lookup("service-token"))
-	viper.BindPFlag("NO_COLOR", rootCmd.PersistentFlags().Lookup("no-color"))
-	//
-	cobra.OnInitialize(func() {
-		config.InitConfig(conf.CfgFile)
-	})
+	rootCmd.Flags().StringVarP(&flags.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	rootCmd.PersistentFlags().StringVar(&flags.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&flags.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
+	rootCmd.PersistentFlags().StringVarP(&flags.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().StringVarP(&flags.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
+	rootCmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable color output (default: $NO_COLOR)")
+	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
+
 	rootCmd.AddCommand(
 		// 1. Register the 'version' command
 		extension.NewVersionCobraCmd(
@@ -125,87 +164,57 @@ func init() {
 	rootCmd.AddCommand(workspace.WorkspaceCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		switch conf.OutputType {
+		switch flags.OutputType {
 		case "pretty", "json", "yaml":
 		default:
 			return clierr.New(
-				fmt.Sprintf("invalid output format %q: must be pretty, json, or yaml", conf.OutputType),
+				fmt.Sprintf("invalid output format %q: must be pretty, json, or yaml", flags.OutputType),
 				clierr.CodeInvalidUsage,
 			)
 		}
+
+		resolveErr := config.Cfg.Resolve(flags)
+
 		if err := config.SetUpLogs(); err != nil {
 			return err
 		}
-		// check the subcommand and return if it is gendocs or genskills
-		if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
-			return nil
+
+		if config.Cfg.NoColorOutput.Value {
+			color.NoColor = true
 		}
 
-		if cmd.Name() == "version" || cmd.Name() == "help" || cmd.Name() == "env" {
-			return nil
-		}
-		if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
-			return nil
-		}
-		if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
-			return nil
-		}
+		if resolveErr != nil {
+			// env runs without a token so users can verify setup, but other Resolve failures leave Cfg half-populated and would render a misleading table.
+			var ce *clierr.CLIError
+			if cmd.Name() == "env" && errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
+				return nil
+			}
+			if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
+				return nil
+			}
+			if cmd.Name() == "version" || cmd.Name() == "help" {
+				return nil
+			}
+			if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
+				return nil
+			}
+			if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
+				return nil
+			}
+			if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
+				return nil
+			}
 
-		if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
-			return nil
+			return resolveErr
 		}
-
-		// env > flag > config file -> profile
-		serviceToken := getServiceTokenWithPriority()
-		if serviceToken == "" {
-			return clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
-				WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
-		}
-		conf.ServiceToken = serviceToken
 
 		utils.InitSDKWithUrls(
-			conf.ServiceToken,
-			profiles.GetResolvedBaseUrl(),
-			profiles.GetResolvedMgmntUrl(),
-			viper.GetBool("debug"),
+			config.Cfg.ServiceToken.String(),
+			config.Cfg.BaseUrl.String(),
+			config.Cfg.MgmntUrl.String(),
+			config.Cfg.Debug.Value,
 		)
+
 		return nil
 	}
-}
-
-func getServiceTokenWithPriority() string {
-	// ENV Variable
-	if envToken := os.Getenv("SUPRSEND_SERVICE_TOKEN"); envToken != "" {
-		log.Debug("Using service token from environment variable")
-		return envToken
-	}
-
-	var cmdFlagToken string
-	if viper.IsSet("service_token") {
-		cmdFlagToken = viper.GetString("service_token")
-	}
-
-	if cmdFlagToken != "" {
-		log.Debug("Using service token from command line flag")
-		return cmdFlagToken
-	}
-
-	// Config file
-	configPath := profiles.GetConfigFilePath()
-	if configPath == "" {
-		return ""
-	}
-
-	cfg, err := profiles.LoadConfig(configPath)
-	if err != nil {
-		return ""
-	}
-
-	activeProfile := cfg.Profiles[cfg.ActiveProfile]
-	if activeProfile.ServiceToken != "" {
-		log.Debug("Using service token from config file profile")
-		return activeProfile.ServiceToken
-	}
-
-	return ""
 }

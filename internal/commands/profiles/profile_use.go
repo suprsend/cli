@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -45,7 +46,7 @@ var profileUseCmd = &cobra.Command{
 
 		cfg.ActiveProfile = useName
 
-		if err := SaveConfig(cfg, path); err != nil {
+		if err := config.SaveProfileConfig(cfg, path); err != nil {
 			log.WithError(err).Error("Failed to save config")
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
@@ -60,7 +61,7 @@ func init() {
 	ProfileCmd.AddCommand(profileUseCmd)
 }
 
-func promptForProfileToUse(cfg *Config) string {
+func promptForProfileToUse(cfg *config.ProfileConfig) string {
 	if !utils.IsInputInteractive() {
 		return ""
 	}

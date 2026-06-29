@@ -21,6 +21,12 @@ suprsend schema push [<slug>] [flags]
   suprsend schema push --dry-run
 ```
 
+### Tips
+
+- Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.
+- Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.
+- After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.
+
 ### Options
 
 ```
@@ -28,6 +34,7 @@ suprsend schema push [<slug>] [flags]
       --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing schema files (default: ./suprsend/schemas)
   -n, --dry-run                 Print what would be pushed without making any changes
+  -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
   -j, --json string             Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
   -g, --slug string             Schema slug to push (omit to push all)

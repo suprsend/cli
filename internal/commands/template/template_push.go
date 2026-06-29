@@ -180,6 +180,10 @@ var templatePushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend template push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live.",
+		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the template server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -190,6 +194,19 @@ var templatePushCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		var dryRunSlugs []string
+
+		if commit && !dryRun && !force {
+			target := "all templates"
+			if slug != "" {
+				target = fmt.Sprintf("template '%s'", slug)
+			}
+			msg := fmt.Sprintf("This will push and promote %s to live in workspace \"%s\". Continue?", target, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
+		}
 
 		if path == "" {
 			path = filepath.Join(".", "suprsend", "templates")

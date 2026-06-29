@@ -13,19 +13,7 @@ import (
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
-	"gopkg.in/yaml.v3"
 )
-
-type Profile struct {
-	BaseUrl      string `yaml:"base_url"`
-	MgmntUrl     string `yaml:"mgmnt_url"`
-	ServiceToken string `yaml:"service_token"`
-}
-
-type Config struct {
-	ActiveProfile string             `yaml:"active_profile"`
-	Profiles      map[string]Profile `yaml:"profiles"`
-}
 
 type ProfileListItem struct {
 	Name         string `json:"name" yaml:"name"`
@@ -46,12 +34,6 @@ func cleanInput(input string) string {
 	input = strings.TrimSuffix(input, "]")
 	return input
 }
-
-// Public-cloud defaults; used when a profile doesn't override these.
-const (
-	DefaultBaseUrl  = "https://hub.suprsend.com/"
-	DefaultMgmntUrl = "https://management-api.suprsend.com/"
-)
 
 // validateAndNormalizeUrl parses, validates and normalizes a profile URL.
 // Rules:
@@ -96,7 +78,9 @@ func promptForProfileName() string {
 	return strings.TrimSpace(name)
 }
 
-func EnsureConfig(path string) (*Config, string, error) {
+// EnsureConfig loads the profile config file, creating a default one if it
+// doesn't exist and the terminal is interactive.
+func EnsureConfig(path string) (*config.ProfileConfig, string, error) {
 	var configPath string
 	if path != "" {
 		configPath = path
@@ -123,11 +107,11 @@ func EnsureConfig(path string) (*Config, string, error) {
 			return nil, configPath, err
 		}
 
-		defaultCfg := &Config{
+		defaultCfg := &config.ProfileConfig{
 			ActiveProfile: "",
-			Profiles:      make(map[string]Profile),
+			Profiles:      make(map[string]config.Profile),
 		}
-		if err := SaveConfig(defaultCfg, configPath); err != nil {
+		if err := config.SaveProfileConfig(defaultCfg, configPath); err != nil {
 			log.WithError(err).Error("Failed to create default config")
 			return nil, configPath, err
 		}
@@ -135,7 +119,7 @@ func EnsureConfig(path string) (*Config, string, error) {
 		return defaultCfg, configPath, nil
 	}
 
-	cfg, err := LoadConfig(configPath)
+	cfg, err := config.LoadProfileConfig(configPath)
 	if err != nil {
 		log.WithError(err).Error("Failed to load config file")
 		return nil, configPath, err
@@ -143,92 +127,7 @@ func EnsureConfig(path string) (*Config, string, error) {
 	return cfg, configPath, nil
 }
 
-func SaveConfig(cfg *Config, path string) error {
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
-}
-
-func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
-
-func GetConfigFilePath() string {
-	if config.Cfg.CfgFile != "" {
-		return config.Cfg.CfgFile
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.WithError(err).Error("Could not get user home directory")
-		return ""
-	}
-	return filepath.Join(homeDir, ".suprsend.yaml")
-}
-
-func GetResolvedBaseUrl() string {
-	// ENV Variable
-	if envUrl := os.Getenv("SUPRSEND_BASE_URL"); envUrl != "" {
-		return envUrl
-	}
-
-	// get the value from the active profile
-	configPath := GetConfigFilePath()
-	if configPath == "" {
-		return DefaultBaseUrl
-	}
-
-	cfg, err := LoadConfig(configPath)
-	if err != nil {
-		return DefaultBaseUrl
-	}
-
-	activeProfile := cfg.Profiles[cfg.ActiveProfile]
-	if activeProfile.BaseUrl != "" {
-		return activeProfile.BaseUrl
-	}
-
-	// Default value
-	return DefaultBaseUrl
-}
-
-func GetResolvedMgmntUrl() string {
-	// ENV Variable
-	if envUrl := os.Getenv("SUPRSEND_MGMNT_URL"); envUrl != "" {
-		return envUrl
-	}
-
-	// get the value from the active profile
-	configPath := GetConfigFilePath()
-	if configPath == "" {
-		return DefaultMgmntUrl
-	}
-
-	cfg, err := LoadConfig(configPath)
-	if err != nil {
-		return DefaultMgmntUrl
-	}
-
-	activeProfile := cfg.Profiles[cfg.ActiveProfile]
-	if activeProfile.MgmntUrl != "" {
-		return activeProfile.MgmntUrl
-	}
-
-	// Default value
-	return DefaultMgmntUrl
-}
-
-// MaskServiceToken masks a service token showing only first 4 and last 4 characters
+// MaskServiceToken shows only first 4 and last 4 characters of a token.
 func MaskServiceToken(token string) string {
 	if token == "" {
 		return "not set"

@@ -21,6 +21,11 @@ suprsend category commit [flags]
   suprsend category commit --commit-message "Update notification preferences"
 ```
 
+### Tips
+
+- Commit is irreversible: it promotes the draft to **live**. End-users immediately see the new preference categories on their notification settings page.
+- Local translation files in the `translations/` subdirectory are pushed before commit. Edit them alongside the categories to keep locales in sync.
+
 ### Options
 
 ```

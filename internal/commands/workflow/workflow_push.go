@@ -24,6 +24,10 @@ var workflowPushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend workflow push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live.",
+		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the workflow server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -33,10 +37,24 @@ var workflowPushCmd = &cobra.Command{
 		slug := utils.ResolveSlug(cmd, args)
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
 		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
 			return clierr.New("--json requires --slug to be specified", clierr.CodeUnknown)
+		}
+
+		if commit && !dryRun && !force {
+			target := "all workflows"
+			if slug != "" {
+				target = fmt.Sprintf("workflow '%s'", slug)
+			}
+			msg := fmt.Sprintf("This will push and promote %s to live in workspace \"%s\". Continue?", target, workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -216,5 +234,6 @@ func init() {
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to push (omit to push all)")
 	workflowPushCmd.PersistentFlags().StringP("json", "j", "", `Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'`)
 	workflowPushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	workflowPushCmd.PersistentFlags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	WorkflowCmd.AddCommand(workflowPushCmd)
 }

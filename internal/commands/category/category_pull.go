@@ -24,6 +24,10 @@ var categoryPullCmd = &cobra.Command{
 
   # Pull draft categories
   suprsend category pull --mode draft`,
+	Annotations: map[string]string{
+		"skills:tip.a-overwrite": "Pull overwrites local `categories_preferences.json` and translation files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -67,6 +71,19 @@ var categoryPullCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't write categories to file")
 			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
+
+		totalSections := 0
+		totalCategories := 0
+		for _, rc := range categories.RootCategories {
+			totalSections += len(rc.Sections)
+			for _, s := range rc.Sections {
+				totalCategories += len(s.Categories)
+			}
+		}
+		log.Info("=== Category Pull Summary ===")
+		log.Infof("Sections: %d", totalSections)
+		log.Infof("Categories: %d", totalCategories)
+		log.Infof("Written to: %s", filePath)
 
 		translationDir := filepath.Join(outputDir, "translations")
 		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {

@@ -30,6 +30,7 @@ suprsend translation push [flags]
       --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing translation JSON files (default: ./suprsend/translations)
   -n, --dry-run                 Print what would be pushed without making any changes
+  -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
   -j, --json string             Translations as a JSON object mapping locale codes (without .json extension) to their translation content objects, e.g. '{"en":{"key":"value"},"fr":{"key":"valeur"}}'
 ```

@@ -16,7 +16,7 @@ import (
 )
 
 type jsonCategoryInput struct {
-	Categories   interface{}                                   `json:"categories"`
+	Categories   *CategoriesOnDisk                             `json:"categories"`
 	Translations map[string]mgmnt.PreferenceTranslationContent `json:"translations"`
 }
 
@@ -35,6 +35,10 @@ var categoryPushCmd = &cobra.Command{
 
   # Push categories inline via JSON
   suprsend category push --json '{"categories": {...}}'`,
+	Annotations: map[string]string{
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend category commit` to promote draft → live.",
+		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the categories server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
@@ -42,6 +46,16 @@ var categoryPushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
+
+		if commit && !dryRun && !force {
+			msg := fmt.Sprintf("This will push and promote categories to live in workspace \"%s\". Continue?", workspace)
+			confirmed, err := utils.ConfirmDestructiveAction(msg)
+			if err != nil || !confirmed {
+				log.Info("Aborted.")
+				return nil
+			}
+		}
 
 		// Aggregate stats across translations + categories so the run finishes
 		// with a single "=== Category Push Summary ===" block matching the
@@ -70,7 +84,18 @@ var categoryPushCmd = &cobra.Command{
 			}
 
 			if dryRun {
-				log.Infof("DRY RUN: would push categories and %d translation(s) to %s", pushableLocales, workspace)
+				sectionCount, categoryCount := 0, 0
+				for _, rc := range input.Categories.RootCategories {
+					sectionCount += len(rc.Sections)
+					for _, s := range rc.Sections {
+						categoryCount += len(s.Categories)
+					}
+				}
+				log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
+					sectionCount, pluralS(sectionCount),
+					categoryCount, pluralIes(categoryCount),
+					pushableLocales, workspace,
+				)
 				return nil
 			}
 
@@ -104,7 +129,8 @@ var categoryPushCmd = &cobra.Command{
 				catSpinner.Stop("Pushed categories")
 			}
 
-			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr)
+			sectionCount, categoryCount := countSectionsAndCategories(input.Categories)
+			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 			if !categorySuccess || translationStats.Failed > 0 {
 				return clierr.New("category push had errors", clierr.CodeAPIInternal)
 			}
@@ -154,7 +180,12 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		if dryRun {
-			log.Infof("DRY RUN: would push categories to %s", workspace)
+			sectionCount, categoryCount := countSectionsAndCategories(categories)
+			log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
+				sectionCount, pluralS(sectionCount),
+				categoryCount, pluralIes(categoryCount),
+				translationStats.Total, workspace,
+			)
 			return nil
 		}
 
@@ -170,7 +201,14 @@ var categoryPushCmd = &cobra.Command{
 			spinner2.Stop("Pushed categories")
 		}
 
-		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr)
+		sectionCount, categoryCount := 0, 0
+		for _, rc := range categories.RootCategories {
+			sectionCount += len(rc.Sections)
+			for _, s := range rc.Sections {
+				categoryCount += len(s.Categories)
+			}
+		}
+		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 		if !categorySuccess || translationStats.Failed > 0 {
 			return clierr.New("category push had errors", clierr.CodeAPIInternal)
 		}
@@ -178,37 +216,68 @@ var categoryPushCmd = &cobra.Command{
 	},
 }
 
-// emitCategoryPushSummary prints the unified end-of-run block. Categories
-// always contribute exactly one item to the totals; translations contribute
-// one item per non-English locale attempted.
-func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) {
+// emitCategoryPushSummary prints the end-of-run summary for `category push`.
+// The "Category Push Summary" block is always printed and reports the
+// section/category counts plus push outcome. The "Translation Push Summary"
+// block follows only when translations were attempted or English files were
+// skipped (i.e. t.Total or t.SkippedEnglish is non-zero).
+func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string, sectionCount, categoryCount int) {
 	if t == nil {
 		t = &translation.PushTranslationStats{}
 	}
-	totalItems := t.Total + 1
-	successItems := t.Success
-	failedItems := t.Failed
-	if categorySuccess {
-		successItems++
-	} else {
-		failedItems++
-	}
+
 	log.Info("=== Category Push Summary ===")
-	log.Infof("Total items processed: %d", totalItems)
-	log.Infof("Successfully pushed: %d", successItems)
-	log.Infof("Failed to push: %d", failedItems)
-	if t.SkippedEnglish > 0 {
-		log.Infof("Skipped (English source of truth): %d", t.SkippedEnglish)
+	log.Infof("Sections: %d", sectionCount)
+	log.Infof("Categories: %d", categoryCount)
+	if categorySuccess {
+		log.Info("Successfully pushed")
+	} else {
+		log.Infof("Failed to push: %s", categoryFailErr)
 	}
-	if failedItems > 0 {
-		log.Info("Failed items:")
-		for _, e := range t.Errors {
-			log.Infof("  - %s", e)
+
+	if t.Total > 0 || t.SkippedEnglish > 0 {
+		log.Info("=== Translation Push Summary ===")
+		log.Infof("Total locales processed: %d", t.Total)
+		log.Infof("Successfully pushed: %d", t.Success)
+		log.Infof("Failed to push: %d", t.Failed)
+		if t.SkippedEnglish > 0 {
+			log.Infof("Skipped (English source of truth): %d", t.SkippedEnglish)
 		}
-		if !categorySuccess {
-			log.Infof("  - preference_categories/categories.json: failed to push: %s", categoryFailErr)
+		if len(t.Errors) > 0 {
+			log.Info("Errors:")
+			for _, e := range t.Errors {
+				log.Infof("  - %s", e)
+			}
 		}
 	}
+}
+
+func countSectionsAndCategories(cats *CategoriesOnDisk) (int, int) {
+	if cats == nil {
+		return 0, 0
+	}
+	sectionCount, categoryCount := 0, 0
+	for _, rc := range cats.RootCategories {
+		sectionCount += len(rc.Sections)
+		for _, s := range rc.Sections {
+			categoryCount += len(s.Categories)
+		}
+	}
+	return sectionCount, categoryCount
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+func pluralIes(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
 }
 
 func init() {
@@ -217,5 +286,6 @@ func init() {
 	categoryPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
 	categoryPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	categoryPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

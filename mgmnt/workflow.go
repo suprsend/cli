@@ -21,8 +21,8 @@ type Workflow struct {
 
 type WorkflowPushResponse struct {
 	ValidationResult struct {
-		IsValid bool     `json:"is_valid"`
-		Errors  []string `json:"errors"`
+		IsValid bool  `json:"is_valid"`
+		Errors  []any `json:"errors"`
 	} `json:"validation_result"`
 }
 

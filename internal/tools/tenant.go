@@ -164,20 +164,6 @@ func updateCategoryPreferenceTenant(ctx context.Context, request mcp.CallToolReq
 		MandatoryChannels:   mandatoryChannels,
 		BlockedChannels:     blockedChannels,
 	}
-	if digestSchedule, ok := args["digest_schedule"]; ok && digestSchedule != nil {
-		prefPayload.DigestSchedule = digestSchedule
-	}
-	if rawConditions, ok := args["preference_conditions"]; ok && rawConditions != nil {
-		if conditionsSlice, ok := rawConditions.([]any); ok {
-			conditions := make([]map[string]any, 0, len(conditionsSlice))
-			for _, item := range conditionsSlice {
-				if m, ok := item.(map[string]any); ok {
-					conditions = append(conditions, m)
-				}
-			}
-			prefPayload.PreferenceConditions = conditions
-		}
-	}
 
 	workspace := request.GetString("workspace", "staging")
 
@@ -250,7 +236,7 @@ func getAllTenantsHandler(ctx context.Context, request mcp.CallToolRequest) (*mc
 
 func newTenantTools() []*Tool {
 	get_suprsend_tenant := &Tool{
-		Name:        "tenants.get",
+		Name: "tenants.get",
 		MCPTool: mcp.NewTool("get_suprsend_tenant",
 			mcp.WithDescription(`Get a tenant's settings, branding metadata, and custom properties by tenant_id. Tenants are sub-accounts of a workspace, modeling end-customers in multi-tenant SaaS deployments.
 
@@ -276,7 +262,7 @@ Returns: the tenant's settings (branding URLs, contact info, custom fields).`),
 	}
 
 	get_suprsend_tenants := &Tool{
-		Name:        "tenants.get_all",
+		Name: "tenants.get_all",
 		MCPTool: mcp.NewTool("get_suprsend_tenants",
 			mcp.WithDescription(`List all tenants in the workspace. Use to discover tenant_ids before calling get_suprsend_tenant or upsert_suprsend_tenant.
 
@@ -295,7 +281,7 @@ Returns: up to limit tenants (default 100) with their id and properties.`),
 	}
 
 	upsert_suprsend_tenant := &Tool{
-		Name:        "tenants.upsert",
+		Name: "tenants.upsert",
 		MCPTool: mcp.NewTool("upsert_suprsend_tenant",
 			mcp.WithDescription(`Create a new tenant or update an existing tenant's properties. Tenants are sub-accounts of a workspace, used to model end-customers in multi-tenant SaaS apps.
 
@@ -325,7 +311,7 @@ Returns: the updated tenant on success.`),
 	}
 
 	update_tenant_default_preference := &Tool{
-		Name:        "tenants.update_preferences",
+		Name: "tenants.update_preferences",
 		MCPTool: mcp.NewTool("update_suprsend_tenant_default_preference",
 			mcp.WithDescription(`Set the default category preference inherited by NEW users created in this tenant. Existing users are not affected; their preferences are independent.
 
@@ -375,20 +361,6 @@ Returns: the updated tenant default preference on success.`),
 				mcp.WithStringItems(),
 				mcp.Required(),
 			),
-			mcp.WithObject("digest_schedule",
-				mcp.Description("Optional digest schedule override for this category preference. Contains a slug field identifying the selected schedule option, plus any user-configurable fields defined by that option."),
-			),
-			mcp.WithArray("preference_conditions",
-				mcp.Description("Optional list of condition overrides for this category. Each entry is an object with a 'key' field (matching a condition defined on the category) and a 'value' field. Pass an empty array to clear existing overrides."),
-				mcp.Items(map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"key":   utils.StringSchema("The condition key as defined on the category"),
-						"value": map[string]any{"description": "The value for this condition"},
-					},
-					"required": []string{"key", "value"},
-				}),
-			),
 			mcp.WithString("workspace",
 				mcp.Description(`SuprSend workspace to update the tenant from.`),
 			),
@@ -400,7 +372,7 @@ Returns: the updated tenant default preference on success.`),
 	}
 
 	get_tenant_default_preference := &Tool{
-		Name:        "tenants.get_preferences",
+		Name: "tenants.get_preferences",
 		MCPTool: mcp.NewTool("get_tenant_default_preference",
 			mcp.WithDescription(`Read a tenant's default category preferences — the inheritance baseline applied to new users in this tenant.
 

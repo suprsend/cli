@@ -211,20 +211,6 @@ func updateObjectCategoryPreference(ctx context.Context, request mcp.CallToolReq
 		Preference:     pref,
 		OptOutChannels: optOutChannels,
 	}
-	if digestSchedule, ok := args["digest_schedule"]; ok && digestSchedule != nil {
-		prefPayload.DigestSchedule = digestSchedule
-	}
-	if rawConditions, ok := args["preference_conditions"]; ok && rawConditions != nil {
-		if conditionsSlice, ok := rawConditions.([]any); ok {
-			conditions := make([]map[string]any, 0, len(conditionsSlice))
-			for _, item := range conditionsSlice {
-				if m, ok := item.(map[string]any); ok {
-					conditions = append(conditions, m)
-				}
-			}
-			prefPayload.PreferenceConditions = conditions
-		}
-	}
 
 	workspace := request.GetString("workspace", "staging")
 
@@ -295,7 +281,7 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, request mcp.CallT
 
 func newObjectTools() []*Tool {
 	get_suprsend_object := &Tool{
-		Name:        "objects.get",
+		Name: "objects.get",
 		MCPTool: mcp.NewTool("get_suprsend_object",
 			mcp.WithDescription(`Get a SuprSend object's full state by object_type + object_id. Objects are non-user entities — organizations, projects, vehicles, devices — namespaced by object_type.
 
@@ -326,7 +312,7 @@ Returns: YAML mirroring get_suprsend_user's shape — object_type, object_id, pr
 	}
 
 	upsert_suprsend_object := &Tool{
-		Name:        "objects.upsert",
+		Name: "objects.upsert",
 		MCPTool: mcp.NewTool("upsert_suprsend_object",
 			mcp.WithDescription(`Modify properties or channel identifiers on a SuprSend object — a non-user entity like an organization, project, or vehicle. One call performs ONE action; for multiple changes, call this tool multiple times.
 
@@ -459,7 +445,7 @@ Returns: the updated object on success; structured error with field reasons on f
 	}
 
 	get_suprsend_object_preferences := &Tool{
-		Name:        "objects.get_preferences",
+		Name: "objects.get_preferences",
 		MCPTool: mcp.NewTool("get_suprsend_object_preferences",
 			mcp.WithDescription(`Read an object's category-level notification preferences and (optionally) per-channel overrides.
 
@@ -497,7 +483,7 @@ Returns: the object's preference tree. Pass category to scope to one preference;
 	}
 
 	update_suprsend_category_preference_object := &Tool{
-		Name:        "objects.update_preferences",
+		Name: "objects.update_preferences",
 		MCPTool: mcp.NewTool("update_suprsend_category_preference_object",
 			mcp.WithDescription(`Set ONE category's preference for ONE object — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
 
@@ -537,20 +523,6 @@ Returns: updated preference state on success; structured error on failure.`),
 				mcp.Description("The channels to opt out from for the object."),
 				mcp.WithStringItems(),
 			),
-			mcp.WithObject("digest_schedule",
-				mcp.Description("Optional digest schedule override for this category. Contains a slug field identifying the selected schedule option, plus any user-configurable fields defined by that option."),
-			),
-			mcp.WithArray("preference_conditions",
-				mcp.Description("Optional list of condition overrides for this category. Each entry is an object with a 'key' field (matching a condition defined on the category) and a 'value' field. Pass an empty array to clear existing overrides."),
-				mcp.Items(map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"key":   utils.StringSchema("The condition key as defined on the category"),
-						"value": map[string]any{"description": "The value for this condition"},
-					},
-					"required": []string{"key", "value"},
-				}),
-			),
 			mcp.WithString("workspace",
 				mcp.Description("SuprSend workspace to get the user from."),
 			),
@@ -562,7 +534,7 @@ Returns: updated preference state on success; structured error on failure.`),
 	}
 
 	update_suprsend_object_channel_preference := &Tool{
-		Name:        "objects.update_channel_preference",
+		Name: "objects.update_channel_preference",
 		MCPTool: mcp.NewTool("update_suprsend_object_channel_preference",
 			mcp.WithDescription(`Block or allow specific delivery channels for ONE object, applied across ALL categories.
 
@@ -606,7 +578,7 @@ Returns: updated channel-preference state on success.`),
 	}
 
 	get_suprsend_obj_subscriptions := &Tool{
-		Name:        "object.get_subscriptions",
+		Name: "object.get_subscriptions",
 		MCPTool: mcp.NewTool("get_suprsend_object_subscriptions",
 			mcp.WithDescription(`List users / objects subscribed TO this object (its followers / members). Subscriptions are stored on the followed object.
 
@@ -642,7 +614,7 @@ Returns: a paginated list of subscriber {type, id} entries. Set channel_preferen
 	}
 
 	add_suprsend_obj_subscriptions := &Tool{
-		Name:        "object.upsert_subscriptions",
+		Name: "object.upsert_subscriptions",
 		MCPTool: mcp.NewTool("add_suprsend_object_subscriptions",
 			mcp.WithDescription(`Subscribe one or more users or other objects TO this object. The recipient list can mix users and objects in a single call.
 

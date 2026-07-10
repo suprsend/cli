@@ -281,7 +281,7 @@ func updateObjectChannelPreferenceHandler(ctx context.Context, request mcp.CallT
 
 func newObjectTools() []*Tool {
 	get_suprsend_object := &Tool{
-		Name:        "objects.get",
+		Name: "objects.get",
 		MCPTool: mcp.NewTool("get_suprsend_object",
 			mcp.WithDescription(`Get a SuprSend object's full state by object_type + object_id. Objects are non-user entities — organizations, projects, vehicles, devices — namespaced by object_type.
 
@@ -312,7 +312,7 @@ Returns: YAML mirroring get_suprsend_user's shape — object_type, object_id, pr
 	}
 
 	upsert_suprsend_object := &Tool{
-		Name:        "objects.upsert",
+		Name: "objects.upsert",
 		MCPTool: mcp.NewTool("upsert_suprsend_object",
 			mcp.WithDescription(`Modify properties or channel identifiers on a SuprSend object — a non-user entity like an organization, project, or vehicle. One call performs ONE action; for multiple changes, call this tool multiple times.
 
@@ -445,7 +445,7 @@ Returns: the updated object on success; structured error with field reasons on f
 	}
 
 	get_suprsend_object_preferences := &Tool{
-		Name:        "objects.get_preferences",
+		Name: "objects.get_preferences",
 		MCPTool: mcp.NewTool("get_suprsend_object_preferences",
 			mcp.WithDescription(`Read an object's category-level notification preferences and (optionally) per-channel overrides.
 
@@ -483,7 +483,7 @@ Returns: the object's preference tree. Pass category to scope to one preference;
 	}
 
 	update_suprsend_category_preference_object := &Tool{
-		Name:        "objects.update_preferences",
+		Name: "objects.update_preferences",
 		MCPTool: mcp.NewTool("update_suprsend_category_preference_object",
 			mcp.WithDescription(`Set ONE category's preference for ONE object — opted in, opted out, or cant_unsubscribe (locked) — plus per-channel opt-outs within that category.
 
@@ -534,7 +534,7 @@ Returns: updated preference state on success; structured error on failure.`),
 	}
 
 	update_suprsend_object_channel_preference := &Tool{
-		Name:        "objects.update_channel_preference",
+		Name: "objects.update_channel_preference",
 		MCPTool: mcp.NewTool("update_suprsend_object_channel_preference",
 			mcp.WithDescription(`Block or allow specific delivery channels for ONE object, applied across ALL categories.
 
@@ -578,7 +578,7 @@ Returns: updated channel-preference state on success.`),
 	}
 
 	get_suprsend_obj_subscriptions := &Tool{
-		Name:        "object.get_subscriptions",
+		Name: "object.get_subscriptions",
 		MCPTool: mcp.NewTool("get_suprsend_object_subscriptions",
 			mcp.WithDescription(`List users / objects subscribed TO this object (its followers / members). Subscriptions are stored on the followed object.
 
@@ -614,7 +614,7 @@ Returns: a paginated list of subscriber {type, id} entries. Set channel_preferen
 	}
 
 	add_suprsend_obj_subscriptions := &Tool{
-		Name:        "object.upsert_subscriptions",
+		Name: "object.upsert_subscriptions",
 		MCPTool: mcp.NewTool("add_suprsend_object_subscriptions",
 			mcp.WithDescription(`Subscribe one or more users or other objects TO this object. The recipient list can mix users and objects in a single call.
 

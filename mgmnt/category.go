@@ -40,7 +40,11 @@ type Category struct {
 	Description              string   `json:"description"`
 	DefaultPreference        string   `json:"default_preference"`
 	DefaultMandatoryChannels []string `json:"default_mandatory_channels"`
+	DefaultOptInChannels     []string `json:"default_opt_in_channels,omitempty"`
 	Tags                     []string `json:"tags"`
+	//
+	DigestSchedule map[string]any   `json:"digest_schedule"`
+	Properties     []map[string]any `json:"properties"`
 }
 
 type CategoryPushResponse struct {

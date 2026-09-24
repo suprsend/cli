@@ -2,7 +2,7 @@
 
 List categories
 
-List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, and mandatory channels. Use --mode to switch between draft and live.
+List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, mandatory channels, and is_commercial. Use --mode to switch between draft and live.
 
 ```
 suprsend category list [flags]

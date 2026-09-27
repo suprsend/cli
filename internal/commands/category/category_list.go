@@ -16,12 +16,13 @@ type CategoryTableRow struct {
 	CategoryName             string `json:"category_name"`
 	DefaultPreference        string `json:"default_preference"`
 	DefaultMandatoryChannels string `json:"default_mandatory_channels"`
+	IsCommercial             *bool  `json:"is_commercial"`
 }
 
 var categoryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List categories",
-	Long:  "List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, and mandatory channels. Use --mode to switch between draft and live.",
+	Long:  "List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, mandatory channels, and is_commercial. Use --mode to switch between draft and live.",
 	Example: `  # List all categories (live mode)
   suprsend category list
 
@@ -61,6 +62,7 @@ var categoryListCmd = &cobra.Command{
 						CategoryName:             category.Name,
 						DefaultPreference:        category.DefaultPreference,
 						DefaultMandatoryChannels: strings.Join(category.DefaultMandatoryChannels, ", "),
+						IsCommercial:             category.IsCommercial,
 					})
 				}
 			}

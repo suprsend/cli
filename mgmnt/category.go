@@ -45,6 +45,10 @@ type Category struct {
 	//
 	DigestSchedule map[string]any   `json:"digest_schedule"`
 	Properties     []map[string]any `json:"properties"`
+	// IsCommercial controls one-click unsubscribe headers.
+	// Nil keeps the server default: true for promotional categories, false for transactional and system.
+	// System categories, and any category with default_preference=cant_unsubscribe, cannot be true.
+	IsCommercial *bool `json:"is_commercial,omitempty"`
 }
 
 type CategoryPushResponse struct {

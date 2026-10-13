@@ -50,7 +50,6 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend generate-types python`](references/suprsend_generate-types_python.md) - Generate Python types from JSON Schema
 - [`suprsend generate-types swift`](references/suprsend_generate-types_swift.md) - Generate Swift types from JSON Schema
 - [`suprsend generate-types typescript`](references/suprsend_generate-types_typescript.md) - Generate TypeScript types from JSON Schema
-- [`suprsend genskills`](references/suprsend_genskills.md) - Generate SKILLS.md
 - [`suprsend profile`](references/suprsend_profile.md) - Manage Profile
 - [`suprsend profile add`](references/suprsend_profile_add.md) - Add a new profile
 - [`suprsend profile list`](references/suprsend_profile_list.md) - List all profiles
@@ -78,6 +77,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend translation list`](references/suprsend_translation_list.md) - List translations
 - [`suprsend translation pull`](references/suprsend_translation_pull.md) - Pull translation files
 - [`suprsend translation push`](references/suprsend_translation_push.md) - Push translation files to a workspace
+- [`suprsend version`](references/suprsend_version.md) - Print the CLI version
 - [`suprsend workflow`](references/suprsend_workflow.md) - Manage workflows
 - [`suprsend workflow commit`](references/suprsend_workflow_commit.md) - Commit workflow from draft to live
 - [`suprsend workflow disable`](references/suprsend_workflow_disable.md) - Disable a workflow

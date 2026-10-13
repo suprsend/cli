@@ -14,6 +14,13 @@ cd cmd/suprsend && go build -o suprsend
 # Full build: compile type-morph binary (requires deno), generate docs and skills
 make build
 
+# Regenerate only docs/ and skills/ (what CI checks; no deno needed)
+go run ./cmd/suprsend/main.go gendocs docs/
+go run ./cmd/suprsend/main.go genskills skills/
+
+# Run unit tests
+go test ./...
+
 # Clean build artifacts
 make clean
 
@@ -22,7 +29,13 @@ make clean
 ./scripts/build.sh release      # release build
 ```
 
-There are no tests in this project.
+`go build`/`go test` need the embedded type-morph binary for your platform to exist; outside `make build`, create an empty placeholder (CI does `touch internal/utils/embedded-binaries/type-morph-linux-amd64`).
+
+There are only a few unit tests so far (schema `--json` payload, `translation pull` errors, the docs/skills generators), and CI does not run them yet.
+
+### Generated docs and skills
+
+`docs/` and `skills/suprsend-cli/` are generated from each command's `Short`/`Long`/`Example`, flag help text, and `skills:tip.*` annotations (rendered as the "Tips" list in the skill reference pages), plus the `Notes` in `internal/commands/skills.go`. Never hand-edit the generated files: change the command source and regenerate. Both generators delete their previous output first (`docs/suprsend*.md`, `skills/suprsend-cli/references/`), so pages for removed commands disappear. Hidden commands (`gendocs`, `genskills`) are excluded.
 
 ## Architecture
 

@@ -95,7 +95,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 make build
 ```
 
-A CI check on PRs to `main` verifies that `docs/` and `skills/` are up to date. Run `make build` and commit the output before opening a PR.
+A CI check on PRs to `main` verifies that `docs/` and `skills/` are up to date. Run `make build` and commit the output before opening a PR. Both are generated from the command definitions, so edit the command help text rather than the generated files.
+
+Run the unit tests (after `make build`, which creates the embedded binary the packages compile against) with:
+
+```bash
+go test ./...
+```
 
 ### Removing local build artifacts
 ```bash

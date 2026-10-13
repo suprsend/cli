@@ -106,6 +106,7 @@ var workflowPullCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
+			return clierr.Failures(fmt.Sprintf("%d workflow(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

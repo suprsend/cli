@@ -31,7 +31,7 @@ make clean
 
 `go build`/`go test` need the embedded type-morph binary for your platform to exist; outside `make build`, create an empty placeholder (CI does `touch internal/utils/embedded-binaries/type-morph-linux-amd64`).
 
-There are only a few unit tests so far (schema `--json` payload, root-type and `is_enabled` checks, `translation pull` errors, commit-result and "no changes to commit" handling plus the bulk event push reply in `mgmnt`, event push failure reporting, `clierr.Failures`, the docs/skills generators), and CI does not run them yet.
+There are only a few unit tests so far (schema `--json` payload, root-type and `is_enabled` checks, `translation pull` errors, commit-result and "no changes to commit" handling plus the bulk event push reply in `mgmnt`, event push failure reporting and `--json` checks, `clierr.Failures`, the docs/skills generators), and CI does not run them yet.
 
 ### Generated docs and skills
 

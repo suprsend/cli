@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -176,7 +177,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting workflows")
 	}
 
-	_, err = workflow.WriteWorkflowsToFiles(*workflows_resp, dirPath)
+	writeStats, err := workflow.WriteWorkflowsToFiles(*workflows_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing workflows to files")
@@ -191,6 +192,10 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	spinner.UpdateMessage(fmt.Sprintf("Pushing workflows to %s ...", toWorkspace))
 
 	var errors []string
+	// Items that couldn't be written locally are never pushed; report them too.
+	for _, e := range writeStats.Errors {
+		errors = append(errors, "pull: "+e)
+	}
 	successCount := 0
 	dryRunCount := 0
 	for _, entry := range entries {
@@ -257,7 +262,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting schemas")
 	}
 
-	_, err = schema.WriteSchemasToFiles(schemas_resp, dirPath)
+	writeStats, err := schema.WriteSchemasToFiles(schemas_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing schemas to files")
@@ -272,6 +277,10 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 	spinner.UpdateMessage(fmt.Sprintf("Pushing schemas to %s ...", toWorkspace))
 
 	var errors []string
+	// Items that couldn't be written locally are never pushed; report them too.
+	for _, e := range writeStats.Errors {
+		errors = append(errors, "pull: "+e)
+	}
 	successCount := 0
 	dryRunCount := 0
 	for _, entry := range entries {
@@ -328,11 +337,23 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting events")
 	}
-	_, err = event.WriteEventsToFiles(events_resp, dirPath)
+	writeStats, err := event.WriteEventsToFiles(events_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing events to files")
 	}
+	// Events that couldn't be written locally are never pushed; report them too.
+	var failures []string
+	for _, e := range writeStats.Errors {
+		failures = append(failures, "pull: "+e)
+	}
+	failed := func() error {
+		if len(failures) == 0 {
+			return nil
+		}
+		return clierr.Failures("one or more events failed to sync", failures, clierr.CodeAPIInternal)
+	}
+
 	events, err := event.ReadEventsFromDir(dirPath)
 	if err != nil {
 		spinner.Stop("")
@@ -340,11 +361,11 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 	}
 	if len(events) == 0 {
 		spinner.Stop("No events to sync")
-		return nil
+		return failed()
 	}
 	if dryRun {
 		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d event(s) to %s", len(events), toWorkspace))
-		return nil
+		return failed()
 	}
 	spinner.UpdateMessage(fmt.Sprintf("Pushing events to %s ...", toWorkspace))
 	records, err := mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
@@ -353,8 +374,11 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing events")
 	}
 	if err := event.PushFailures(events, records); err != nil {
+		failures = append(failures, err.Error())
+	}
+	if len(failures) > 0 {
 		spinner.Stop("")
-		return err
+		return failed()
 	}
 	spinner.Stop(fmt.Sprintf("Synced %d event(s) to %s", len(events), toWorkspace))
 	return nil
@@ -581,16 +605,19 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling templates from %s ...", fromWorkspace))
 
-	listed := 0
+	var fetchMu sync.Mutex
+	var fetchErrors []string
 	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{
-		OnListed: func(n int) { listed = n },
+		OnFetchError: func(slug string, err error) {
+			fetchMu.Lock()
+			fetchErrors = append(fetchErrors, clierr.ItemFailure("templates/"+slug, "couldn't fetch variants", err))
+			fetchMu.Unlock()
+		},
 	})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting templates")
 	}
-	// Templates whose variants couldn't be fetched are left out of results.
-	fetchFailed := max(listed-len(results), 0)
 
 	writeStats, err := template.WriteTemplatesToFiles(results, dirPath)
 	if err != nil {
@@ -625,8 +652,8 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	}
 
 	var errors []string
-	if fetchFailed > 0 {
-		errors = append(errors, fmt.Sprintf("pull: %d template(s) couldn't be fetched from %s", fetchFailed, fromWorkspace))
+	for _, e := range fetchErrors {
+		errors = append(errors, "pull: "+e)
 	}
 	for _, e := range writeStats.Errors {
 		errors = append(errors, fmt.Sprintf("local write: %s", e))
@@ -638,7 +665,7 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		spinner.Stop(fmt.Sprintf("Synced templates with %d error(s)", len(errors)))
 		return clierr.New(
 			fmt.Sprintf("one or more templates failed to sync (%d fetch failures, %d local-write failures, %d push failures):\n%s",
-				fetchFailed, writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n")),
+				len(fetchErrors), writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n")),
 			clierr.CodeAPIInternal,
 		)
 	}

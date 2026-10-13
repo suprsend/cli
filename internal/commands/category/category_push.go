@@ -134,7 +134,7 @@ var categoryPushCmd = &cobra.Command{
 			sectionCount, categoryCount := countSectionsAndCategories(input.Categories)
 			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 			if !categorySuccess || translationStats.Failed > 0 {
-				return clierr.New("category push had errors", clierr.CodeAPIInternal)
+				return categoryPushError(translationStats, categorySuccess, categoryFailErr)
 			}
 			return nil
 		}
@@ -212,7 +212,7 @@ var categoryPushCmd = &cobra.Command{
 		}
 		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 		if !categorySuccess || translationStats.Failed > 0 {
-			return clierr.New("category push had errors", clierr.CodeAPIInternal)
+			return categoryPushError(translationStats, categorySuccess, categoryFailErr)
 		}
 		return nil
 	},
@@ -223,6 +223,17 @@ var categoryPushCmd = &cobra.Command{
 // section/category counts plus push outcome. The "Translation Push Summary"
 // block follows only when translations were attempted or English files were
 // skipped (i.e. t.Total or t.SkippedEnglish is non-zero).
+// categoryPushError lists everything that failed in a category push: the
+// categories themselves and each translation locale.
+func categoryPushError(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) error {
+	var failures []string
+	if !categorySuccess {
+		failures = append(failures, clierr.ItemFailure("preference_categories", "failed to push", errors.New(categoryFailErr)))
+	}
+	failures = append(failures, t.Errors...)
+	return clierr.Failures("category push had errors", failures, clierr.CodeAPIInternal)
+}
+
 func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string, sectionCount, categoryCount int) {
 	if t == nil {
 		t = &translation.PushTranslationStats{}

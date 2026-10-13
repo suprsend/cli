@@ -43,6 +43,12 @@ var eventPushCmd = &cobra.Command{
 			if err := json.Unmarshal([]byte(jsonPayload), &payload); err != nil {
 				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
+			// Unlike an empty events directory, an empty or missing "events"
+			// array here is a mistake in the payload, so don't treat it as
+			// "nothing to push".
+			if evs, ok := payload["events"].([]any); !ok || len(evs) == 0 {
+				return clierr.New(`--json must be an object with a non-empty "events" array`, clierr.CodeInvalidUsage)
+			}
 		} else {
 			if dir == "" {
 				dir = filepath.Join(".", "suprsend", "events")

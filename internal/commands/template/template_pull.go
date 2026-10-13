@@ -48,6 +48,9 @@ type TemplateResult struct {
 type FetchOptions struct {
 	OnListed func(total int)
 	OnResult func(TemplateResult)
+	// OnFetchError is called for each template skipped because its variants
+	// couldn't be fetched. Like OnResult, it runs concurrently.
+	OnFetchError func(slug string, err error)
 }
 
 // FetchTemplates fetches either one template (when slug != "") or all templates
@@ -99,6 +102,17 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 	if err != nil {
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
 	}
+	// The list can contain a phantom entry with an empty slug; no endpoint can
+	// fetch (or push) it, so skip it instead of failing every pull.
+	listed := templates.Results[:0]
+	for _, t := range templates.Results {
+		if t.Slug == "" {
+			log.Warnf("Skipping a template with an empty slug (name %q)", t.Name)
+			continue
+		}
+		listed = append(listed, t)
+	}
+	templates.Results = listed
 	if opts.OnListed != nil {
 		opts.OnListed(len(templates.Results))
 	}
@@ -116,6 +130,9 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 			variants, err := client.GetTemplateVariants(workspace, t.Slug, mode)
 			if err != nil {
 				log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
+				if opts.OnFetchError != nil {
+					opts.OnFetchError(t.Slug, err)
+				}
 				return nil
 			}
 			mockData, err := client.GetTemplateMockData(workspace, t.Slug)
@@ -228,6 +245,12 @@ var templatePullCmd = &cobra.Command{
 				n := done.Add(1)
 				spinner.UpdateMessage(fmt.Sprintf("Pulled %d/%d templates", n, total.Load()))
 			},
+			OnFetchError: func(slug string, err error) {
+				statsMu.Lock()
+				stats.Failed++
+				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+slug, "couldn't fetch variants", err))
+				statsMu.Unlock()
+			},
 		})
 		if fetchErr != nil {
 			spinner.Stop("Failed")
@@ -235,12 +258,6 @@ var templatePullCmd = &cobra.Command{
 		}
 
 		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants.Load(), workspace))
-
-		// Templates whose variants couldn't be fetched never reach OnResult.
-		if fetchFailed := int(total.Load()) - len(results); fetchFailed > 0 {
-			stats.Failed += fetchFailed
-			stats.Errors = append(stats.Errors, fmt.Sprintf("%d template(s) couldn't be fetched", fetchFailed))
-		}
 
 		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
 		if len(stats.Errors) > 0 {

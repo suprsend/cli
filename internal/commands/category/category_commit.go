@@ -75,7 +75,7 @@ var categoryCommitCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't commit categories")
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
-		spinner.Stop(fmt.Sprintf("Committed categories to %s", workspace))
+		spinner.Stop(fmt.Sprintf("Categories in %s are up to date in live", workspace))
 		if terr != nil {
 			return clierr.New(fmt.Sprintf("categories committed to %s, but translations failed to push: %v", workspace, terr), clierr.CodeAPIInternal)
 		}

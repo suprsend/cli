@@ -104,6 +104,7 @@ var schemaPullCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
+			return clierr.Failures(fmt.Sprintf("%d schema(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

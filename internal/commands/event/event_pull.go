@@ -59,10 +59,13 @@ var eventPullCmd = &cobra.Command{
 		}
 		spinner.Stop(fmt.Sprintf("Pulled %d events", len(eventsResp.Results)))
 
-		_, err = WriteEventsToFiles(eventsResp, dirPath)
+		stats, err := WriteEventsToFiles(eventsResp, dirPath)
 		if err != nil {
 			log.Errorf("Failed to save events: %v", err)
 			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+		}
+		if stats.Failed > 0 {
+			return clierr.Failures(fmt.Sprintf("%d event(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

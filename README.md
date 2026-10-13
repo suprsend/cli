@@ -2,14 +2,14 @@
 
 [![cli MCP server](https://glama.ai/mcp/servers/suprsend/cli/badges/score.svg)](https://glama.ai/mcp/servers/suprsend/cli)
 
-SuprSend CLI is a command-line interface tool for interacting with the SuprSend API, written in Go. It also doubles as an MCP server so AI agents (Claude, Cursor, Gemini, etc.) can drive your workspace through the same set of operations.
+SuprSend CLI is a command-line interface tool for interacting with the SuprSend API, written in Go. To connect AI agents (Claude, Cursor, VS Code, Gemini, etc.) to SuprSend, use the [hosted SuprSend MCP server](https://docs.suprsend.com/reference/mcp-overview) instead of the CLI.
 
 ## What you can do with it
 
 - **Manage workspace resources** — `template`, `workflow`, `schema`, `event`, `category`, `translation`, `workspace`. Most support `list`, `get`, `pull`, `push` and `commit` against your local working directory (`event` has no `commit`, `category` has no `get`, and `workspace` only has `list`).
 - **Sync between workspaces** — `suprsend sync` pulls assets from one workspace and pushes **and commits** them in another (changes go live in the destination), using a local directory (default `./suprsend`) as intermediate storage.
 - **Generate typed payload code** — `suprsend generate-types` emits typed code in Go, TypeScript, Python, Java, Kotlin, Swift, or Dart from your event / workflow JSON Schemas.
-- **Run as an MCP server** — `suprsend start-mcp-server` exposes tools over stdio/SSE/HTTP. Installable directly from the [MCP Registry](https://modelcontextprotocol.io/registry) (`npx -y suprsend start-mcp-server`), or wire it into Claude Code / Cursor / Gemini CLI manually.
+- **MCP server (deprecated)** — `suprsend start-mcp-server` still works but is deprecated. Use the hosted MCP server at `https://mcp.suprsend.com/mcp` (for Claude Code: `claude mcp add --transport http suprsend https://mcp.suprsend.com/mcp`), or the [suprsend/claude-plugin](https://github.com/suprsend/claude-plugin) and [suprsend/agent-plugin](https://github.com/suprsend/agent-plugin) plugins. Keep using `start-mcp-server` only if you need service-token auth or a self-hosted (BYOC) instance.
 - **Multi-account / multi-environment profiles** — `suprsend profile add|modify|list|use|remove` stores per-account credentials and base URLs, so the same CLI works against public cloud, BYOC, staging, pre-prod, etc.
 
 Full command reference: [docs.suprsend.com/reference/cli-intro](https://docs.suprsend.com/reference/cli-intro). Or run `suprsend --help` for the command tree.

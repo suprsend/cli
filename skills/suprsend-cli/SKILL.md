@@ -20,6 +20,7 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - When stderr is not a terminal (piped, as in most agent and CI shells) or with `-o json`, all log output is suppressed, including `--dry-run` previews, warnings and per-item failure lines; only command output on stdout and a JSON error on stderr remain. Rely on the exit code and the error instead: when a command over several items (push or pull of a whole directory, `sync`) fails, the error lists each failed item and its reason, also as `details.failures` with `-o json`.
 - Committing when the draft already matches live is not an error: `commit`, `push --commit` and `sync` log "no changes to commit" and exit 0, so re-running them is safe.
 - `sync` pushes **and commits** every synced asset in the destination (default `--to production`), so the changes go live immediately.
+- To give an AI tool direct access to SuprSend, use the hosted MCP server at `https://mcp.suprsend.com/mcp` (sign in with a SuprSend account; for Claude Code: `claude mcp add --transport http suprsend https://mcp.suprsend.com/mcp`) or the `suprsend/claude-plugin` / `suprsend/agent-plugin` plugins. The CLI's own `start-mcp-server` command is deprecated and not covered here.
 - The `profile` command and its subcommands (add, list, modify, remove, use) are only needed for self-hosted/BYOC SuprSend instances or managing multiple accounts. SaaS users do not need them. Profiles are not used for switching between workspaces within the same account; use the `--workspace` flag for that.
 
 ## Available Commands
@@ -64,8 +65,6 @@ This CLI lets you interact with your SuprSend workspace and do actions like fetc
 - [`suprsend schema list`](references/suprsend_schema_list.md) - List schemas
 - [`suprsend schema pull`](references/suprsend_schema_pull.md) - Pull schemas
 - [`suprsend schema push`](references/suprsend_schema_push.md) - Push schemas
-- [`suprsend start-mcp-server`](references/suprsend_start-mcp-server.md) - Start SuprSend MCP server
-- [`suprsend start-mcp-server list-tools`](references/suprsend_start-mcp-server_list-tools.md) - List all the tools supported by the server
 - [`suprsend sync`](references/suprsend_sync.md) - Sync SuprSend assets from one workspace to another
 - [`suprsend template`](references/suprsend_template.md) - Manage templates
 - [`suprsend template commit`](references/suprsend_template_commit.md) - Commit a template from draft to live

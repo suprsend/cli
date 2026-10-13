@@ -94,3 +94,30 @@ func TestTranslationPullWritesFiles(t *testing.T) {
 		t.Errorf("candidate.es.json = %q, want %q", data, want)
 	}
 }
+
+func TestTranslationPullFailsOnBadEntries(t *testing.T) {
+	dir := t.TempDir()
+	err := runTranslationPull(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("offset") == "0" {
+			_, _ = w.Write([]byte(`{"results":[
+				{"slug":"ok","filename":"ok.es.json","content":{"a":"b"}},
+				{"slug":"nofile","content":{"a":"b"}},
+				{"slug":"escape","filename":"../escape.json","content":{"a":"b"}}
+			]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"results":[]}`))
+	}, "--dir", dir)
+
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAPIInternal {
+		t.Fatalf("expected a clierr with code %q, got %#v", clierr.CodeAPIInternal, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ok.es.json")); err != nil {
+		t.Errorf("expected the valid entry to be written: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(dir), "escape.json")); err == nil {
+		t.Error("a filename with a path must not be written outside --dir")
+	}
+}

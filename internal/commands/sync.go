@@ -23,7 +23,7 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync SuprSend assets from one workspace to another",
-	Long: "Sync notification assets from one workspace to another. For each asset type, sync pulls the source workspace (`--from`, default `staging`, in `--mode`, default `live`) into a local directory (`./suprsend/<type>/`, or `<dir>/<type>/` with `--dir`), then pushes every asset found in that directory to the destination workspace (`--to`, default `production`) and commits it, so synced assets go live in the destination immediately. " +
+	Long: "Sync notification assets from one workspace to another. For each asset type, sync pulls the source workspace (`--from`, default `staging`, in `--mode`, default `live`) into a local directory (`./suprsend/<type-dir>/`, or `<dir>/<type-dir>/` with `--dir`, where `<type-dir>` is `workflows`, `schemas`, `events`, `templates`, `translations` or `preference_categories`), then pushes every asset found in that directory to the destination workspace (`--to`, default `production`) and commits it, so synced assets go live in the destination immediately. " +
 		"Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.",
 	Example: `  # Sync all assets from staging to production (pushes and commits to live)
   suprsend sync --from staging --to production
@@ -38,8 +38,8 @@ var syncCmd = &cobra.Command{
   suprsend sync --from staging --to production --dir ./sync-tmp`,
 	Annotations: map[string]string{
 		"skills:tip.a-direction": "`--from` is the source (default `staging`), `--to` is the destination (default `production`); they must be different workspaces. Sync pushes **and commits** every asset type, so changes go **live** in the destination immediately. There is no draft-only sync.",
-		"skills:tip.b-commit":    "Committing is best-effort per asset: a workflow that fails validation is pushed as a draft with only a warning (the API skips its commit), and template variants that fail pre-commit validation are skipped with a warning while the valid ones are committed.",
-		"skills:tip.c-local":     "Sync pushes **every** asset in the local sync directory, not just what it pulled: local-only workflows, schemas, events, templates or translation files under `./suprsend/<type>/` are pushed and committed too. Pulled assets overwrite local files with the same slug. Use a fresh `--dir` to sync exactly what exists in the source.",
+		"skills:tip.b-commit":    "Committing is per asset: a workflow or schema that is saved as a draft but not committed (for example a workflow that fails validation) counts as a failure, and sync exits non-zero after trying the rest. Template variants that fail pre-commit validation are skipped while the valid ones are committed; the skips are only logged as warnings, and a template with no valid changed variant counts as a failure. Events the destination rejects (typically a `payload_schema` pinned to a schema `version_no` that does not exist there, since each workspace numbers schema versions separately) are listed and count as a failure; the other events are still saved. Assets with nothing to commit (the destination already matches) count as success, so re-running sync is safe.",
+		"skills:tip.c-local":     "Sync pushes **every** asset in the local sync directory, not just what it pulled: local-only workflows, schemas, events, templates or translation files under `./suprsend/{workflows,schemas,events,templates,translations}/` are pushed and committed too. Categories are the exception: `categories.json` is overwritten from the source. Pulled assets overwrite local files with the same slug. Use a fresh `--dir` to sync exactly what exists in the source.",
 		"skills:tip.d-dryrun":    "`--dry-run` makes no calls to the destination, but it still pulls the source and **overwrites local files** in the sync directory (template slug directories are deleted and rewritten). Only local checks run (JSON parsing, plus a JSON Schema compile for schemas); nothing is validated server-side. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).",
 		"skills:tip.e-confirm":   "The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) sync starts immediately, even without `--force`.",
 	},
@@ -56,6 +56,9 @@ var syncCmd = &cobra.Command{
 
 		if fromWorkspace == toWorkspace {
 			return clierr.New("cannot sync within the same workspace; source and destination workspaces must be different", clierr.CodeInvalidUsage)
+		}
+		if mode != "live" && mode != "draft" {
+			return clierr.New(fmt.Sprintf("invalid mode '%s'; valid options are: draft, live", mode), clierr.CodeInvalidUsage)
 		}
 
 		var assetsToSync []string
@@ -335,15 +338,23 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error reading events from files")
 	}
+	if len(events) == 0 {
+		spinner.Stop("No events to sync")
+		return nil
+	}
 	if dryRun {
 		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d event(s) to %s", len(events), toWorkspace))
 		return nil
 	}
 	spinner.UpdateMessage(fmt.Sprintf("Pushing events to %s ...", toWorkspace))
-	err = mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
+	records, err := mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing events")
+	}
+	if err := event.PushFailures(events, records); err != nil {
+		spinner.Stop("")
+		return err
 	}
 	spinner.Stop(fmt.Sprintf("Synced %d event(s) to %s", len(events), toWorkspace))
 	return nil
@@ -517,6 +528,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 
 		if dryRun {
 			log.Infof("DRY RUN: would push translation %s to %s", file.Name(), toWorkspace)
+			successCount++
 			continue
 		}
 
@@ -533,6 +545,13 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	if len(errors) > 0 {
 		spinner.Stop(fmt.Sprintf("Synced translations with %d error(s)", len(errors)))
 		return clierr.New(fmt.Sprintf("one or more translations failed to sync:\n%s", strings.Join(errors, "\n")), clierr.CodeAPIInternal)
+	}
+
+	if successCount == 0 {
+		// Nothing pushed, so nothing to commit (and a destination with no
+		// translations yet has no draft to commit).
+		spinner.Stop("No translations to sync")
+		return nil
 	}
 
 	if commit && !dryRun {
@@ -562,11 +581,16 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling templates from %s ...", fromWorkspace))
 
-	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{})
+	listed := 0
+	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{
+		OnListed: func(n int) { listed = n },
+	})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting templates")
 	}
+	// Templates whose variants couldn't be fetched are left out of results.
+	fetchFailed := max(listed-len(results), 0)
 
 	writeStats, err := template.WriteTemplatesToFiles(results, dirPath)
 	if err != nil {
@@ -601,6 +625,9 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	}
 
 	var errors []string
+	if fetchFailed > 0 {
+		errors = append(errors, fmt.Sprintf("pull: %d template(s) couldn't be fetched from %s", fetchFailed, fromWorkspace))
+	}
 	for _, e := range writeStats.Errors {
 		errors = append(errors, fmt.Sprintf("local write: %s", e))
 	}
@@ -610,8 +637,8 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	if len(errors) > 0 {
 		spinner.Stop(fmt.Sprintf("Synced templates with %d error(s)", len(errors)))
 		return clierr.New(
-			fmt.Sprintf("one or more templates failed to sync (%d local-write failures, %d push failures):\n%s",
-				writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n")),
+			fmt.Sprintf("one or more templates failed to sync (%d fetch failures, %d local-write failures, %d push failures):\n%s",
+				fetchFailed, writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n")),
 			clierr.CodeAPIInternal,
 		)
 	}

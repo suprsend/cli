@@ -19,8 +19,8 @@ suprsend event push [flags]
   # Push from a custom directory
   suprsend event push --dir ./my-events
 
-  # Push events inline via JSON
-  suprsend event push --json '{"events":[{"name":"user_signed_up","payload_schema":{...}}]}'
+  # Push an event inline via JSON, linked to the "user-signup" schema
+  suprsend event push --json '{"events":[{"name":"user_signed_up","payload_schema":{"schema":"user-signup"}}]}'
 
   # Dry run: preview what would be pushed without making changes
   suprsend event push --dry-run
@@ -32,7 +32,7 @@ suprsend event push [flags]
   -d, --dir string    Directory containing per-event subdirectories (default: ./suprsend/events)
   -n, --dry-run       Print what would be pushed without making any changes
   -h, --help          help for push
-  -j, --json string   Events payload as a JSON object with an "events" array, e.g. '{"events":[{"name":"user_signed_up","description":"...","payload_schema":{...}}]}'
+  -j, --json string   Events payload as a JSON object with an "events" array, e.g. '{"events":[{"name":"user_signed_up","description":"Signup completed","payload_schema":{"schema":"user-signup","version_no":1}}]}'. payload_schema links the event to an existing schema by slug (version_no is optional); it is not an inline JSON Schema
 ```
 
 ### Options inherited from parent commands

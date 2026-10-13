@@ -30,7 +30,8 @@ var schemaPushCmd = &cobra.Command{
 		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
 		"skills:tip.b-dryrun": "`--dry-run` makes no API calls. It reads the local files, compiles each payload schema (`payload_schema.json`, or the `--json` value) locally as JSON Schema (draft 2020-12; root `type` must be `object`), and logs what would be pushed. Nothing is validated server-side.",
 		"skills:tip.c-regen":  "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
-		"skills:tip.d-commit": "Exit 0 with `--commit` only means the push request succeeded: the CLI does not check whether the commit itself happened, so a failed commit is not reported. Confirm with `suprsend schema get <slug> --mode live`.",
+		"skills:tip.d-commit": "With `--commit`, a schema that is saved as a draft but not committed (for example an empty JSON Schema) is an error: the command exits non-zero with the API's reason. A schema whose draft already matches live counts as success (nothing to commit).",
+		"skills:tip.f-enabled": "Enabled/disabled is a property of the schema, not a version: it applies on push, without `--commit`. If `schema.json` has no `is_enabled` key, the API currently **enables** the schema on every push, re-enabling a disabled one (this includes `sync`). To keep a schema disabled, set `\"is_enabled\": false` in its `schema.json`. `--json` pushes never send `is_enabled`.",
 		"skills:tip.e-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -193,6 +194,9 @@ var schemaPushCmd = &cobra.Command{
 			for _, s := range dryRunSlugs {
 				log.Infof("  - %s", s)
 			}
+			if stats.Failed > 0 {
+				return clierr.New(fmt.Sprintf("%d schema(s) failed local checks", stats.Failed), clierr.CodeFileParseFailed)
+			}
 			return nil
 		}
 
@@ -206,6 +210,7 @@ var schemaPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
+			return clierr.New(fmt.Sprintf("%d schema(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
 		}
 		return nil
 	},

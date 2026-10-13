@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 )
 
 type TemplateWriteStats struct {
@@ -30,7 +31,6 @@ type TemplatePushStats struct {
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
-		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}
 	reader := bufio.NewReader(os.Stdin)
@@ -217,4 +217,33 @@ func writeOneTemplate(tmpl TemplateResult, outputDir string, stats *TemplateWrit
 	stats.Success++
 	log.Infof("Pulled template: %s", tmpl.Slug)
 	return nil
+}
+
+// selectValidVariants picks the variants for a partial (`-F`) commit: the
+// changed variants that pass pre-commit validation. It returns nil when no
+// changed variant has errors, so the whole draft (including name, channel and
+// mock-data changes) is committed, and an error when every changed variant has
+// errors, since nothing would be committed.
+func selectValidVariants(resp *mgmnt.PreCommitValidateResponse, slug string) ([]map[string]any, error) {
+	var valid []map[string]any
+	skipped := 0
+	for _, v := range resp.Variants {
+		if len(v.Errors) > 0 {
+			log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
+			skipped++
+			continue
+		}
+		valid = append(valid, map[string]any{
+			"channel": v.Channel,
+			"id":      v.ID,
+		})
+	}
+	if skipped == 0 {
+		return nil, nil
+	}
+	if len(valid) == 0 {
+		return nil, clierr.New(fmt.Sprintf("templates/%s: all %d changed variant(s) failed pre-commit validation; nothing committed", slug, skipped),
+			clierr.CodeAPIInternal).WithResource("templates/" + slug)
+	}
+	return valid, nil
 }

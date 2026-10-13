@@ -46,7 +46,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 			} else {
 				od, success := promptForOutputDirectory()
 				if !success {
-					return nil
+					return clierr.New("output directory is required; pass --dir, or --force to use the default", clierr.CodeInvalidUsage)
 				}
 				outputDir = od
 			}
@@ -57,7 +57,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		}
 	}
 	if err := ensureOutputDirectory(outputDir); err != nil {
-		return fmt.Errorf("error with output directory: %w", err)
+		return clierr.Wrap(err, clierr.CodeFileNotFound, "error with output directory")
 	}
 
 	spinner := utils.NewSpinner("Loading...")
@@ -65,7 +65,8 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 	mgmntClient := utils.GetSuprSendMgmntClient()
 	locales, err := mgmntClient.ListPreferenceTranslations(workspace)
 	if err != nil {
-		return fmt.Errorf("couldn't fetch translation locales from workspace '%s': %w", workspace, err)
+		spinner.Stop("")
+		return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch translation locales from workspace '%s'", workspace))
 	}
 
 	successCount := 0
@@ -82,6 +83,13 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 			continue
 		}
 
+		// The locale comes from the API; only accept a plain name so the file
+		// can't land outside outputDir.
+		if locale == "" || locale != filepath.Base(locale) {
+			failedCount++
+			errors = append(errors, fmt.Sprintf("Invalid locale %q", locale))
+			continue
+		}
 		filename := filepath.Join(outputDir, fmt.Sprintf("%s.json", locale))
 		fileData, err := json.MarshalIndent(translations, "", "  ")
 		if err != nil {
@@ -115,6 +123,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		for _, errMsg := range errors {
 			log.Infof("  - %s", errMsg)
 		}
+		return clierr.New(fmt.Sprintf("%d translation locale(s) failed to pull", failedCount), clierr.CodeAPIInternal)
 	}
 	return nil
 }

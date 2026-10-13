@@ -29,7 +29,6 @@ type TranslationPushStats struct {
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
-		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}
 	reader := bufio.NewReader(os.Stdin)
@@ -61,7 +60,7 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 			return stats, fmt.Errorf("error accessing '%s': %w", outputDir, err)
 		}
 	} else if !info.IsDir() {
-		return stats, err
+		return stats, fmt.Errorf("'%s' exists but is not a directory", outputDir)
 	}
 
 	for _, wf := range resp.Results {
@@ -72,7 +71,15 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 			continue
 		}
 		slug, _ := obj["slug"].(string)
-		filename := filepath.Join(outputDir, obj["filename"].(string))
+		// The filename comes from the API; only accept a plain file name so it
+		// can't point outside outputDir.
+		name, _ := obj["filename"].(string)
+		if name == "" || name != filepath.Base(name) {
+			stats.Failed++
+			stats.Errors = append(stats.Errors, fmt.Sprintf("Invalid filename %q for translation '%s'", name, slug))
+			continue
+		}
+		filename := filepath.Join(outputDir, name)
 		content, ok := obj["content"]
 		if !ok || content == nil {
 			log.Warnf("No content found for translation '%s', skipping", slug)

@@ -35,7 +35,7 @@ var listProfilesCmd = &cobra.Command{
 		sort.Strings(names)
 
 		if len(names) == 0 {
-			log.Info("No profiles found. Use 'suprsend profiles add' to add a profile")
+			log.Info("No profiles found. Use 'suprsend profile add' to add a profile")
 			return nil
 		}
 

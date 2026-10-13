@@ -36,7 +36,7 @@ var translationPullCmd = &cobra.Command{
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
-						return nil
+						return clierr.New("output directory is required; pass --dir, or --force to use the default", clierr.CodeInvalidUsage)
 					}
 					outputDir = od
 				}
@@ -56,11 +56,6 @@ var translationPullCmd = &cobra.Command{
 			log.Errorf("Failed to get translations: %v", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
-		if translationResp == nil {
-			// GetTranslations returns (nil, nil) for a mode other than draft/live.
-			spinner.Stop("")
-			return clierr.New(fmt.Sprintf("invalid mode %q: must be draft or live", mode), clierr.CodeInvalidUsage)
-		}
 		spinner.Stop(fmt.Sprintf("Pulled %d translations from %s", len(translationResp.Results), workspace))
 
 		stats, err := WriteTranslationToFiles(*translationResp, outputDir)
@@ -79,6 +74,7 @@ var translationPullCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
+			return clierr.New(fmt.Sprintf("%d translation(s) failed to write", stats.Failed), clierr.CodeAPIInternal)
 		}
 		return nil
 	},

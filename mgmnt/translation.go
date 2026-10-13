@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
+	"github.com/suprsend/cli/internal/clierr"
 )
 
 type TranslationItem struct {
@@ -68,8 +69,7 @@ func (c *SS_MgmntClient) ListTranslations(workspace, mode, includeContent string
 
 func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationResponse, error) {
 	if mode != "live" && mode != "draft" {
-		log.Errorf("%s: invalid mode. Available modes are: draft, live", mode)
-		return nil, nil
+		return nil, clierr.New(fmt.Sprintf("invalid mode '%s'; valid options are: draft, live", mode), clierr.CodeInvalidUsage)
 	}
 	client := client.NewHTTPClient()
 	defer client.Close()
@@ -152,7 +152,7 @@ func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) er
 		return err
 	}
 	if res.IsError() {
-		return apiError(res)
+		return commitHTTPError(res, "translations")
 	}
 	return nil
 }

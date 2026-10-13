@@ -25,7 +25,7 @@ suprsend workflow push [<slug>] [flags]
 
 - Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.
 - `--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and logs what would be pushed. Nothing is validated server-side.
-- Exit 0 with `--commit` does not guarantee the workflow is live: if the workflow fails validation, the API saves the draft but skips the commit, and the CLI only logs a `Workflow <slug> is not valid` warning. Check for that warning, or confirm with `suprsend workflow get <slug> --mode live`.
+- With `--commit`, a workflow that is saved as a draft but not committed is an error: an invalid workflow exits 2 and lists the validation errors, and any other commit failure exits 1. A workflow whose draft already matches live counts as success (nothing to commit).
 - `-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.
 
 ### Options

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -28,7 +29,6 @@ var trailingNonAlphanumRe = regexp.MustCompile(`[^a-zA-Z0-9]+$`)
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
-		fmt.Fprintf(os.Stderr, "required flag missing, cannot prompt in non-interactive mode")
 		return "", false
 	}
 	reader := bufio.NewReader(os.Stdin)
@@ -180,4 +180,37 @@ func ReadEventsFromDir(dirPath string) ([]any, error) {
 		events = append(events, obj)
 	}
 	return events, nil
+}
+
+// PushFailures returns an error listing every event the bulk push rejected,
+// or nil when all succeeded. records are in the same order as events, which
+// is how a record is matched to its event name.
+func PushFailures(events []any, records []mgmnt.EventPushRecord) error {
+	var lines []string
+	var failed []map[string]any
+	for i, rec := range records {
+		if !rec.Failed() {
+			continue
+		}
+		name := fmt.Sprintf("#%d", i)
+		if i < len(events) {
+			if obj, ok := events[i].(map[string]any); ok {
+				if n, _ := obj["name"].(string); n != "" {
+					name = n
+				}
+			}
+		}
+		msg := rec.Message
+		if msg == "" && rec.Error != nil {
+			msg = rec.Error.Message
+		}
+		log.Errorf("events/%s: %s", name, msg)
+		lines = append(lines, fmt.Sprintf("events/%s: %s", name, msg))
+		failed = append(failed, map[string]any{"name": name, "message": msg})
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	return clierr.New(fmt.Sprintf("%d of %d event(s) failed to push:\n%s", len(lines), len(events), strings.Join(lines, "\n")),
+		clierr.CodeAPIInternal).WithDetails(map[string]any{"failed": failed})
 }

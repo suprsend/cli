@@ -106,7 +106,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				t := parts[1]
 				tenantIDPtr = &t
 			}
-			var variants []string
+			variants := []string{} // the API rejects null
 			if variantsList, ok := variantsRaw.([]any); ok {
 				for _, v := range variantsList {
 					if s, ok := v.(string); ok {
@@ -122,7 +122,8 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				Variants: variants,
 			})
 		}
-		var variantOrder mgmnt.VariantOrderResponse
+		// The API rejects null channels, so send [] for a template with no variants.
+		variantOrder := mgmnt.VariantOrderResponse{Channels: []mgmnt.VariantOrderChannel{}}
 		for _, ch := range channelMap {
 			variantOrder.Channels = append(variantOrder.Channels, *ch)
 		}
@@ -138,21 +139,13 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to pre-commit validate template %s", slug))
 			}
 
-			var validVariants []map[string]any
-			for _, v := range validateResp.Variants {
-				if len(v.Errors) > 0 {
-					log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
-					continue
-				}
-				validVariants = append(validVariants, map[string]any{
-					"channel": v.Channel,
-					"id":      v.ID,
-				})
-			}
-
-			if len(validVariants) == 0 {
-				log.Warnf("No valid variants to commit for template %s", slug)
+			if !validateResp.HasChanges {
+				log.Infof("Template %s: no changes to commit", slug)
 				return nil
+			}
+			validVariants, err := selectValidVariants(validateResp, slug)
+			if err != nil {
+				return err
 			}
 
 			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, validVariants); err != nil {
@@ -183,7 +176,7 @@ var templatePushCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
 		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads the local template directories and logs the variants and channels that would be pushed. Nothing is validated server-side.",
-		"skills:tip.c-force":   "With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If no variant passes, nothing is committed and push still exits 0. Without `-F`, all variants are committed together.",
+		"skills:tip.c-force":   "With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, push succeeds without committing. Without `-F`, all variants are committed together.",
 		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -300,6 +293,9 @@ var templatePushCmd = &cobra.Command{
 			log.Infof("DRY RUN: would %s %d template(s) to %s", action, len(dryRunSlugs), workspace)
 			for _, s := range dryRunSlugs {
 				log.Infof("  - %s", s)
+			}
+			if stats.Failed > 0 {
+				return clierr.New(fmt.Sprintf("%d template(s) failed local checks", stats.Failed), clierr.CodeFileParseFailed)
 			}
 			return nil
 		}

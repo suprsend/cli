@@ -35,7 +35,7 @@ suprsend template push [<slug>] [flags]
 
 - Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live, or pass `--commit` to push + commit in one step.
 - `--dry-run` makes no API calls: it only reads the local template directories and logs the variants and channels that would be pushed. Nothing is validated server-side.
-- With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If no variant passes, nothing is committed and push still exits 0. Without `-F`, all variants are committed together.
+- With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, push succeeds without committing. Without `-F`, all variants are committed together.
 - The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.
 
 ### Options

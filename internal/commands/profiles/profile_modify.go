@@ -91,7 +91,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	}
 
 	if len(profileNames) == 0 {
-		log.Info("No profiles found. Use the command 'suprsend profiles add' to add a profile.")
+		log.Info("No profiles found. Use the command 'suprsend profile add' to add a profile.")
 		return
 	}
 

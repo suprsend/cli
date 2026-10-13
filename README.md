@@ -6,7 +6,7 @@ SuprSend CLI is a command-line interface tool for interacting with the SuprSend 
 
 ## What you can do with it
 
-- **Manage workspace resources** — `template`, `workflow`, `schema`, `event`, `category`, `translation`, `workspace`. Each supports `list`, `get`, `pull`, `push`, `commit` against your local working directory.
+- **Manage workspace resources** — `template`, `workflow`, `schema`, `event`, `category`, `translation`, `workspace`. Most support `list`, `get`, `pull`, `push` and `commit` against your local working directory (`event` has no `commit`, `category` has no `get`, and `workspace` only has `list`).
 - **Sync between workspaces** — `suprsend sync` pulls assets from one workspace and pushes **and commits** them in another (changes go live in the destination), using a local directory (default `./suprsend`) as intermediate storage.
 - **Generate typed payload code** — `suprsend generate-types` emits typed code in Go, TypeScript, Python, Java, Kotlin, Swift, or Dart from your event / workflow JSON Schemas.
 - **Run as an MCP server** — `suprsend start-mcp-server` exposes tools over stdio/SSE/HTTP. Installable directly from the [MCP Registry](https://modelcontextprotocol.io/registry) (`npx -y suprsend start-mcp-server`), or wire it into Claude Code / Cursor / Gemini CLI manually.

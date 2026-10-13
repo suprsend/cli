@@ -1,6 +1,7 @@
 package category
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -14,7 +15,7 @@ import (
 var categoryCommitCmd = &cobra.Command{
 	Use:   "commit",
 	Short: "Commit categories",
-	Long:  "Promote preference categories from draft to live mode. Before committing, it also pushes every non-English translation file from the `translations/` subdirectory of --dir (default `./suprsend/preference_categories/translations`); translation push errors are ignored and do not stop the commit.",
+	Long:  "Promote preference categories from draft to live mode. Before committing, it also pushes every non-English translation file from the `translations/` subdirectory of --dir (default `./suprsend/preference_categories/translations`); a translation push error does not stop the commit, but the command then exits non-zero.",
 	Example: `  # Commit categories to live
   suprsend category commit
 
@@ -25,7 +26,7 @@ var categoryCommitCmd = &cobra.Command{
   suprsend category commit --commit-message "Update notification preferences"`,
 	Annotations: map[string]string{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**. End-users immediately see the new preference categories on their notification settings page.",
-		"skills:tip.b-translations": "Local translation files in the `translations/` subdirectory are pushed (live) before the commit. Translation push failures are only logged: the commit still runs and the command exits 0. Check the output for `failed to push` errors, or run `suprsend category translation push` first (it exits non-zero when a locale fails).",
+		"skills:tip.b-translations": "Local translation files in the `translations/` subdirectory are pushed (live) before the commit. If a locale fails to push, the categories are still committed, but the command exits non-zero and names the failure. Run `suprsend category translation push` first to fix translations separately.",
 		"skills:tip.c-confirm":      "The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) the commit proceeds without asking, even without `-F`. Use `--dry-run` if you only want to check the command.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -59,7 +60,14 @@ var categoryCommitCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner("Loading...")
 
-		_, _ = translation.PushTranslations(workspace, "", translationDir, false)
+		// Translations are not part of the commit (they have no draft state),
+		// so a failed locale doesn't block it, but it does fail the command.
+		_, terr := translation.PushTranslations(workspace, "", translationDir, false)
+		var ce *clierr.CLIError
+		if errors.As(terr, &ce) && (ce.Code == clierr.CodeInvalidUsage || ce.Code == clierr.CodeFileNotFound) {
+			log.Debugf("No translations to push: %v", terr)
+			terr = nil
+		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		err := mgmntClient.FinalizeCategories(workspace, commitMsg)
@@ -68,6 +76,9 @@ var categoryCommitCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 		spinner.Stop(fmt.Sprintf("Committed categories to %s", workspace))
+		if terr != nil {
+			return clierr.New(fmt.Sprintf("categories committed to %s, but translations failed to push: %v", workspace, terr), clierr.CodeAPIInternal)
+		}
 		return nil
 	},
 }

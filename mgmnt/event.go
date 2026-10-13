@@ -1,10 +1,10 @@
 package mgmnt
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -140,19 +140,34 @@ func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, er
 	return res.Result().(*Event), nil
 }
 
-func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]any) error {
+// EventPushRecord is the result for one event in a bulk push, in request order.
+type EventPushRecord struct {
+	StatusCode int    `json:"status_code"`
+	Status     string `json:"status"`
+	Message    string `json:"message"`
+	Error      *struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+	} `json:"error,omitempty"`
+}
+
+// Failed reports whether the API rejected this event.
+func (r EventPushRecord) Failed() bool {
+	return r.Status != "success" || r.StatusCode >= 400
+}
+
+// PushEventsFromPayload upserts events with one bulk request and returns the
+// per-event results. The endpoint answers 207 whenever the request itself is
+// valid, even if some events fail (for example a payload_schema that doesn't
+// exist in the workspace), so callers must check each record.
+func (c *SS_MgmntClient) PushEventsFromPayload(workspace string, events map[string]any) ([]EventPushRecord, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "bulk", "event", "/")
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
-	}
-	urlStr = u.String()
 	log.Debugf("Pushing events to workspace: %s", workspace)
 	res, err := client.R().
 		SetDebug(c.debug).
@@ -162,28 +177,32 @@ func (c *SS_MgmntClient) pushEventsPayload(workspace string, events map[string]a
 		Post(urlStr)
 	if err != nil {
 		log.Errorf("Error pushing event: %s", err)
-		return err
+		return nil, err
 	}
 	if res.IsError() {
-		return apiError(res)
+		return nil, apiError(res)
 	}
-	return nil
+	return parseEventPushRecords(res.Bytes()), nil
 }
 
-func (c *SS_MgmntClient) PushEvents(workspace, filePath string) error {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		log.Errorf("Error reading event schema mapping file: %s", err)
-		return err
+// parseEventPushRecords reads the bulk reply: {"records":[...], ...} when at
+// least one event is valid, or a bare array of records when none is.
+func parseEventPushRecords(body []byte) []EventPushRecord {
+	body = bytes.TrimSpace(body)
+	var records []EventPushRecord
+	if len(body) > 0 && body[0] == '[' {
+		if err := json.Unmarshal(body, &records); err != nil {
+			log.Warnf("Couldn't parse event push response: %v", err)
+		}
+		return records
 	}
-	var events map[string]any
-	if err := json.Unmarshal(data, &events); err != nil {
-		log.Errorf("Error parsing event_schema_mapping.json: %s", err)
-		return err
+	var wrapped struct {
+		Records []EventPushRecord `json:"records"`
 	}
-	return c.pushEventsPayload(workspace, events)
-}
-
-func (c *SS_MgmntClient) PushEventsFromPayload(workspace string, events map[string]any) error {
-	return c.pushEventsPayload(workspace, events)
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &wrapped); err != nil {
+			log.Warnf("Couldn't parse event push response: %v", err)
+		}
+	}
+	return wrapped.Records
 }

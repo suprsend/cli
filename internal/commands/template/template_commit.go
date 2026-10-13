@@ -27,7 +27,7 @@ var templateCommitCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, overwriting the previous live version. Affected workflows immediately render the new content.",
 		"skills:tip.b-inspect":      "If you didn't author the draft locally, run `suprsend template get --slug <slug> --mode draft` first to inspect what will become live.",
-		"skills:tip.c-force":        "`-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning (the command fails if none pass). Without `-F`, all variants are committed together.",
+		"skills:tip.c-force":        "`-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning (the command fails if every changed variant fails). Without `-F`, all variants are committed together.",
 		"skills:tip.d-confirm":      "The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) the commit proceeds without asking, even without `-F`. Use `--dry-run` if you only want to check the command.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -71,20 +71,9 @@ var templateCommitCmd = &cobra.Command{
 
 			validationSpinner.Stop("")
 
-			for _, v := range validateResp.Variants {
-				if len(v.Errors) > 0 {
-					log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
-					continue
-				}
-				variants = append(variants, map[string]any{
-					"channel": v.Channel,
-					"id":      v.ID,
-				})
-			}
-
-			if len(variants) == 0 {
-				log.Errorf("No valid variants to commit for template %s", slug)
-				return clierr.New(fmt.Sprintf("no valid variants to commit for template %s", slug), clierr.CodeAPIInternal)
+			variants, err = selectValidVariants(validateResp, slug)
+			if err != nil {
+				return err
 			}
 		}
 

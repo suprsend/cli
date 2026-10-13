@@ -4,7 +4,7 @@ Commit categories
 
 ### Synopsis
 
-Promote preference categories from draft to live mode. Before committing, it also pushes every non-English translation file from the `translations/` subdirectory of --dir (default `./suprsend/preference_categories/translations`); translation push errors are ignored and do not stop the commit.
+Promote preference categories from draft to live mode. Before committing, it also pushes every non-English translation file from the `translations/` subdirectory of --dir (default `./suprsend/preference_categories/translations`); a translation push error does not stop the commit, but the command then exits non-zero.
 
 ```
 suprsend category commit [flags]

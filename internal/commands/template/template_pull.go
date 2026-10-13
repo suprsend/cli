@@ -164,7 +164,7 @@ var templatePullCmd = &cobra.Command{
   # Pull to a custom directory using the flag form
   suprsend template pull --slug welcome-email --dir ./my-templates`,
 	Annotations: map[string]string{
-		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`.",
+		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -184,7 +184,7 @@ var templatePullCmd = &cobra.Command{
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
-						return clierr.New("output directory is required; use --dir to specify one", clierr.CodeInvalidUsage)
+						return clierr.New("output directory is required; pass --dir, or --force to use the default", clierr.CodeInvalidUsage)
 					}
 					outputDir = od
 				}
@@ -236,12 +236,21 @@ var templatePullCmd = &cobra.Command{
 
 		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants.Load(), workspace))
 
+		// Templates whose variants couldn't be fetched never reach OnResult.
+		if fetchFailed := int(total.Load()) - len(results); fetchFailed > 0 {
+			stats.Failed += fetchFailed
+			stats.Errors = append(stats.Errors, fmt.Sprintf("%d template(s) couldn't be fetched", fetchFailed))
+		}
+
 		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
 		if len(stats.Errors) > 0 {
 			log.Info("Errors:")
 			for _, e := range stats.Errors {
 				log.Infof("  - %s", e)
 			}
+		}
+		if stats.Failed > 0 {
+			return clierr.New(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), clierr.CodeAPIInternal)
 		}
 		return nil
 	},

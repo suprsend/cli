@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -33,7 +34,8 @@ var templateListCmd = &cobra.Command{
 
 		templates, err := mgmntClient.ListTemplates(workspace, limit, offset, mode)
 		if err != nil {
-			return err
+			spinner.Stop("")
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't list templates")
 		}
 
 		spinner.Stop(fmt.Sprintf("Listed %d templates from %s with offset %d", len(templates.Results), workspace, offset))

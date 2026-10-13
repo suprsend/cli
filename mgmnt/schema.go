@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
+	"github.com/suprsend/cli/internal/clierr"
 	"resty.dev/v3"
 )
 
@@ -55,13 +56,6 @@ type LinkedSchemas struct {
 	LinkedWorkflows []string   `json:"linked_workflows"`
 	LinkedEvents    []string   `json:"linked_events"`
 	CreatedAt       string     `json:"created_at"`
-}
-
-type SchemaPayload struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	IsEnabled   string     `json:"is_enabled"`
-	JSONSchema  JSONSchema `json:"json_schema"`
 }
 
 type JSONSchema struct {
@@ -355,6 +349,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
 		SetBody(payload).
+		SetResult(&SchemaPushResponse{}).
 		Post(urlStr)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -362,7 +357,14 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 	if resp.IsError() {
 		return apiError(resp)
 	}
+	if commit {
+		return commitError("schemas/"+schemaSlug, resp.Result().(*SchemaPushResponse).CommitResult, clierr.CodeAPIConflict)
+	}
 	return nil
+}
+
+type SchemaPushResponse struct {
+	CommitResult *CommitResult `json:"commit_result"`
 }
 
 func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) error {
@@ -393,7 +395,7 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if res.IsError() {
-		return apiError(res)
+		return commitHTTPError(res, "schemas/"+slug)
 	}
 	return nil
 }

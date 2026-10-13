@@ -73,7 +73,7 @@ var categoryPushCmd = &cobra.Command{
 				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			if input.Categories == nil {
-				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeUnknown)
+				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeInvalidUsage)
 			}
 
 			mgmntClient := utils.GetSuprSendMgmntClient()

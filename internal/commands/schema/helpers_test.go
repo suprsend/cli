@@ -73,6 +73,7 @@ func TestSchemaPayloadFromJSONRejectsInvalidInput(t *testing.T) {
 		{"null", `null`, "must be a JSON Schema object"},
 		{"array", `[{"type":"object"}]`, "failed to parse --json"},
 		{"non-object root", `{"type":"string"}`, "root 'type' must be 'object'"},
+		{"missing root type", `{"properties":{"id":{"type":"string"}}}`, "root 'type' must be 'object'"},
 		{"invalid schema", `{"type":"object","properties":{"id":{"type":"strng"}}}`, "is not a valid JSON Schema"},
 	}
 	for _, tt := range tests {
@@ -88,10 +89,38 @@ func TestSchemaPayloadFromJSONRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestSchemaPayloadFromJSONAcceptsObjectInTypeList(t *testing.T) {
+	if _, err := SchemaPayloadFromJSON("order-placed", `{"type":["object","null"],"properties":{"id":{"type":"string"}}}`); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func keysOf(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+func TestSchemaFilesRoundTripIsEnabled(t *testing.T) {
+	dir := t.TempDir()
+	obj := map[string]any{"name": "Order placed", "description": "", "is_enabled": false, "json_schema": map[string]any{"type": "object"}}
+	if err := writeSchemaFiles(dir, "order-placed", obj); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := ReadAndMergeSchemaFiles(dir, "order-placed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := payload["is_enabled"]; !ok || v != false {
+		t.Errorf("is_enabled = %v (present %v), want false so push keeps the schema disabled", v, ok)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "schema.json"), []byte(`{"slug":"order-placed","is_enabled":"no"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadAndMergeSchemaFiles(dir, "order-placed"); err == nil || !strings.Contains(err.Error(), "is_enabled must be true or false") {
+		t.Errorf("expected a non-bool is_enabled to be rejected, got %v", err)
+	}
 }

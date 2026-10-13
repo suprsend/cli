@@ -27,7 +27,7 @@ var workflowPushCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
 		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and logs what would be pushed. Nothing is validated server-side.",
-		"skills:tip.c-commit": "Exit 0 with `--commit` does not guarantee the workflow is live: if the workflow fails validation, the API saves the draft but skips the commit, and the CLI only logs a `Workflow <slug> is not valid` warning. Check for that warning, or confirm with `suprsend workflow get <slug> --mode live`.",
+		"skills:tip.c-commit": "With `--commit`, a workflow that is saved as a draft but not committed is an error: an invalid workflow exits 2 and lists the validation errors, and any other commit failure exits 1. A workflow whose draft already matches live counts as success (nothing to commit).",
 		"skills:tip.d-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -43,7 +43,7 @@ var workflowPushCmd = &cobra.Command{
 		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
-			return clierr.New("--json requires --slug to be specified", clierr.CodeUnknown)
+			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
 		}
 
 		if commit && !dryRun && !force {
@@ -209,6 +209,9 @@ var workflowPushCmd = &cobra.Command{
 			log.Infof("DRY RUN: would %s %d workflow(s) to %s", action, len(dryRunSlugs), workspace)
 			for _, s := range dryRunSlugs {
 				log.Infof("  - %s", s)
+			}
+			if stats.Failed > 0 {
+				return clierr.New(fmt.Sprintf("%d workflow(s) failed local checks", stats.Failed), clierr.CodeFileParseFailed)
 			}
 			return nil
 		}

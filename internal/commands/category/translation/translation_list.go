@@ -42,7 +42,8 @@ func listTranslations(workspace, outputType string) error {
 
 	translations, err := mgmntClient.ListPreferenceTranslations(workspace)
 	if err != nil {
-		return fmt.Errorf("couldn't fetch translations: %w", err)
+		spinner.Stop("")
+		return clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch translations")
 	}
 
 	spinner.Stop(fmt.Sprintf("Listed %d translation locales from %s", len(translations.Results), workspace))

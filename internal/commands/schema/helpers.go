@@ -235,6 +235,37 @@ func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
 	if err := json.Unmarshal(psData, &payloadSchema); err != nil {
 		return nil, fmt.Errorf("schemas/%s: failed to parse payload_schema.json: %w", slug, err)
 	}
+	if err := cleanAndValidatePayloadSchema(slug, "payload_schema.json", payloadSchema); err != nil {
+		return nil, err
+	}
+
+	payload["json_schema"] = payloadSchema
+	return payload, nil
+}
+
+// SchemaPayloadFromJSON builds the push payload for `schema push --json`.
+// The flag value is a JSON Schema object — the same content as
+// payload_schema.json — so it is cleaned and validated the same way and sent
+// under "json_schema". The management API only reads `name`, `description`,
+// `json_schema` and `is_enabled` from the request body, so posting the bare
+// schema would silently drop it.
+func SchemaPayloadFromJSON(slug, raw string) (map[string]any, error) {
+	var payloadSchema map[string]any
+	if err := json.Unmarshal([]byte(raw), &payloadSchema); err != nil {
+		return nil, fmt.Errorf("schemas/%s: failed to parse --json: %w", slug, err)
+	}
+	if payloadSchema == nil {
+		return nil, fmt.Errorf("schemas/%s: --json must be a JSON Schema object", slug)
+	}
+	if err := cleanAndValidatePayloadSchema(slug, "--json", payloadSchema); err != nil {
+		return nil, err
+	}
+	return map[string]any{"json_schema": payloadSchema}, nil
+}
+
+// cleanAndValidatePayloadSchema strips the $schema key from a payload schema
+// (in place) and validates it. source names the input in error messages.
+func cleanAndValidatePayloadSchema(slug, source string, payloadSchema map[string]any) error {
 	delete(payloadSchema, "$schema")
 
 	// SuprSend requires the root payload schema's type to be "object".
@@ -242,7 +273,7 @@ func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
 	// (jsonschema/v5 would otherwise allow non-object root types per the
 	// JSON Schema spec).
 	if t, ok := payloadSchema["type"].(string); ok && t != "object" {
-		return nil, fmt.Errorf("schemas/%s: payload_schema.json root 'type' must be 'object', got %q", slug, t)
+		return fmt.Errorf("schemas/%s: %s root 'type' must be 'object', got %q", slug, source, t)
 	}
 
 	// Re-marshal the cleaned payload schema and compile it. Catches typos
@@ -250,14 +281,12 @@ func ReadAndMergeSchemaFiles(slugDir, slug string) (map[string]any, error) {
 	// '$ref', etc. — the same shape errors the API rejects.
 	cleanedBytes, err := json.Marshal(payloadSchema)
 	if err != nil {
-		return nil, fmt.Errorf("schemas/%s: failed to re-marshal payload_schema.json: %w", slug, err)
+		return fmt.Errorf("schemas/%s: failed to re-marshal %s: %w", slug, source, err)
 	}
 	if err := compileSchema(cleanedBytes); err != nil {
-		return nil, fmt.Errorf("schemas/%s: payload_schema.json is not a valid JSON Schema: %w", slug, err)
+		return fmt.Errorf("schemas/%s: %s is not a valid JSON Schema: %w", slug, source, err)
 	}
-
-	payload["json_schema"] = payloadSchema
-	return payload, nil
+	return nil
 }
 
 type SchemasResponse struct {

@@ -2,6 +2,7 @@ package clierr
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -24,5 +25,21 @@ func TestFailuresListsEachFailure(t *testing.T) {
 	}
 	if strings.Contains(Failures("x", nil, CodeAPIInternal).Message, ":") {
 		t.Error("no failures should leave the summary unchanged")
+	}
+}
+
+func TestItemFailureDoesNotRepeatResource(t *testing.T) {
+	tests := []struct {
+		err  error
+		want string
+	}{
+		{New("workflows/bad: saved as draft but not committed", CodeAPIConflict), "workflows/bad: failed to push: saved as draft but not committed"},
+		{errors.New("request failed: 500"), "workflows/bad: failed to push: request failed: 500"},
+		{errors.New("workflows/badge: other"), "workflows/bad: failed to push: workflows/badge: other"},
+	}
+	for _, tt := range tests {
+		if got := ItemFailure("workflows/bad", "failed to push", tt.err); got != tt.want {
+			t.Errorf("ItemFailure(%q) = %q, want %q", tt.err, got, tt.want)
+		}
 	}
 }

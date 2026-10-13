@@ -271,7 +271,7 @@ var templatePushCmd = &cobra.Command{
 				hasError = true
 				log.WithError(err).Errorf("templates/%s: failed to push", templateSlug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("templates/%s: failed to push: %v", templateSlug, err))
+				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+templateSlug, "failed to push", err))
 				continue
 			}
 

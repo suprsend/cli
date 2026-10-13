@@ -222,7 +222,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 		err = mgmntClient.PushWorkflow(toWorkspace, slug, wf, commit, commitMessage)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("workflows/%s: failed to push: %v", slug, err))
+			errors = append(errors, clierr.ItemFailure("workflows/"+slug, "failed to push", err))
 			log.Errorf("workflows/%s: failed to push: %v", slug, err)
 			continue
 		}
@@ -294,7 +294,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 
 		err = mgmntClient.PushSchema(toWorkspace, slug, sch, commit, commitMessage)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("schemas/%s: failed to push: %v", slug, err))
+			errors = append(errors, clierr.ItemFailure("schemas/"+slug, "failed to push", err))
 			log.Errorf("schemas/%s: failed to push: %v", slug, err)
 			continue
 		}
@@ -456,7 +456,7 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 		// Push translation to destination workspace
 		err = mgmntClient.PushPreferenceTranslation(toWorkspace, locale, *translations)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("preference_categories/translations/%s.json: failed to push: %v", locale, err))
+			errors = append(errors, clierr.ItemFailure("preference_categories/translations/"+locale+".json", "failed to push", err))
 			log.Errorf("preference_categories/translations/%s.json: failed to push: %v", locale, err)
 			continue
 		}
@@ -534,7 +534,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 
 		err = mgmntClient.PushTranslation(toWorkspace, file.Name(), map[string]any{"content": translation})
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("translations/%s: failed to push: %v", file.Name(), err))
+			errors = append(errors, clierr.ItemFailure("translations/"+file.Name(), "failed to push", err))
 			log.Errorf("translations/%s: failed to push: %v", file.Name(), err)
 			continue
 		}
@@ -618,7 +618,7 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		if err := template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun); err != nil {
 			log.Errorf("templates/%s: failed to push: %v", slug, err)
 			pushStats.Failed++
-			pushStats.Errors = append(pushStats.Errors, fmt.Sprintf("templates/%s: failed to push: %v", slug, err))
+			pushStats.Errors = append(pushStats.Errors, clierr.ItemFailure("templates/"+slug, "failed to push", err))
 		} else {
 			pushStats.Success++
 		}

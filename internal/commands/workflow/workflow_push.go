@@ -192,7 +192,7 @@ var workflowPushCmd = &cobra.Command{
 				hasError = true
 				log.WithError(err).Errorf("workflows/%s: failed to push", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("workflows/%s: failed to push: %v", slug, err))
+				stats.Errors = append(stats.Errors, clierr.ItemFailure("workflows/"+slug, "failed to push", err))
 				continue
 			}
 

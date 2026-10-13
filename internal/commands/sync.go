@@ -517,7 +517,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting translations")
 	}
-	_, err = translation.WriteTranslationToFiles(*translations_resp, dirPath)
+	writeStats, err := translation.WriteTranslationToFiles(*translations_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing translations to files")
@@ -531,6 +531,10 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	spinner.UpdateMessage(fmt.Sprintf("Pushing translations to %s ...", toWorkspace))
 
 	var errors []string
+	// Translations that couldn't be written locally are never pushed; report them too.
+	for _, e := range writeStats.Errors {
+		errors = append(errors, "pull: "+e)
+	}
 	successCount := 0
 	for _, file := range files {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {

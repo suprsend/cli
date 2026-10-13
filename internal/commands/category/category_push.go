@@ -38,7 +38,7 @@ var categoryPushCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-draft":   "Categories are written to the **draft** state. Run `suprsend category commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
 		"skills:tip.b-live":    "Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.",
-		"skills:tip.c-dryrun":  "`--dry-run` makes no API calls: it only reads `categories.json` and the translation files (or `--json`) and logs counts. Nothing is validated server-side.",
+		"skills:tip.c-dryrun":  "`--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and logs counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.",
 		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -218,11 +218,6 @@ var categoryPushCmd = &cobra.Command{
 	},
 }
 
-// emitCategoryPushSummary prints the end-of-run summary for `category push`.
-// The "Category Push Summary" block is always printed and reports the
-// section/category counts plus push outcome. The "Translation Push Summary"
-// block follows only when translations were attempted or English files were
-// skipped (i.e. t.Total or t.SkippedEnglish is non-zero).
 // categoryPushError lists everything that failed in a category push: the
 // categories themselves and each translation locale.
 func categoryPushError(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) error {
@@ -234,6 +229,11 @@ func categoryPushError(t *translation.PushTranslationStats, categorySuccess bool
 	return clierr.Failures("category push had errors", failures, clierr.CodeAPIInternal)
 }
 
+// emitCategoryPushSummary prints the end-of-run summary for `category push`.
+// The "Category Push Summary" block is always printed and reports the
+// section/category counts plus push outcome. The "Translation Push Summary"
+// block follows only when translations were attempted or English files were
+// skipped (i.e. t.Total or t.SkippedEnglish is non-zero).
 func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string, sectionCount, categoryCount int) {
 	if t == nil {
 		t = &translation.PushTranslationStats{}

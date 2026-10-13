@@ -84,7 +84,13 @@ var templateCommitCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		spinner.Stop(fmt.Sprintf("Successfully committed template '%s' to live", slug))
+		// selectValidVariants returns a list only when it skipped invalid
+		// variants; otherwise the whole draft was committed or already live.
+		if variants != nil {
+			spinner.Stop(fmt.Sprintf("Committed %d valid variant(s) of template '%s' to live; invalid variants were skipped", len(variants), slug))
+		} else {
+			spinner.Stop(fmt.Sprintf("Template '%s' is up to date in live", slug))
+		}
 		return nil
 	},
 }

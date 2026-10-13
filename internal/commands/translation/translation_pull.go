@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -22,7 +23,7 @@ var translationPullCmd = &cobra.Command{
 
   # Pull draft translations
   suprsend translation pull --mode draft`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -35,14 +36,14 @@ var translationPullCmd = &cobra.Command{
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
-						return
+						return nil
 					}
 					outputDir = od
 				}
 			}
 			if outputDir == "" {
 				log.Info("No output directory specified. Exiting.")
-				return
+				return nil
 			}
 		}
 
@@ -51,15 +52,21 @@ var translationPullCmd = &cobra.Command{
 		mgmnt_client := utils.GetSuprSendMgmntClient()
 		translationResp, err := mgmnt_client.GetTranslations(workspace, mode)
 		if err != nil {
+			spinner.Stop("")
 			log.Errorf("Failed to get translations: %v", err)
-			return
+			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+		}
+		if translationResp == nil {
+			// GetTranslations returns (nil, nil) for a mode other than draft/live.
+			spinner.Stop("")
+			return clierr.New(fmt.Sprintf("invalid mode %q: must be draft or live", mode), clierr.CodeInvalidUsage)
 		}
 		spinner.Stop(fmt.Sprintf("Pulled %d translations from %s", len(translationResp.Results), workspace))
 
 		stats, err := WriteTranslationToFiles(*translationResp, outputDir)
 		if err != nil {
 			log.Errorf("Failed to save translations: %v", err)
-			return
+			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 		}
 
 		log.Info("=== Translation Pull Summary ===")
@@ -73,6 +80,7 @@ var translationPullCmd = &cobra.Command{
 				log.Infof("  - %s", errorMsg)
 			}
 		}
+		return nil
 	},
 }
 

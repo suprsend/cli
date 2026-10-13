@@ -82,6 +82,7 @@ var startMcpServerCmd = &cobra.Command{
   Claude (web/Desktop) Settings > Connectors > Add custom connector > https://mcp.suprsend.com/mcp
   Claude plugin:       /plugin marketplace add suprsend/claude-plugin, then /plugin install suprsend@suprsend
   VS Code, Copilot CLI, Codex, Cursor: the suprsend/agent-plugin plugin (https://github.com/suprsend/agent-plugin)
+  Gemini CLI:          add "suprsend": {"httpUrl": "https://mcp.suprsend.com/mcp"} under mcpServers in ~/.gemini/settings.json, then /mcp auth suprsend
 
 Setup for other clients: https://docs.suprsend.com/reference/mcp-overview
 

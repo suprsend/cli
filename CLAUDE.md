@@ -78,10 +78,10 @@ Use `clierr` (`internal/clierr/clierr.go`) for all user-facing errors — never 
 - **`generate-types` command** — Fetches JSON schemas from API and generates typed code (Python, TypeScript, Go, Java, Kotlin, Swift, Dart) using an embedded Deno binary (`type-morph/`)
 - **MCP server (deprecated)** — `start-mcp-server` command serves tools over stdio/SSE/HTTP transports using `mcp-go`. Tools are dynamically registered for events and workflows.
   - **Deprecated in favour of the hosted MCP server** (`https://mcp.suprsend.com/mcp`, OAuth sign-in) and the `suprsend/claude-plugin` / `suprsend/agent-plugin` plugins. Cobra's `Deprecated` field prints the notice on stderr (stdout stays clean JSON-RPC for stdio clients) and hides the command from help, completion and the generated docs/skills; the server also sends MCP `instructions` pointing assistants to the replacement. It stays only for service-token auth and BYOC instances, which the hosted server doesn't cover yet, so don't add features to it.
-  - **Default tool surface differs by entry point.** Terminal users get `--workflows=none --events=none` (minimal — only the static admin tools) so scripted invocations stay predictable. Registry-installed servers (Glama, MCP Registry) get `--workflows=all` injected via `server.json`'s `packageArguments`, so installing through a registry exposes the full trigger surface out of the box.
+  - **Default tool surface**: `--workflows=none --events=none` (only the static admin tools) so invocations stay predictable; pass `--workflows`/`--events` to add trigger tools.
   - **Selector syntax**: `--workflows` accepts `all`, `none`, comma-separated slugs, or `tag:<tag>` entries (e.g. `tag:onboarding,tag:transactional`). Mixed forms work: `welcome,tag:transactional`. Tag matching is client-side — the management API does not currently support `?tags=` filtering, so all workflows are fetched and filtered in memory.
   - **Cold start**: payload-schema fetches for dynamic tools run in parallel (bounded to 10 concurrent requests). A schema fetch failure for one workflow/event no longer aborts startup — it logs and skips that single tool, leaving the rest registered.
-- **Gemini CLI extension** — Built as a separate binary via goreleaser for Google Gemini CLI integration
+- **Retired distribution channels** — the MCP Registry entry `io.github.suprsend/cli` (now deprecated; the hosted server is listed as `com.suprsend/mcp`), the Gemini CLI extension (`gemini-extension.json` and its goreleaser build/archive) and the Glama listing (`glama.json`) were removed along with the `start-mcp-server` deprecation. Gemini CLI users connect to the hosted server via `httpUrl` in `~/.gemini/settings.json`.
 
 ### Release
 
@@ -89,7 +89,7 @@ Uses goreleaser (`.goreleaser.yaml`). Builds include macOS notarization and Home
 
 After goreleaser, the release workflow also publishes to npm via `scripts/publish-npm.sh`. This ships seven packages at the same version: the unscoped root `suprsend` (a Node shim) and six platform packages `@suprsend/cli-<os>-<arch>` (darwin/linux/win32 × x64/arm64), each carrying the matching goreleaser binary. Package sources live under `npm/`. Users run `npx suprsend` or `npm i -g suprsend`.
 
-After npm publish, the workflow publishes the (deprecated) CLI MCP server metadata to the [MCP Registry](https://modelcontextprotocol.io/registry) via `mcp-publisher`. The manifest is `server.json` at the repo root and references the `suprsend` npm package; ownership is verified by the `mcpName: io.github.suprsend/cli` field in `npm/suprsend/package.json` (which must match `server.json#name`). Authentication is via GitHub OIDC — no extra secrets needed. The MCP host launches the server as `npx -y suprsend start-mcp-server` (`packageArguments` in `server.json`).
+After npm publish, the workflow no longer publishes to the [MCP Registry](https://modelcontextprotocol.io/registry). Instead it runs `mcp-publisher status --status deprecated --all-versions` on `io.github.suprsend/cli` (GitHub OIDC login, no extra secrets), so every version of the old CLI server entry shows as deprecated and points to `com.suprsend/mcp`. The step is idempotent and can be removed once the registry shows all versions deprecated.
 
 #### Pre-release tags (beta / rc / alpha / canary)
 
@@ -98,7 +98,6 @@ Tags with a SemVer pre-release suffix (`0.3.0-beta.1`, `0.3.0-rc.2`, `1.0.0-alph
 - **GitHub release** — `release.prerelease: auto` in `.goreleaser.yaml` auto-detects the suffix and marks the release as a pre-release.
 - **npm** — `scripts/publish-npm.sh` derives the dist-tag from the suffix (`-beta.1` → `beta`, `-rc.2` → `rc`, `-canary.5` → `canary`) and publishes all seven packages under that dist-tag, NOT under `latest`. Stable users running `npm i suprsend` are unaffected; testers opt in via `npm i suprsend@beta`.
 - **Homebrew** — `homebrew_casks[].skip_upload: auto` skips the public `suprsend/homebrew-tap` update on pre-releases. `brew upgrade suprsend` on the stable tap never bumps users to a beta build.
-- **MCP Registry** — the four publish-related steps in `release.yml` are guarded by `if: ${{ !contains(github.ref_name, '-') }}`, so the registry only ever advertises stable versions.
-- **Glama** — Glama releases are user-triggered through their admin UI; the maintainer chooses whether to mark a Glama release on a pre-release tag.
+- **MCP Registry** — the deprecation step in `release.yml` is guarded by `if: ${{ !contains(github.ref_name, '-') }}`, so it only runs on stable releases.
 
-The detection rule across all four channels is the same: any tag with a `-` in the version string is treated as a pre-release per SemVer 2.0. If we ever need stable releases with weird suffixes, all four guards have to be revisited together.
+The detection rule across all of these is the same: any tag with a `-` in the version string is treated as a pre-release per SemVer 2.0. If we ever need stable releases with weird suffixes, all of these guards have to be revisited together.

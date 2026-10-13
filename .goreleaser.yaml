@@ -30,21 +30,6 @@ builds:
       - linux
       - windows
       - darwin
-  - id: gemini-cli-extension
-    env:
-      - CGO_ENABLED=0
-    main: ./cmd/suprsend
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
-      - -X go.szostok.io/version.version={{.Version}}
-      - -X go.szostok.io/version.buildDate={{.Date}}
 
 archives:
   # existing tar/zip archives
@@ -62,20 +47,6 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
-  - id: gemini-cli-extension
-    ids:
-      - gemini-cli-extension
-    formats: tar.gz
-    files:
-      - gemini-extension.json
-    name_template: >-
-      {{ if eq .Os "windows" }}win32
-      {{- else }}{{ .Os }}{{ end }}.
-      {{- if eq .Arch "amd64" }}x64
-      {{- else }}{{ .Arch }}{{ end }}.suprsend
-    format_overrides:
-      - goos: windows
-        formats: zip
 
 checksum:
   name_template: "checksums.txt"

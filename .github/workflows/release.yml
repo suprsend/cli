@@ -94,34 +94,22 @@ jobs:
       - name: Publish to npm
         run: scripts/publish-npm.sh "${GITHUB_REF_NAME#v}"
 
-      # MCP Registry only hosts metadata; the npm package above is the artifact.
-      # Registry validation pulls the published package and matches mcpName
-      # against server.json#name, so this step must run after npm publish.
-      #
-      # Pre-release tags (0.x.y-beta.z, 0.x.y-rc.z, ...) are skipped so the
-      # registry only ever advertises stable versions. The npm publish above
-      # still happens for pre-releases under a non-`latest` dist-tag, so beta
-      # users have somewhere to install from.
-      - name: Install mcp-publisher
+      # The CLI's own MCP server (start-mcp-server) is deprecated in favour of
+      # the hosted server, which is listed in the MCP Registry as
+      # com.suprsend/mcp. We no longer publish io.github.suprsend/cli; this
+      # marks every published version deprecated. It is idempotent, so it is
+      # safe on every stable release, and can be dropped once the registry
+      # shows all versions as deprecated. Pre-release tags are skipped, as
+      # the publish steps were.
+      - name: Deprecate the CLI server in the MCP Registry
         if: ${{ !contains(github.ref_name, '-') }}
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
             | tar xz mcp-publisher
-
-      - name: Stamp version into server.json
-        if: ${{ !contains(github.ref_name, '-') }}
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp
-          mv server.tmp server.json
-
-      - name: Authenticate to MCP Registry (GitHub OIDC)
-        if: ${{ !contains(github.ref_name, '-') }}
-        run: ./mcp-publisher login github-oidc
-
-      - name: Publish to MCP Registry
-        if: ${{ !contains(github.ref_name, '-') }}
-        run: ./mcp-publisher publish
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher status --status deprecated --all-versions --yes \
+            --message "Deprecated: use com.suprsend/mcp, SuprSend's hosted MCP server (https://mcp.suprsend.com/mcp)." \
+            io.github.suprsend/cli
 
       - name: Clean up keys
         if: always()

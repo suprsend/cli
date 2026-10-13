@@ -35,7 +35,7 @@ There are only a few unit tests so far (schema `--json` payload, root-type and `
 
 ### Generated docs and skills
 
-`docs/` and `skills/suprsend-cli/` are generated from each command's `Short`/`Long`/`Example`, flag help text, and `skills:tip.*` annotations (rendered as the "Tips" list in the skill reference pages), plus the `Notes` in `internal/commands/skills.go`. Never hand-edit the generated files: change the command source and regenerate. Both generators delete their previous output first (`docs/suprsend*.md`, `skills/suprsend-cli/references/`), so pages for removed commands disappear. Hidden commands (`gendocs`, `genskills`) are excluded.
+`docs/` and `skills/suprsend-cli/` are generated from each command's `Short`/`Long`/`Example`, flag help text, and `skills:tip.*` annotations (rendered as the "Tips" list in the skill reference pages), plus the `Notes` in `internal/commands/skills.go`. Never hand-edit the generated files: change the command source and regenerate. Both generators delete their previous output first (`docs/suprsend*.md`, `skills/suprsend-cli/references/`), so pages for removed commands disappear. Hidden commands (`gendocs`, `genskills`) and deprecated ones (`start-mcp-server`) are excluded.
 
 ## Architecture
 
@@ -81,7 +81,7 @@ Use `clierr` (`internal/clierr/clierr.go`) for all user-facing errors — never 
   - **Default tool surface**: `--workflows=none --events=none` (only the static admin tools) so invocations stay predictable; pass `--workflows`/`--events` to add trigger tools.
   - **Selector syntax**: `--workflows` accepts `all`, `none`, comma-separated slugs, or `tag:<tag>` entries (e.g. `tag:onboarding,tag:transactional`). Mixed forms work: `welcome,tag:transactional`. Tag matching is client-side — the management API does not currently support `?tags=` filtering, so all workflows are fetched and filtered in memory.
   - **Cold start**: payload-schema fetches for dynamic tools run in parallel (bounded to 10 concurrent requests). A schema fetch failure for one workflow/event no longer aborts startup — it logs and skips that single tool, leaving the rest registered.
-- **Retired distribution channels** — the MCP Registry entry `io.github.suprsend/cli` (now deprecated; the hosted server is listed as `com.suprsend/mcp`), the Gemini CLI extension (`gemini-extension.json` and its goreleaser build/archive) and the Glama listing (`glama.json`) were removed along with the `start-mcp-server` deprecation. Gemini CLI users connect to the hosted server via `httpUrl` in `~/.gemini/settings.json`.
+- **Retired distribution channels** — the MCP Registry entry `io.github.suprsend/cli` (now deprecated; the hosted server is listed as `com.suprsend/mcp`), the Gemini CLI extension (`gemini-extension.json` and its goreleaser build/archive) and Glama (`glama.json` and the README badge; the listing on glama.ai itself is unlisted by hand in Glama's admin UI) were retired along with the `start-mcp-server` deprecation. Gemini CLI users connect to the hosted server via `httpUrl` in `~/.gemini/settings.json`.
 
 ### Release
 

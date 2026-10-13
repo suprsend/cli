@@ -194,7 +194,7 @@ func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslat
 	}
 
 	if stats.Failed > 0 {
-		return stats, clierr.New(fmt.Sprintf("%d locale(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+		return stats, clierr.Failures(fmt.Sprintf("%d locale(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 	}
 	return stats, nil
 }

@@ -165,7 +165,7 @@ var translationPushCmd = &cobra.Command{
 				log.Infof("  - %s", n)
 			}
 			if stats.Failed > 0 {
-				return clierr.New(fmt.Sprintf("%d translation(s) failed local checks", stats.Failed), clierr.CodeFileParseFailed)
+				return clierr.Failures(fmt.Sprintf("%d translation(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
 			}
 			return nil
 		}
@@ -191,7 +191,7 @@ var translationPushCmd = &cobra.Command{
 		}
 
 		if stats.Failed > 0 {
-			return clierr.New(fmt.Sprintf("%d translation(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d translation(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

@@ -123,7 +123,7 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 		for _, errMsg := range errors {
 			log.Infof("  - %s", errMsg)
 		}
-		return clierr.New(fmt.Sprintf("%d translation locale(s) failed to pull", failedCount), clierr.CodeAPIInternal)
+		return clierr.Failures(fmt.Sprintf("%d translation locale(s) failed to pull", failedCount), errors, clierr.CodeAPIInternal)
 	}
 	return nil
 }

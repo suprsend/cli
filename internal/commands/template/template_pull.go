@@ -250,7 +250,7 @@ var templatePullCmd = &cobra.Command{
 			}
 		}
 		if stats.Failed > 0 {
-			return clierr.New(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

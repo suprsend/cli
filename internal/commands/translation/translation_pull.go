@@ -74,7 +74,7 @@ var translationPullCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
-			return clierr.New(fmt.Sprintf("%d translation(s) failed to write", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d translation(s) failed to write", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

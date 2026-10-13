@@ -195,7 +195,7 @@ var schemaPushCmd = &cobra.Command{
 				log.Infof("  - %s", s)
 			}
 			if stats.Failed > 0 {
-				return clierr.New(fmt.Sprintf("%d schema(s) failed local checks", stats.Failed), clierr.CodeFileParseFailed)
+				return clierr.Failures(fmt.Sprintf("%d schema(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
 			}
 			return nil
 		}
@@ -210,7 +210,7 @@ var schemaPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
-			return clierr.New(fmt.Sprintf("%d schema(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d schema(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

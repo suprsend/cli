@@ -187,7 +187,6 @@ func ReadEventsFromDir(dirPath string) ([]any, error) {
 // is how a record is matched to its event name.
 func PushFailures(events []any, records []mgmnt.EventPushRecord) error {
 	var lines []string
-	var failed []map[string]any
 	for i, rec := range records {
 		if !rec.Failed() {
 			continue
@@ -206,11 +205,9 @@ func PushFailures(events []any, records []mgmnt.EventPushRecord) error {
 		}
 		log.Errorf("events/%s: %s", name, msg)
 		lines = append(lines, fmt.Sprintf("events/%s: %s", name, msg))
-		failed = append(failed, map[string]any{"name": name, "message": msg})
 	}
 	if len(lines) == 0 {
 		return nil
 	}
-	return clierr.New(fmt.Sprintf("%d of %d event(s) failed to push:\n%s", len(lines), len(events), strings.Join(lines, "\n")),
-		clierr.CodeAPIInternal).WithDetails(map[string]any{"failed": failed})
+	return clierr.Failures(fmt.Sprintf("%d of %d event(s) failed to push", len(lines), len(events)), lines, clierr.CodeAPIInternal)
 }

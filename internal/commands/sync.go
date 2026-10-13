@@ -97,7 +97,7 @@ var syncCmd = &cobra.Command{
 		log.Infof("Assets to sync: %v", assetsToSync)
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		hasErrors := false
+		var failures []string
 
 		for _, assetType := range assetsToSync {
 			switch assetType {
@@ -105,42 +105,42 @@ var syncCmd = &cobra.Command{
 				err := syncWorkflows(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync workflows: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync workflows: %v", err))
 				}
 			case "schema":
 				err := syncSchemas(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync schemas: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync schemas: %v", err))
 				}
 			case "event":
 				err := syncEvents(mgmntClient, fromWorkspace, toWorkspace, dirPath, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync events: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync events: %v", err))
 				}
 			case "category":
 				err := syncCategories(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync categories: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync categories: %v", err))
 				}
 			case "translation":
 				err := syncTranslation(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync translations: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync translations: %v", err))
 				}
 			case "template":
 				err := syncTemplates(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync templates: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync templates: %v", err))
 				}
 			}
 		}
-		if hasErrors {
-			return clierr.New("sync complete with errors", clierr.CodeAPIInternal)
+		if len(failures) > 0 {
+			return clierr.Failures("sync complete with errors", failures, clierr.CodeAPIInternal)
 		}
 		log.Info("Sync complete")
 		return nil

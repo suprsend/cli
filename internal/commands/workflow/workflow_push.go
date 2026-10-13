@@ -27,7 +27,7 @@ var workflowPushCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
 		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and logs what would be pushed. Nothing is validated server-side.",
-		"skills:tip.c-commit": "With `--commit`, a workflow that is saved as a draft but not committed is an error. Pushing one workflow (`workflow push <slug> --commit`) exits 2 for an invalid workflow, with the validation errors in the message, and 1 for any other commit failure. Pushing all workflows exits 1 if any of them fails; the per-workflow reasons are only in the log output. A workflow whose draft already matches live counts as success (nothing to commit).",
+		"skills:tip.c-commit": "With `--commit`, a workflow that is saved as a draft but not committed is an error. Pushing one workflow (`workflow push <slug> --commit`) exits 2 for an invalid workflow, with the validation errors in the message, and 1 for any other commit failure. Pushing all workflows exits 1 if any of them fails, and the error lists each failed workflow with its reason. A workflow whose draft already matches live counts as success (nothing to commit).",
 		"skills:tip.d-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -211,7 +211,7 @@ var workflowPushCmd = &cobra.Command{
 				log.Infof("  - %s", s)
 			}
 			if stats.Failed > 0 {
-				return clierr.New(fmt.Sprintf("%d workflow(s) failed local checks", stats.Failed), clierr.CodeFileParseFailed)
+				return clierr.Failures(fmt.Sprintf("%d workflow(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
 			}
 			return nil
 		}
@@ -226,7 +226,7 @@ var workflowPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
-			return clierr.New(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

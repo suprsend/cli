@@ -3,6 +3,7 @@ package clierr
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 const (
@@ -114,4 +115,15 @@ func Wrap(err error, code, hint string) *CLIError {
 		return ce
 	}
 	return &CLIError{Message: err.Error(), Code: code, Hint: hint}
+}
+
+// Failures creates a CLIError for a run where some items failed. Each failure
+// goes in the message and in details["failures"], because the per-item log
+// lines are suppressed when stderr isn't a terminal or with -o json.
+func Failures(summary string, failures []string, code string) *CLIError {
+	msg := summary
+	if len(failures) > 0 {
+		msg += ":\n" + strings.Join(failures, "\n")
+	}
+	return New(msg, code).WithDetails(map[string]any{"failures": failures})
 }

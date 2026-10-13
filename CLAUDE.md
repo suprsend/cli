@@ -31,7 +31,7 @@ make clean
 
 `go build`/`go test` need the embedded type-morph binary for your platform to exist; outside `make build`, create an empty placeholder (CI does `touch internal/utils/embedded-binaries/type-morph-linux-amd64`).
 
-There are only a few unit tests so far (schema `--json` payload, root-type and `is_enabled` checks, `translation pull` errors, commit-result and "no changes to commit" handling plus the bulk event push reply in `mgmnt`, event push failure reporting, the docs/skills generators), and CI does not run them yet.
+There are only a few unit tests so far (schema `--json` payload, root-type and `is_enabled` checks, `translation pull` errors, commit-result and "no changes to commit" handling plus the bulk event push reply in `mgmnt`, event push failure reporting, `clierr.Failures`, the docs/skills generators), and CI does not run them yet.
 
 ### Generated docs and skills
 
@@ -68,6 +68,7 @@ Use `clierr` (`internal/clierr/clierr.go`) for all user-facing errors — never 
 
 - `clierr.New(message, code)` — create a new structured error
 - `clierr.Wrap(err, code, hint)` — promote a plain error with a code and hint
+- `clierr.Failures(summary, failures, code)` — the error for a run over several items where some failed; lists each failure in the message and in `details.failures`, since per-item log lines are hidden when stderr is piped
 - Codes are constants in `clierr` (e.g. `CodeConfigInvalid`, `CodeAuthMissingToken`, `CodeFileParseFailed`). Pick the closest match; use `CodeUnknown` as a last resort.
 - `clierr` errors carry a numeric exit code (auth=3, validation=2, not-found=4, etc.) and render correctly in both plain-text and `--output json` modes.
 

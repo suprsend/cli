@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
+	"github.com/suprsend/cli/internal/clierr"
 )
 
 type Workflow struct {
@@ -24,6 +25,7 @@ type WorkflowPushResponse struct {
 		IsValid bool  `json:"is_valid"`
 		Errors  []any `json:"errors"`
 	} `json:"validation_result"`
+	CommitResult *CommitResult `json:"commit_result"`
 }
 
 type WorkflowAPIResponse struct {
@@ -295,10 +297,12 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		return apiError(res)
 	}
 	if commit {
-		validationResult := res.Result().(*WorkflowPushResponse)
-		if !validationResult.ValidationResult.IsValid {
-			log.Warnf("Workflow %s is not valid: %v", slug, validationResult.ValidationResult.Errors)
+		result := res.Result().(*WorkflowPushResponse)
+		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
+			return clierr.New(fmt.Sprintf("workflows/%s: saved as draft but not committed: workflow is invalid: %v", slug, result.ValidationResult.Errors),
+				clierr.CodeSchemaValidation).WithResource("workflows/" + slug)
 		}
+		return commitError("workflows/"+slug, result.CommitResult, clierr.CodeAPIConflict)
 	}
 	return nil
 }
@@ -332,7 +336,7 @@ func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string)
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if res.IsError() {
-		return apiError(res)
+		return commitHTTPError(res, "workflows/"+slug)
 	}
 	return nil
 }

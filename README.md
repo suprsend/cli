@@ -6,8 +6,8 @@ SuprSend CLI is a command-line interface tool for interacting with the SuprSend 
 
 ## What you can do with it
 
-- **Manage workspace resources** — `template`, `workflow`, `schema`, `event`, `category`, `translation`, `workspace`. Each supports `list`, `get`, `pull`, `push`, `commit` against your local working directory.
-- **Sync between workspaces** — `suprsend sync` pulls assets from one workspace and pushes to another, with an optional local directory as intermediate storage.
+- **Manage workspace resources** — `template`, `workflow`, `schema`, `event`, `category`, `translation`, `workspace`. Most support `list`, `get`, `pull`, `push` and `commit` against your local working directory (`event` has no `commit`, `category` has no `get`, and `workspace` only has `list`).
+- **Sync between workspaces** — `suprsend sync` pulls assets from one workspace and pushes **and commits** them in another (changes go live in the destination), using a local directory (default `./suprsend`) as intermediate storage.
 - **Generate typed payload code** — `suprsend generate-types` emits typed code in Go, TypeScript, Python, Java, Kotlin, Swift, or Dart from your event / workflow JSON Schemas.
 - **Run as an MCP server** — `suprsend start-mcp-server` exposes tools over stdio/SSE/HTTP. Installable directly from the [MCP Registry](https://modelcontextprotocol.io/registry) (`npx -y suprsend start-mcp-server`), or wire it into Claude Code / Cursor / Gemini CLI manually.
 - **Multi-account / multi-environment profiles** — `suprsend profile add|modify|list|use|remove` stores per-account credentials and base URLs, so the same CLI works against public cloud, BYOC, staging, pre-prod, etc.
@@ -95,7 +95,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 make build
 ```
 
-A CI check on PRs to `main` verifies that `docs/` and `skills/` are up to date. Run `make build` and commit the output before opening a PR.
+A CI check on PRs to `main` verifies that `docs/` and `skills/` are up to date. Run `make build` and commit the output before opening a PR. Both are generated from the command definitions, so edit the command help text rather than the generated files.
+
+Run the unit tests (after `make build`, which creates the embedded binary the packages compile against) with:
+
+```bash
+go test ./...
+```
 
 ### Removing local build artifacts
 ```bash

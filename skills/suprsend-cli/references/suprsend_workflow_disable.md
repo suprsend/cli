@@ -11,7 +11,8 @@ suprsend workflow disable [<slug>] [flags]
 ## Examples
 
 ```
-  # Disable a workflow (prompts for confirmation)
+  # Disable a workflow (prompts for confirmation in an interactive terminal;
+  # when stdin is not a TTY, e.g. CI or an agent shell, it disables without asking)
   suprsend workflow disable welcome
 
   # Disable without confirmation prompt

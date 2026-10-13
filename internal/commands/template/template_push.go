@@ -106,7 +106,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				t := parts[1]
 				tenantIDPtr = &t
 			}
-			var variants []string
+			variants := []string{} // the API rejects null
 			if variantsList, ok := variantsRaw.([]any); ok {
 				for _, v := range variantsList {
 					if s, ok := v.(string); ok {
@@ -122,7 +122,8 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				Variants: variants,
 			})
 		}
-		var variantOrder mgmnt.VariantOrderResponse
+		// The API rejects null channels, so send [] for a template with no variants.
+		variantOrder := mgmnt.VariantOrderResponse{Channels: []mgmnt.VariantOrderChannel{}}
 		for _, ch := range channelMap {
 			variantOrder.Channels = append(variantOrder.Channels, *ch)
 		}
@@ -138,21 +139,13 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to pre-commit validate template %s", slug))
 			}
 
-			var validVariants []map[string]any
-			for _, v := range validateResp.Variants {
-				if len(v.Errors) > 0 {
-					log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
-					continue
-				}
-				validVariants = append(validVariants, map[string]any{
-					"channel": v.Channel,
-					"id":      v.ID,
-				})
-			}
-
-			if len(validVariants) == 0 {
-				log.Warnf("No valid variants to commit for template %s", slug)
+			if !validateResp.HasChanges {
+				log.Infof("Template %s: no changes to commit", slug)
 				return nil
+			}
+			validVariants, err := selectValidVariants(validateResp, slug)
+			if err != nil {
+				return err
 			}
 
 			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, validVariants); err != nil {
@@ -171,7 +164,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 var templatePushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push templates and their variants from local to SuprSend workspace",
-	Long:  `Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.`,
+	Long:  "Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.\n\n" + templateLayoutHelp,
 	Example: `  # Push all templates from default directory
   suprsend template push
 
@@ -181,8 +174,10 @@ var templatePushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend template push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live.",
-		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the template server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads the local template directories and logs the variants and channels that would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-force":   "With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, push succeeds without committing. Without `-F`, all variants are committed together.",
+		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -276,7 +271,7 @@ var templatePushCmd = &cobra.Command{
 				hasError = true
 				log.WithError(err).Errorf("templates/%s: failed to push", templateSlug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("templates/%s: failed to push: %v", templateSlug, err))
+				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+templateSlug, "failed to push", err))
 				continue
 			}
 
@@ -299,6 +294,9 @@ var templatePushCmd = &cobra.Command{
 			for _, s := range dryRunSlugs {
 				log.Infof("  - %s", s)
 			}
+			if stats.Failed > 0 {
+				return clierr.Failures(fmt.Sprintf("%d template(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
+			}
 			return nil
 		}
 
@@ -312,7 +310,7 @@ var templatePushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
-			return clierr.New(fmt.Sprintf("%d template(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d template(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},
@@ -365,7 +363,7 @@ func init() {
 	templatePushCmd.PersistentFlags().BoolP("commit", "c", false, "Commit the pushed templates to live")
 	templatePushCmd.PersistentFlags().String("commit-message", "", "Commit message describing the changes")
 	templatePushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to push")
-	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
+	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "With --commit: skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)")
 	templatePushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

@@ -23,7 +23,7 @@ type jsonCategoryInput struct {
 var categoryPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push categories to a workspace",
-	Long:  `Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are staged as drafts. Use --commit to also promote to live.`,
+	Long:  "Upload local preference categories and translations to a workspace. Reads `categories.json` and `translations/<locale>.json` from the input directory (default `./suprsend/preference_categories`). Categories are staged as a draft unless --commit is passed. Translation files (every locale except `en`) are pushed first and take effect immediately, with or without --commit.",
 	Example: `  # Push from local files (default directory)
   suprsend category push
 
@@ -36,8 +36,10 @@ var categoryPushCmd = &cobra.Command{
   # Push categories inline via JSON
   suprsend category push --json '{"categories": {...}}'`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend category commit` to promote draft → live.",
-		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the categories server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.a-draft":   "Categories are written to the **draft** state. Run `suprsend category commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-live":    "Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.",
+		"skills:tip.c-dryrun":  "`--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and logs counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.",
+		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -71,7 +73,7 @@ var categoryPushCmd = &cobra.Command{
 				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 			}
 			if input.Categories == nil {
-				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeUnknown)
+				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeInvalidUsage)
 			}
 
 			mgmntClient := utils.GetSuprSendMgmntClient()
@@ -132,7 +134,7 @@ var categoryPushCmd = &cobra.Command{
 			sectionCount, categoryCount := countSectionsAndCategories(input.Categories)
 			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 			if !categorySuccess || translationStats.Failed > 0 {
-				return clierr.New("category push had errors", clierr.CodeAPIInternal)
+				return categoryPushError(translationStats, categorySuccess, categoryFailErr)
 			}
 			return nil
 		}
@@ -210,10 +212,21 @@ var categoryPushCmd = &cobra.Command{
 		}
 		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
 		if !categorySuccess || translationStats.Failed > 0 {
-			return clierr.New("category push had errors", clierr.CodeAPIInternal)
+			return categoryPushError(translationStats, categorySuccess, categoryFailErr)
 		}
 		return nil
 	},
+}
+
+// categoryPushError lists everything that failed in a category push: the
+// categories themselves and each translation locale.
+func categoryPushError(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) error {
+	var failures []string
+	if !categorySuccess {
+		failures = append(failures, clierr.ItemFailure("preference_categories", "failed to push", errors.New(categoryFailErr)))
+	}
+	failures = append(failures, t.Errors...)
+	return clierr.Failures("category push had errors", failures, clierr.CodeAPIInternal)
 }
 
 // emitCategoryPushSummary prints the end-of-run summary for `category push`.

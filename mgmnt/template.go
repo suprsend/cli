@@ -206,7 +206,7 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		return apiError(resp)
+		return commitHTTPError(resp, "templates/"+slug)
 	}
 	return nil
 }

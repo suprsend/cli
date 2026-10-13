@@ -2,7 +2,7 @@
 
 Push schemas
 
-Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema.
+Upload local schemas to a workspace. For every subdirectory `<dir>/<slug>/` of the input directory (default `./suprsend/schemas`), reads `schema.json` (name, description, and `is_enabled` if present) and `payload_schema.json` (the JSON Schema), validates the payload schema locally, and pushes both; the directory name is used as the slug. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema, or omit to push all. With a slug, --json takes the JSON Schema inline instead of reading the slug's files.
 
 ```
 suprsend schema push [<slug>] [flags]
@@ -17,15 +17,21 @@ suprsend schema push [<slug>] [flags]
   # Push a single schema and commit to live immediately
   suprsend schema push order-placed --commit
 
+  # Push an inline JSON Schema instead of reading payload_schema.json
+  suprsend schema push order-placed --json '{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}'
+
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run
 ```
 
 ### Tips
 
-- Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.
-- Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.
+- Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live, or pass `--commit` to push + commit in one step.
+- `--dry-run` makes no API calls. It reads the local files, compiles each payload schema (`payload_schema.json`, or the `--json` value) locally as JSON Schema (draft 2020-12; root `type` must be `object`), and logs what would be pushed. Nothing is validated server-side.
 - After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.
+- With `--commit`, a schema that is saved as a draft but not committed (for example an empty JSON Schema) is an error: the command exits non-zero with the API's reason. A schema whose draft already matches live counts as success (nothing to commit).
+- `-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.
+- Enabled/disabled is a property of the schema, not a version: it applies on push, without `--commit`. If `schema.json` has no `is_enabled` key, the API currently **enables** the schema on every push, re-enabling a disabled one (this includes `sync`). To keep a schema disabled, set `"is_enabled": false` in its `schema.json`. `--json` pushes never send `is_enabled`.
 
 ### Options
 
@@ -36,7 +42,7 @@ suprsend schema push [<slug>] [flags]
   -n, --dry-run                 Print what would be pushed without making any changes
   -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
-  -j, --json string             Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
+  -j, --json string             Payload JSON Schema as a JSON object, used instead of payload_schema.json (requires --slug). Must be a valid JSON Schema with root type "object", e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
   -g, --slug string             Schema slug to push (omit to push all)
 ```
 

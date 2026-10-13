@@ -48,6 +48,9 @@ type TemplateResult struct {
 type FetchOptions struct {
 	OnListed func(total int)
 	OnResult func(TemplateResult)
+	// OnFetchError is called for each template skipped because its variants
+	// couldn't be fetched. Like OnResult, it runs concurrently.
+	OnFetchError func(slug string, err error)
 }
 
 // FetchTemplates fetches either one template (when slug != "") or all templates
@@ -99,6 +102,17 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 	if err != nil {
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
 	}
+	// The list can contain a phantom entry with an empty slug; no endpoint can
+	// fetch (or push) it, so skip it instead of failing every pull.
+	listed := templates.Results[:0]
+	for _, t := range templates.Results {
+		if t.Slug == "" {
+			log.Warnf("Skipping a template with an empty slug (name %q)", t.Name)
+			continue
+		}
+		listed = append(listed, t)
+	}
+	templates.Results = listed
 	if opts.OnListed != nil {
 		opts.OnListed(len(templates.Results))
 	}
@@ -116,6 +130,9 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 			variants, err := client.GetTemplateVariants(workspace, t.Slug, mode)
 			if err != nil {
 				log.WithError(err).Errorf("Couldn't fetch variants for template: %s", t.Slug)
+				if opts.OnFetchError != nil {
+					opts.OnFetchError(t.Slug, err)
+				}
 				return nil
 			}
 			mockData, err := client.GetTemplateMockData(workspace, t.Slug)
@@ -154,7 +171,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 var templatePullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull templates and their variants from SuprSend workspace",
-	Long:  `Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all.`,
+	Long:  "Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all. Each pulled template's `<dir>/<slug>/` directory is deleted and rewritten.\n\n" + templateLayoutHelp,
 	Example: `  # Pull all templates to default directory (suprsend/templates/)
   suprsend template pull
 
@@ -164,7 +181,7 @@ var templatePullCmd = &cobra.Command{
   # Pull to a custom directory using the flag form
   suprsend template pull --slug welcome-email --dir ./my-templates`,
 	Annotations: map[string]string{
-		"skills:tip.a-overwrite": "Pull overwrites local template files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
 	Args:  cobra.MaximumNArgs(1),
@@ -184,7 +201,7 @@ var templatePullCmd = &cobra.Command{
 				} else {
 					od, success := promptForOutputDirectory()
 					if !success {
-						return clierr.New("output directory is required; use --dir to specify one", clierr.CodeInvalidUsage)
+						return clierr.New("output directory is required; pass --dir, or --force to use the default", clierr.CodeInvalidUsage)
 					}
 					outputDir = od
 				}
@@ -228,6 +245,12 @@ var templatePullCmd = &cobra.Command{
 				n := done.Add(1)
 				spinner.UpdateMessage(fmt.Sprintf("Pulled %d/%d templates", n, total.Load()))
 			},
+			OnFetchError: func(slug string, err error) {
+				statsMu.Lock()
+				stats.Failed++
+				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+slug, "couldn't fetch variants", err))
+				statsMu.Unlock()
+			},
 		})
 		if fetchErr != nil {
 			spinner.Stop("Failed")
@@ -242,6 +265,9 @@ var templatePullCmd = &cobra.Command{
 			for _, e := range stats.Errors {
 				log.Infof("  - %s", e)
 			}
+		}
+		if stats.Failed > 0 {
+			return clierr.Failures(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

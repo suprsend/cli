@@ -4,7 +4,7 @@ Manage events
 
 ### Synopsis
 
-Manage events. Subcommands let you list events, pull event definitions to local files, and push event-schema mappings to a workspace.
+Manage events. Subcommands let you list events, get a single event, pull event definitions to local files, and push event-schema mappings to a workspace.
 
 ```
 suprsend event [flags]
@@ -13,7 +13,8 @@ suprsend event [flags]
 ### Examples
 
 ```
-  suprsend event get --output json
+  suprsend event list --output json
+  suprsend event get ORDER_RECEIVED
   suprsend event pull --dir ./suprsend/events
 ```
 

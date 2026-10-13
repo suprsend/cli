@@ -25,13 +25,15 @@ suprsend template commit [<slug>] [flags]
 
 - Commit is irreversible: it promotes the draft to **live**, overwriting the previous live version. Affected workflows immediately render the new content.
 - If you didn't author the draft locally, run `suprsend template get --slug <slug> --mode draft` first to inspect what will become live.
+- `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning (the command fails if every changed variant fails). Without `-F`, all variants are committed together.
+- The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) the commit proceeds without asking, even without `-F`. Use `--dry-run` if you only want to check the command.
 
 ### Options
 
 ```
       --commit-message string   Commit message describing the changes
   -n, --dry-run                 Print what would be committed without making any changes
-  -F, --force                   Force commit by skipping variants with errors
+  -F, --force                   Skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)
   -h, --help                    help for commit
   -g, --slug string             Template slug
 ```

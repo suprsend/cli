@@ -59,7 +59,7 @@ var schemaCommitCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		spinner.Stop(fmt.Sprintf("Successfully committed schema '%s' to live mode", slug))
+		spinner.Stop(fmt.Sprintf("Schema '%s' is up to date in live", slug))
 		return nil
 	},
 }

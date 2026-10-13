@@ -12,7 +12,7 @@ suprsend translation [flags]
 
 ```
   suprsend translation list
-  suprsend translation get --output json
+  suprsend translation get candidate.es.json
   suprsend translation pull --dir ./suprsend/translations
   suprsend translation push --commit
 ```

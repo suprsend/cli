@@ -79,7 +79,7 @@ var translationPushCmd = &cobra.Command{
 					hasError = true
 					log.Errorf("translations/%s.json: failed to push: %v", filename, err)
 					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("translations/%s.json: failed to push: %v", filename, err))
+					stats.Errors = append(stats.Errors, clierr.ItemFailure("translations/"+filename+".json", "failed to push", err))
 					continue
 				}
 
@@ -145,7 +145,7 @@ var translationPushCmd = &cobra.Command{
 					hasError = true
 					log.Errorf("translations/%s: failed to push: %v", file.Name(), err)
 					stats.Failed++
-					stats.Errors = append(stats.Errors, fmt.Sprintf("translations/%s: failed to push: %v", file.Name(), err))
+					stats.Errors = append(stats.Errors, clierr.ItemFailure("translations/"+file.Name(), "failed to push", err))
 					continue
 				}
 
@@ -163,6 +163,9 @@ var translationPushCmd = &cobra.Command{
 			log.Infof("DRY RUN: would %s %d translation(s) to %s", action, len(dryRunNames), workspace)
 			for _, n := range dryRunNames {
 				log.Infof("  - %s", n)
+			}
+			if stats.Failed > 0 {
+				return clierr.Failures(fmt.Sprintf("%d translation(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
 			}
 			return nil
 		}
@@ -188,7 +191,7 @@ var translationPushCmd = &cobra.Command{
 		}
 
 		if stats.Failed > 0 {
-			return fmt.Errorf("%d translation(s) failed to push", stats.Failed)
+			return clierr.Failures(fmt.Sprintf("%d translation(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

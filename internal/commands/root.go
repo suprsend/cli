@@ -145,13 +145,19 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable color output (default: $NO_COLOR)")
 	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
 
-	rootCmd.AddCommand(
-		// 1. Register the 'version' command
-		extension.NewVersionCobraCmd(
-			// 2. Explicitly enable upgrade notice
-			extension.WithUpgradeNotice("suprsend", "cli"),
-		),
+	// Register the 'version' command with the upgrade notice enabled.
+	versionCmd := extension.NewVersionCobraCmd(
+		extension.WithUpgradeNotice("suprsend", "cli"),
 	)
+	// The library builds the example from os.Args[0], which is a temp build
+	// path under `go run` (as used by gendocs/genskills) and an absolute path
+	// for installed binaries. Use the command name so help output and the
+	// generated docs/skills are stable.
+	versionCmd.Example = `  suprsend version
+  suprsend version -o json
+  suprsend version -o yaml
+  suprsend version -o short`
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.DisableAutoGenTag = true
 
 	rootCmd.AddCommand(profiles.ProfileCmd)

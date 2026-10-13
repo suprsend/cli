@@ -20,10 +20,10 @@ var eventGetCmd = &cobra.Command{
   suprsend event get --slug ORDER_RECEIVED
 
   # Get from a specific workspace
-  suprsend event get --workspace production`,
+  suprsend event get ORDER_RECEIVED --workspace production`,
 	Args: cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
-		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
+		"skills:tip:output": "Output defaults to `-o json`; `-o yaml` is also supported. `-o pretty` is not supported for this command and is rejected.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := utils.ResolveSlug(cmd, args)

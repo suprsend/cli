@@ -10,7 +10,7 @@ var CategoryCmd = &cobra.Command{
 	Short: "Manage preference categories",
 	Long:  "Manage notification preference categories. Categories organize notification preferences into a hierarchy of root categories, sections, and individual preference items.",
 	Example: `  suprsend category list
-  suprsend category pull --dir ./suprsend/categories
+  suprsend category pull --dir ./suprsend/preference_categories
   suprsend category push --commit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()

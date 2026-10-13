@@ -15,7 +15,7 @@ import (
 var workflowPushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push workflows from local to SuprSend workspace",
-	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single workflow, or omit to push all.`,
+	Long:  "Upload local workflow definitions to a workspace. Reads `<dir>/<slug>/workflow.json` for every subdirectory of the input directory (default `./suprsend/workflows`); the directory name is used as the slug. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single workflow, or omit to push all. With --slug, --json pushes an inline workflow definition instead of reading a file.",
 	Example: `  # Push all workflows from default directory
   suprsend workflow push
 
@@ -25,8 +25,10 @@ var workflowPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend workflow push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live.",
-		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the workflow server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and logs what would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-commit": "With `--commit`, a workflow that is saved as a draft but not committed is an error. Pushing one workflow (`workflow push <slug> --commit`) exits 2 for an invalid workflow, with the validation errors in the message, and 1 for any other commit failure. Pushing all workflows exits 1 if any of them fails, and the error lists each failed workflow with its reason. A workflow whose draft already matches live counts as success (nothing to commit).",
+		"skills:tip.d-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +43,7 @@ var workflowPushCmd = &cobra.Command{
 		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
-			return clierr.New("--json requires --slug to be specified", clierr.CodeUnknown)
+			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
 		}
 
 		if commit && !dryRun && !force {
@@ -190,7 +192,7 @@ var workflowPushCmd = &cobra.Command{
 				hasError = true
 				log.WithError(err).Errorf("workflows/%s: failed to push", slug)
 				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("workflows/%s: failed to push: %v", slug, err))
+				stats.Errors = append(stats.Errors, clierr.ItemFailure("workflows/"+slug, "failed to push", err))
 				continue
 			}
 
@@ -208,6 +210,9 @@ var workflowPushCmd = &cobra.Command{
 			for _, s := range dryRunSlugs {
 				log.Infof("  - %s", s)
 			}
+			if stats.Failed > 0 {
+				return clierr.Failures(fmt.Sprintf("%d workflow(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
+			}
 			return nil
 		}
 
@@ -221,7 +226,7 @@ var workflowPushCmd = &cobra.Command{
 			for _, errorMsg := range stats.Errors {
 				log.Infof("  - %s", errorMsg)
 			}
-			return clierr.New(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+			return clierr.Failures(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 		}
 		return nil
 	},

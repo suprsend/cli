@@ -2,7 +2,17 @@
 
 Pull templates and their variants from SuprSend workspace
 
-Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all.
+Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all. Each pulled template's `<dir>/<slug>/` directory is deleted and rewritten.
+
+Local layout: each template lives in `<dir>/<slug>/` (default dir `./suprsend/templates`):
+
+- `template.json`: `slug`, `name`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `enabled_channels` and `variant_order`; `name` is informational and is not pushed.
+- `mock_data.json`: mock data used for previews (optional).
+- `<channel>/<variant_id>/variant.json`: one directory per variant.
+- `<channel>/_tenants/<tenant_id>/<variant_id>/variant.json`: tenant-specific variants.
+- Body files next to `variant.json`, referenced from it as `"@<file>"`: `body.raw.html`, `body.raw.txt`, `body.designer.json`, `body.designer.html`, `body.designer.txt`, `body.plain_text.txt` (email), `body.block.jsonnet` (Slack / MS Teams block kit), `body.card.jsonnet` (MS Teams jsonnet card), `body.md` (inbox). Push inlines them back into the variant.
+
+The variant's channel, id, and tenant are read from the fields inside `variant.json`; the directory names only have to follow the shape above.
 
 ```
 suprsend template pull [<slug>] [flags]
@@ -23,7 +33,7 @@ suprsend template pull [<slug>] [flags]
 
 ### Tips
 
-- Pull overwrites local template files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.
 - Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
 
 ### Options

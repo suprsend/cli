@@ -2,7 +2,7 @@
 
 Pull events from workspace to local directory
 
-Download event definitions from a workspace to local files. Saves each event as events/<name>/event.json in the output directory.
+Download event definitions from a workspace to local files. Saves each event as `<dir>/<event_dir>/event.json` (default dir `./suprsend/events`). `<event_dir>` is the event name made filesystem-safe: characters other than letters, digits, `.`, `_` and `-` become `_`, leading and trailing non-alphanumeric characters are dropped (a leading `$` is kept), and the result is capped at 128 characters. If two event names map to the same directory name (compared case-insensitively), only the first is written and the other is skipped with a warning.
 
 ```
 suprsend event pull [flags]
@@ -23,7 +23,8 @@ suprsend event pull [flags]
 
 ### Tips
 
-- Pull overwrites local `events/<name>/event.json` files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Pull overwrites `<dir>/<event_dir>/event.json` for every pulled event without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/events` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.
+- The directory name is a sanitized form of the event name (e.g. `Order Placed` → `Order_Placed`), so don't derive the event name from it: the real name is the `name` field inside `event.json`.
 
 ### Options
 

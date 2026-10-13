@@ -60,7 +60,7 @@ var workflowCommitCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		spinner.Stop(fmt.Sprintf("Successfully committed workflow '%s' to live mode", slug))
+		spinner.Stop(fmt.Sprintf("Workflow '%s' is up to date in live", slug))
 		return nil
 	},
 }

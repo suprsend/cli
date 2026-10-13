@@ -23,7 +23,7 @@ var workflowGetCmd = &cobra.Command{
   suprsend workflow get welcome --mode draft`,
 	Args:  cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
-		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+		"skills:tip:output": "Output defaults to `-o json` (the full workflow definition); `-o yaml` is also supported. `-o pretty` is not supported for this command and is rejected.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)

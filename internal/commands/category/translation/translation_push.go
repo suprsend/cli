@@ -27,15 +27,15 @@ type PushTranslationStats struct {
 var translationPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push preference translations",
-	Long:  "Upload local preference category translation files to a workspace. Reads {locale}.json files from the input directory. English (en.json) is skipped — the API rejects pushes to the source-of-truth locale. Use --locale to push a single locale, or omit to push all.",
+	Long:  "Upload local preference category translation files to a workspace. Reads {locale}.json files directly from the input directory (default `./suprsend/preference_categories/translations`). English (en.json) is skipped — the API rejects pushes to the source-of-truth locale. Translations have no draft state: pushed files take effect immediately. Use --locale to push a single locale, or omit to push all.",
 	Example: `  # Push all locale translations from default directory
   suprsend category translation push
 
   # Push a specific locale only
   suprsend category translation push --locale es
 
-  # Push from a custom directory
-  suprsend category translation push --dir ./my-categories
+  # Push from a custom directory (the directory that contains the locale files)
+  suprsend category translation push --dir ./my-categories/translations
 
   # Dry run: preview what would be pushed without making changes
   suprsend category translation push --dry-run`,
@@ -194,7 +194,7 @@ func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslat
 	}
 
 	if stats.Failed > 0 {
-		return stats, clierr.New(fmt.Sprintf("%d locale(s) failed to push", stats.Failed), clierr.CodeAPIInternal)
+		return stats, clierr.Failures(fmt.Sprintf("%d locale(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
 	}
 	return stats, nil
 }

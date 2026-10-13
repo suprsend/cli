@@ -14,6 +14,13 @@ cd cmd/suprsend && go build -o suprsend
 # Full build: compile type-morph binary (requires deno), generate docs and skills
 make build
 
+# Regenerate only docs/ and skills/ (what CI checks; no deno needed)
+go run ./cmd/suprsend/main.go gendocs docs/
+go run ./cmd/suprsend/main.go genskills skills/
+
+# Run unit tests
+go test ./...
+
 # Clean build artifacts
 make clean
 
@@ -22,7 +29,13 @@ make clean
 ./scripts/build.sh release      # release build
 ```
 
-There are no tests in this project.
+`go build`/`go test` need the embedded type-morph binary for your platform to exist; outside `make build`, create an empty placeholder (CI does `touch internal/utils/embedded-binaries/type-morph-linux-amd64`).
+
+There are only a few unit tests so far (schema `--json` payload, root-type and `is_enabled` checks, `translation pull` errors, commit-result and "no changes to commit" handling plus the bulk event push reply in `mgmnt`, event push failure reporting and `--json` checks, `clierr.Failures`, the docs/skills generators), and CI does not run them yet.
+
+### Generated docs and skills
+
+`docs/` and `skills/suprsend-cli/` are generated from each command's `Short`/`Long`/`Example`, flag help text, and `skills:tip.*` annotations (rendered as the "Tips" list in the skill reference pages), plus the `Notes` in `internal/commands/skills.go`. Never hand-edit the generated files: change the command source and regenerate. Both generators delete their previous output first (`docs/suprsend*.md`, `skills/suprsend-cli/references/`), so pages for removed commands disappear. Hidden commands (`gendocs`, `genskills`) are excluded.
 
 ## Architecture
 
@@ -55,12 +68,13 @@ Use `clierr` (`internal/clierr/clierr.go`) for all user-facing errors — never 
 
 - `clierr.New(message, code)` — create a new structured error
 - `clierr.Wrap(err, code, hint)` — promote a plain error with a code and hint
+- `clierr.Failures(summary, failures, code)` — the error for a run over several items where some failed; lists each failure in the message and in `details.failures`, since per-item log lines are hidden when stderr is piped. Build each entry with `clierr.ItemFailure(resource, action, err)`, which avoids repeating a resource prefix the error already has
 - Codes are constants in `clierr` (e.g. `CodeConfigInvalid`, `CodeAuthMissingToken`, `CodeFileParseFailed`). Pick the closest match; use `CodeUnknown` as a last resort.
 - `clierr` errors carry a numeric exit code (auth=3, validation=2, not-found=4, etc.) and render correctly in both plain-text and `--output json` modes.
 
 ### Special Features
 
-- **`sync` command** — Pulls all assets from one workspace and pushes to another, with an optional local directory as intermediate storage
+- **`sync` command** — Pulls all assets from one workspace into a local directory (default `./suprsend`, override with `--dir`) and pushes everything in that directory to another workspace. Commit is hardcoded on (`commit := true`), so every synced asset goes live in the destination; `--dry-run` still pulls and overwrites the local files
 - **`generate-types` command** — Fetches JSON schemas from API and generates typed code (Python, TypeScript, Go, Java, Kotlin, Swift, Dart) using an embedded Deno binary (`type-morph/`)
 - **MCP server** — `start-mcp-server` command serves tools over stdio/SSE/HTTP transports using `mcp-go`. Tools are dynamically registered for events and workflows.
   - **Default tool surface differs by entry point.** Terminal users get `--workflows=none --events=none` (minimal — only the static admin tools) so scripted invocations stay predictable. Registry-installed servers (Glama, MCP Registry) get `--workflows=all` injected via `server.json`'s `packageArguments`, so installing through a registry exposes the full trigger surface out of the box.

@@ -4,7 +4,7 @@ Pull schemas
 
 ### Synopsis
 
-Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.
+Download schema definitions from a workspace to local JSON files. Each schema is saved as `<dir>/<slug>/schema.json` (slug, name, description, and `is_enabled` when the API returns it) plus `<dir>/<slug>/payload_schema.json` (the JSON Schema), default dir `./suprsend/schemas`. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.
 
 ```
 suprsend schema pull [<slug>] [flags]

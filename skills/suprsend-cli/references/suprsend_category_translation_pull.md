@@ -2,7 +2,7 @@
 
 Pull preference translations
 
-Download preference category translations from a workspace to local JSON files. Creates one file per locale (e.g., es.json, fr.json) in the output directory.
+Download preference category translations from a workspace to local JSON files. Creates one file per locale (e.g., es.json, fr.json) directly in the output directory (default `./suprsend/preference_categories/translations`), overwriting existing files.
 
 ```
 suprsend category translation pull [flags]
@@ -14,8 +14,8 @@ suprsend category translation pull [flags]
   # Pull all locale translations to default directory
   suprsend category translation pull
 
-  # Pull to a custom directory
-  suprsend category translation pull --dir ./my-categories
+  # Pull to a custom directory (locale files are written directly into it)
+  suprsend category translation pull --dir ./my-categories/translations
 
   # Pull in the production workspace
   suprsend category translation pull --workspace production

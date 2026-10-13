@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
+	"github.com/suprsend/cli/internal/clierr"
 )
 
 type PreferenceCategoryResponse struct {
@@ -56,6 +56,7 @@ type CategoryPushResponse struct {
 		IsValid bool  `json:"is_valid"`
 		Errors  []any `json:"errors"`
 	} `json:"validation_result"`
+	CommitResult *CommitResult `json:"commit_result"`
 }
 
 type ErrorResponse struct {
@@ -130,10 +131,14 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return apiError(resp)
 	}
 	if commit {
+		// Like the workflow and schema endpoints, this answers 201 even when
+		// the commit fails; the outcome is in commit_result.
 		result := resp.Result().(*CategoryPushResponse)
-		if !result.ValidationResult.IsValid {
-			log.Warnf("validation failed: %v", result.ValidationResult.Errors)
+		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
+			return clierr.New(fmt.Sprintf("preference_categories: saved as draft but not committed: categories are invalid: %v", result.ValidationResult.Errors),
+				clierr.CodeSchemaValidation).WithResource("preference_categories")
 		}
+		return commitError("preference_categories", result.CommitResult, clierr.CodeAPIConflict)
 	}
 	return nil
 }
@@ -162,7 +167,7 @@ func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage stri
 		return fmt.Errorf("request failed: %w", err)
 	}
 	if resp.IsError() {
-		return apiError(resp)
+		return commitHTTPError(resp, "preference_categories")
 	}
 	return nil
 }

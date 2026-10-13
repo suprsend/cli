@@ -4,7 +4,17 @@ Pull templates and their variants from SuprSend workspace
 
 ### Synopsis
 
-Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all.
+Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all. Each pulled template's `<dir>/<slug>/` directory is deleted and rewritten.
+
+Local layout: each template lives in `<dir>/<slug>/` (default dir `./suprsend/templates`):
+
+- `template.json`: `slug`, `name`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `enabled_channels` and `variant_order`; `name` is informational and is not pushed.
+- `mock_data.json`: mock data used for previews (optional).
+- `<channel>/<variant_id>/variant.json`: one directory per variant.
+- `<channel>/_tenants/<tenant_id>/<variant_id>/variant.json`: tenant-specific variants.
+- Body files next to `variant.json`, referenced from it as `"@<file>"`: `body.raw.html`, `body.raw.txt`, `body.designer.json`, `body.designer.html`, `body.designer.txt`, `body.plain_text.txt` (email), `body.block.jsonnet` (Slack / MS Teams block kit), `body.card.jsonnet` (MS Teams jsonnet card), `body.md` (inbox). Push inlines them back into the variant.
+
+The variant's channel, id, and tenant are read from the fields inside `variant.json`; the directory names only have to follow the shape above.
 
 ```
 suprsend template pull [<slug>] [flags]

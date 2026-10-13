@@ -48,7 +48,7 @@ var translationCommitCmd = &cobra.Command{
 			log.Errorf("%s", err)
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
-		spinner.Stop(fmt.Sprintf("Successfully committed translation '%s'", commitMessage))
+		spinner.Stop(fmt.Sprintf("Translations in %s are up to date in live", workspace))
 		return nil
 	},
 }

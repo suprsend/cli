@@ -16,10 +16,19 @@ import (
 var useName string
 
 var profileUseCmd = &cobra.Command{
-	Use:   "use",
+	Use:   "use [<name>]",
 	Short: "Set the active profile",
-	Long:  "Set the active profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	Long:  "Set the active profile in the configs. Pass the profile name as a positional argument or with --name; without either, the command prompts for a name (or fails when stdin is not a TTY). Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	Example: `  # Make the "byoc" profile active
+  suprsend profile use byoc
+
+  # Same, with the flag
+  suprsend profile use --name byoc`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if useName == "" && len(args) == 1 {
+			useName = args[0]
+		}
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {
 			log.WithError(err).Error("Couldn't find the path")
@@ -40,7 +49,7 @@ var profileUseCmd = &cobra.Command{
 		}
 
 		if _, exists := cfg.Profiles[useName]; !exists {
-			log.Infof("Profile %q does not exist. Use the command 'suprsend profiles list' to see all profiles.", useName)
+			log.Infof("Profile %q does not exist. Use the command 'suprsend profile list' to see all profiles.", useName)
 			return clierr.New(fmt.Sprintf("profile %q does not exist", useName), clierr.CodeUnknown)
 		}
 
@@ -66,7 +75,7 @@ func promptForProfileToUse(cfg *config.ProfileConfig) string {
 		return ""
 	}
 	if len(cfg.Profiles) == 0 {
-		fmt.Println("No profiles found. Create a profile first with 'suprsend profiles add'")
+		fmt.Println("No profiles found. Create a profile first with 'suprsend profile add'")
 		return ""
 	}
 

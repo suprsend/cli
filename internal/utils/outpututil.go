@@ -16,6 +16,7 @@ import (
 	"errors"
 
 	"github.com/fatih/color"
+	"github.com/mattn/go-isatty"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
@@ -31,8 +32,7 @@ import (
 // ConfirmDestructiveAction prints prompt + "[y/N]" on stderr and reads the answer from stdin.
 // Returns true if the user confirmed. Skips the prompt and returns true when stdin is not a TTY.
 func ConfirmDestructiveAction(prompt string) (bool, error) {
-	fi, err := os.Stdin.Stat()
-	if err != nil || (fi.Mode()&os.ModeCharDevice) == 0 {
+	if !IsInputInteractive() {
 		return true, nil
 	}
 	fmt.Fprintf(os.Stderr, "%s [y/N] ", prompt)
@@ -47,12 +47,11 @@ func ConfirmDestructiveAction(prompt string) (bool, error) {
 
 // IsInputInteractive returns true when stdin is a TTY — i.e. a human can respond to prompts.
 // Use this to gate any interactive prompt; IsOutputPiped is for color/spinner decisions only.
+// A ModeCharDevice check is not enough: /dev/null (the stdin of most agent and CI shells)
+// is a character device too.
 func IsInputInteractive() bool {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
+	fd := os.Stdin.Fd()
+	return isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
 }
 
 // IsOutputPiped checks if os.Stdout is connected to a pipe or redirected.

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -23,18 +24,25 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync SuprSend assets from one workspace to another",
-	Long:  `Sync notification assets from one workspace to another. Pulls assets from the source workspace and pushes them to the destination. Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.`,
-	Example: `  # Sync all assets from staging to production
+	Long: "Sync notification assets from one workspace to another. For each asset type, sync pulls the source workspace (`--from`, default `staging`, in `--mode`, default `live`) into a local directory (`./suprsend/<type-dir>/`, or `<dir>/<type-dir>/` with `--dir`, where `<type-dir>` is `workflows`, `schemas`, `events`, `templates`, `translations` or `preference_categories`), then pushes every asset found in that directory to the destination workspace (`--to`, default `production`) and commits it, so synced assets go live in the destination immediately. " +
+		"Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.",
+	Example: `  # Sync all assets from staging to production (pushes and commits to live)
   suprsend sync --from staging --to production
 
   # Sync only workflows
   suprsend sync --from staging --to production --assets workflow
 
-  # Dry run: preview what would be synced without making changes
-  suprsend sync --from staging --to production --dry-run`,
+  # Dry run: pull staging into local files and list what would be pushed (destination untouched)
+  suprsend sync --from staging --to production --dry-run
+
+  # Sync through a fresh directory so only assets that exist in staging are pushed
+  suprsend sync --from staging --to production --dir ./sync-tmp`,
 	Annotations: map[string]string{
-		"skills:tip.a-direction": "`--from` is the source, `--to` is the destination. They must be different workspaces; sync **overwrites** drafts in the destination.",
-		"skills:tip.b-dryrun":    "Pair with `--dry-run` to validate every asset server-side without writing to the destination. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).",
+		"skills:tip.a-direction": "`--from` is the source (default `staging`), `--to` is the destination (default `production`); they must be different workspaces. Sync pushes **and commits** every asset type, so changes go **live** in the destination immediately. There is no draft-only sync.",
+		"skills:tip.b-commit":    "Committing is per asset: a workflow or schema that is saved as a draft but not committed (for example a workflow that fails validation) counts as a failure, and sync exits non-zero after trying the rest. Template variants that fail pre-commit validation are skipped while the valid ones are committed; the skips are only logged as warnings, and a template with no valid changed variant counts as a failure. Events the destination rejects (typically a `payload_schema` pinned to a schema `version_no` that does not exist there, since each workspace numbers schema versions separately) are listed and count as a failure; the other events are still saved. Assets with nothing to commit (the destination already matches) count as success, so re-running sync is safe.",
+		"skills:tip.c-local":     "Sync pushes **every** asset in the local sync directory, not just what it pulled: local-only workflows, schemas, events, templates or translation files under `./suprsend/{workflows,schemas,events,templates,translations}/` are pushed and committed too. Categories are the exception: `categories.json` is overwritten from the source. Pulled assets overwrite local files with the same slug. Use a fresh `--dir` to sync exactly what exists in the source.",
+		"skills:tip.d-dryrun":    "`--dry-run` makes no calls to the destination, but it still pulls the source and **overwrites local files** in the sync directory (template slug directories are deleted and rewritten). Only local checks run (JSON parsing, plus a JSON Schema compile for schemas); nothing is validated server-side. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).",
+		"skills:tip.e-confirm":   "The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) sync starts immediately, even without `--force`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mode, _ := cmd.Flags().GetString("mode")
@@ -49,6 +57,9 @@ var syncCmd = &cobra.Command{
 
 		if fromWorkspace == toWorkspace {
 			return clierr.New("cannot sync within the same workspace; source and destination workspaces must be different", clierr.CodeInvalidUsage)
+		}
+		if mode != "live" && mode != "draft" {
+			return clierr.New(fmt.Sprintf("invalid mode '%s'; valid options are: draft, live", mode), clierr.CodeInvalidUsage)
 		}
 
 		var assetsToSync []string
@@ -87,7 +98,7 @@ var syncCmd = &cobra.Command{
 		log.Infof("Assets to sync: %v", assetsToSync)
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		hasErrors := false
+		var failures []string
 
 		for _, assetType := range assetsToSync {
 			switch assetType {
@@ -95,42 +106,42 @@ var syncCmd = &cobra.Command{
 				err := syncWorkflows(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync workflows: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync workflows: %v", err))
 				}
 			case "schema":
 				err := syncSchemas(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync schemas: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync schemas: %v", err))
 				}
 			case "event":
 				err := syncEvents(mgmntClient, fromWorkspace, toWorkspace, dirPath, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync events: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync events: %v", err))
 				}
 			case "category":
 				err := syncCategories(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync categories: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync categories: %v", err))
 				}
 			case "translation":
 				err := syncTranslation(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync translations: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync translations: %v", err))
 				}
 			case "template":
 				err := syncTemplates(mgmntClient, fromWorkspace, toWorkspace, mode, dirPath, commit, commitMessage, dryRun)
 				if err != nil {
 					log.Errorf("Failed to sync templates: %v", err)
-					hasErrors = true
+					failures = append(failures, fmt.Sprintf("Failed to sync templates: %v", err))
 				}
 			}
 		}
-		if hasErrors {
-			return clierr.New("sync complete with errors", clierr.CodeAPIInternal)
+		if len(failures) > 0 {
+			return clierr.Failures("sync complete with errors", failures, clierr.CodeAPIInternal)
 		}
 		log.Info("Sync complete")
 		return nil
@@ -143,11 +154,11 @@ func init() {
 	// Flags consumed in Run
 	syncCmd.Flags().StringP("from", "S", "staging", "Source workspace to pull assets from")
 	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace to push assets to")
-	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage during sync")
-	syncCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
+	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage; each asset type uses a subdirectory (default: ./suprsend)")
+	syncCmd.Flags().StringP("mode", "m", "live", "Version of the source assets to pull: draft or live")
 	syncCmd.Flags().StringP("assets", "a", "all", "Asset types to sync: all, workflow, schema, event, category, translation, or template")
 	syncCmd.Flags().String("commit-message", "", "Commit message applied to every committed resource in this sync run")
-	syncCmd.Flags().BoolP("dry-run", "n", false, "Print what would be synced without making any changes")
+	syncCmd.Flags().BoolP("dry-run", "n", false, "Pull the source into local files, then only print what would be pushed (no changes to the destination)")
 	syncCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 }
 
@@ -166,7 +177,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting workflows")
 	}
 
-	_, err = workflow.WriteWorkflowsToFiles(*workflows_resp, dirPath)
+	writeStats, err := workflow.WriteWorkflowsToFiles(*workflows_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing workflows to files")
@@ -181,6 +192,10 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	spinner.UpdateMessage(fmt.Sprintf("Pushing workflows to %s ...", toWorkspace))
 
 	var errors []string
+	// Items that couldn't be written locally are never pushed; report them too.
+	for _, e := range writeStats.Errors {
+		errors = append(errors, "pull: "+e)
+	}
 	successCount := 0
 	dryRunCount := 0
 	for _, entry := range entries {
@@ -212,7 +227,7 @@ func syncWorkflows(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 		err = mgmntClient.PushWorkflow(toWorkspace, slug, wf, commit, commitMessage)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("workflows/%s: failed to push: %v", slug, err))
+			errors = append(errors, clierr.ItemFailure("workflows/"+slug, "failed to push", err))
 			log.Errorf("workflows/%s: failed to push: %v", slug, err)
 			continue
 		}
@@ -247,7 +262,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting schemas")
 	}
 
-	_, err = schema.WriteSchemasToFiles(schemas_resp, dirPath)
+	writeStats, err := schema.WriteSchemasToFiles(schemas_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing schemas to files")
@@ -262,6 +277,10 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 	spinner.UpdateMessage(fmt.Sprintf("Pushing schemas to %s ...", toWorkspace))
 
 	var errors []string
+	// Items that couldn't be written locally are never pushed; report them too.
+	for _, e := range writeStats.Errors {
+		errors = append(errors, "pull: "+e)
+	}
 	successCount := 0
 	dryRunCount := 0
 	for _, entry := range entries {
@@ -284,7 +303,7 @@ func syncSchemas(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, 
 
 		err = mgmntClient.PushSchema(toWorkspace, slug, sch, commit, commitMessage)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("schemas/%s: failed to push: %v", slug, err))
+			errors = append(errors, clierr.ItemFailure("schemas/"+slug, "failed to push", err))
 			log.Errorf("schemas/%s: failed to push: %v", slug, err)
 			continue
 		}
@@ -318,25 +337,48 @@ func syncEvents(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace, d
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting events")
 	}
-	_, err = event.WriteEventsToFiles(events_resp, dirPath)
+	writeStats, err := event.WriteEventsToFiles(events_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing events to files")
 	}
+	// Events that couldn't be written locally are never pushed; report them too.
+	var failures []string
+	for _, e := range writeStats.Errors {
+		failures = append(failures, "pull: "+e)
+	}
+	failed := func() error {
+		if len(failures) == 0 {
+			return nil
+		}
+		return clierr.Failures("one or more events failed to sync", failures, clierr.CodeAPIInternal)
+	}
+
 	events, err := event.ReadEventsFromDir(dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error reading events from files")
 	}
+	if len(events) == 0 {
+		spinner.Stop("No events to sync")
+		return failed()
+	}
 	if dryRun {
 		spinner.Stop(fmt.Sprintf("DRY RUN: would push %d event(s) to %s", len(events), toWorkspace))
-		return nil
+		return failed()
 	}
 	spinner.UpdateMessage(fmt.Sprintf("Pushing events to %s ...", toWorkspace))
-	err = mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
+	records, err := mgmntClient.PushEventsFromPayload(toWorkspace, map[string]any{"events": events})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing events")
+	}
+	if err := event.PushFailures(events, records); err != nil {
+		failures = append(failures, err.Error())
+	}
+	if len(failures) > 0 {
+		spinner.Stop("")
+		return failed()
 	}
 	spinner.Stop(fmt.Sprintf("Synced %d event(s) to %s", len(events), toWorkspace))
 	return nil
@@ -438,7 +480,7 @@ func syncCategoryTranslations(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, 
 		// Push translation to destination workspace
 		err = mgmntClient.PushPreferenceTranslation(toWorkspace, locale, *translations)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("preference_categories/translations/%s.json: failed to push: %v", locale, err))
+			errors = append(errors, clierr.ItemFailure("preference_categories/translations/"+locale+".json", "failed to push", err))
 			log.Errorf("preference_categories/translations/%s.json: failed to push: %v", locale, err)
 			continue
 		}
@@ -475,7 +517,7 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting translations")
 	}
-	_, err = translation.WriteTranslationToFiles(*translations_resp, dirPath)
+	writeStats, err := translation.WriteTranslationToFiles(*translations_resp, dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing translations to files")
@@ -489,6 +531,10 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	spinner.UpdateMessage(fmt.Sprintf("Pushing translations to %s ...", toWorkspace))
 
 	var errors []string
+	// Translations that couldn't be written locally are never pushed; report them too.
+	for _, e := range writeStats.Errors {
+		errors = append(errors, "pull: "+e)
+	}
 	successCount := 0
 	for _, file := range files {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
@@ -510,12 +556,13 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 
 		if dryRun {
 			log.Infof("DRY RUN: would push translation %s to %s", file.Name(), toWorkspace)
+			successCount++
 			continue
 		}
 
 		err = mgmntClient.PushTranslation(toWorkspace, file.Name(), map[string]any{"content": translation})
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("translations/%s: failed to push: %v", file.Name(), err))
+			errors = append(errors, clierr.ItemFailure("translations/"+file.Name(), "failed to push", err))
 			log.Errorf("translations/%s: failed to push: %v", file.Name(), err)
 			continue
 		}
@@ -526,6 +573,13 @@ func syncTranslation(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspa
 	if len(errors) > 0 {
 		spinner.Stop(fmt.Sprintf("Synced translations with %d error(s)", len(errors)))
 		return clierr.New(fmt.Sprintf("one or more translations failed to sync:\n%s", strings.Join(errors, "\n")), clierr.CodeAPIInternal)
+	}
+
+	if successCount == 0 {
+		// Nothing pushed, so nothing to commit (and a destination with no
+		// translations yet has no draft to commit).
+		spinner.Stop("No translations to sync")
+		return nil
 	}
 
 	if commit && !dryRun {
@@ -555,7 +609,15 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 
 	spinner := utils.NewSpinner(fmt.Sprintf("Pulling templates from %s ...", fromWorkspace))
 
-	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{})
+	var fetchMu sync.Mutex
+	var fetchErrors []string
+	results, err := template.FetchTemplates(mgmntClient, fromWorkspace, mode, "", template.FetchOptions{
+		OnFetchError: func(slug string, err error) {
+			fetchMu.Lock()
+			fetchErrors = append(fetchErrors, clierr.ItemFailure("templates/"+slug, "couldn't fetch variants", err))
+			fetchMu.Unlock()
+		},
+	})
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error getting templates")
@@ -587,13 +649,16 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 		if err := template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun); err != nil {
 			log.Errorf("templates/%s: failed to push: %v", slug, err)
 			pushStats.Failed++
-			pushStats.Errors = append(pushStats.Errors, fmt.Sprintf("templates/%s: failed to push: %v", slug, err))
+			pushStats.Errors = append(pushStats.Errors, clierr.ItemFailure("templates/"+slug, "failed to push", err))
 		} else {
 			pushStats.Success++
 		}
 	}
 
 	var errors []string
+	for _, e := range fetchErrors {
+		errors = append(errors, "pull: "+e)
+	}
 	for _, e := range writeStats.Errors {
 		errors = append(errors, fmt.Sprintf("local write: %s", e))
 	}
@@ -603,8 +668,8 @@ func syncTemplates(mgmntClient *mgmnt.SS_MgmntClient, fromWorkspace, toWorkspace
 	if len(errors) > 0 {
 		spinner.Stop(fmt.Sprintf("Synced templates with %d error(s)", len(errors)))
 		return clierr.New(
-			fmt.Sprintf("one or more templates failed to sync (%d local-write failures, %d push failures):\n%s",
-				writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n")),
+			fmt.Sprintf("one or more templates failed to sync (%d fetch failures, %d local-write failures, %d push failures):\n%s",
+				len(fetchErrors), writeStats.Failed, pushStats.Failed, strings.Join(errors, "\n")),
 			clierr.CodeAPIInternal,
 		)
 	}

@@ -4,7 +4,7 @@ Push schemas
 
 ### Synopsis
 
-Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema.
+Upload local schemas to a workspace. For every subdirectory `<dir>/<slug>/` of the input directory (default `./suprsend/schemas`), reads `schema.json` (name, description, and `is_enabled` if present) and `payload_schema.json` (the JSON Schema), validates the payload schema locally, and pushes both; the directory name is used as the slug. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema, or omit to push all. With a slug, --json takes the JSON Schema inline instead of reading the slug's files.
 
 ```
 suprsend schema push [<slug>] [flags]
@@ -19,6 +19,9 @@ suprsend schema push [<slug>] [flags]
   # Push a single schema and commit to live immediately
   suprsend schema push order-placed --commit
 
+  # Push an inline JSON Schema instead of reading payload_schema.json
+  suprsend schema push order-placed --json '{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}'
+
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run
 ```
@@ -32,7 +35,7 @@ suprsend schema push [<slug>] [flags]
   -n, --dry-run                 Print what would be pushed without making any changes
   -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
-  -j, --json string             Schema definition as a JSON object (requires --slug). Must be a valid JSON Schema object, e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
+  -j, --json string             Payload JSON Schema as a JSON object, used instead of payload_schema.json (requires --slug). Must be a valid JSON Schema with root type "object", e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
   -g, --slug string             Schema slug to push (omit to push all)
 ```
 

@@ -14,7 +14,7 @@ suprsend category [flags]
 
 ```
   suprsend category list
-  suprsend category pull --dir ./suprsend/categories
+  suprsend category pull --dir ./suprsend/preference_categories
   suprsend category push --commit
 ```
 

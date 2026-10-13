@@ -18,7 +18,9 @@ var useName string
 var profileUseCmd = &cobra.Command{
 	Use:   "use",
 	Short: "Set the active profile",
-	Long:  "Set the active profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	Long:  "Set the active profile in the configs. Pass the profile name with --name; a positional argument is ignored, and without --name the command prompts for a name (or fails when stdin is not a TTY). Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.",
+	Example: `  # Make the "byoc" profile active
+  suprsend profile use --name byoc`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, err := cmd.Flags().GetString("config")
 		if err != nil {

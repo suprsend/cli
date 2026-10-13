@@ -14,7 +14,7 @@ import (
 var eventPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull events from workspace to local directory",
-	Long:  "Download event definitions from a workspace to local files. Saves each event as events/<name>/event.json in the output directory.",
+	Long:  "Download event definitions from a workspace to local files. Saves each event as `<dir>/<event_dir>/event.json` (default dir `./suprsend/events`). `<event_dir>` is the event name made filesystem-safe: characters other than letters, digits, `.`, `_` and `-` become `_`, leading and trailing non-alphanumeric characters are dropped (a leading `$` is kept), and the result is capped at 128 characters. If two event names map to the same directory name (compared case-insensitively), only the first is written and the other is skipped with a warning.",
 	Example: `  # Pull all events to default directory (suprsend/events/)
   suprsend event pull
 
@@ -24,7 +24,8 @@ var eventPullCmd = &cobra.Command{
   # Pull from the production workspace
   suprsend event pull --workspace production`,
 	Annotations: map[string]string{
-		"skills:tip.a-overwrite": "Pull overwrites local `events/<name>/event.json` files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.a-overwrite": "Pull overwrites `<dir>/<event_dir>/event.json` for every pulled event without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/events` doesn't exist. In non-interactive shells pass `--dir` or `--force`, otherwise nothing is pulled.",
+		"skills:tip.b-dirname":   "The directory name is a sanitized form of the event name (e.g. `Order Placed` → `Order_Placed`), so don't derive the event name from it: the real name is the `name` field inside `event.json`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")

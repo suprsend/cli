@@ -28,7 +28,7 @@ suprsend template commit [<slug>] [flags]
 ```
       --commit-message string   Commit message describing the changes
   -n, --dry-run                 Print what would be committed without making any changes
-  -F, --force                   Force commit by skipping variants with errors
+  -F, --force                   Skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)
   -h, --help                    help for commit
   -g, --slug string             Template slug
 ```

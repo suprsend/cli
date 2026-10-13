@@ -60,7 +60,7 @@ Use `clierr` (`internal/clierr/clierr.go`) for all user-facing errors — never 
 
 ### Special Features
 
-- **`sync` command** — Pulls all assets from one workspace and pushes to another, with an optional local directory as intermediate storage
+- **`sync` command** — Pulls all assets from one workspace into a local directory (default `./suprsend`, override with `--dir`) and pushes everything in that directory to another workspace. Commit is hardcoded on (`commit := true`), so every synced asset goes live in the destination; `--dry-run` still pulls and overwrites the local files
 - **`generate-types` command** — Fetches JSON schemas from API and generates typed code (Python, TypeScript, Go, Java, Kotlin, Swift, Dart) using an embedded Deno binary (`type-morph/`)
 - **MCP server** — `start-mcp-server` command serves tools over stdio/SSE/HTTP transports using `mcp-go`. Tools are dynamically registered for events and workflows.
   - **Default tool surface differs by entry point.** Terminal users get `--workflows=none --events=none` (minimal — only the static admin tools) so scripted invocations stay predictable. Registry-installed servers (Glama, MCP Registry) get `--workflows=all` injected via `server.json`'s `packageArguments`, so installing through a registry exposes the full trigger surface out of the box.

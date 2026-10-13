@@ -15,7 +15,7 @@ import (
 var eventPushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push linked events",
-	Long:  "Push event definitions from local per-event directories to a workspace. Reads from events/<name>/event.json files in the specified directory.",
+	Long:  "Push event definitions from local per-event directories to a workspace in a single bulk request. Reads `event.json` from every subdirectory of the input directory (default `./suprsend/events`); the event name comes from the `name` field inside each file, not from the directory name.",
 	Example: `  # Push all events from default directory
   suprsend event push
 

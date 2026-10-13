@@ -4,7 +4,7 @@ Push preference translations
 
 ### Synopsis
 
-Upload local preference category translation files to a workspace. Reads {locale}.json files from the input directory. English (en.json) is skipped — the API rejects pushes to the source-of-truth locale. Use --locale to push a single locale, or omit to push all.
+Upload local preference category translation files to a workspace. Reads {locale}.json files directly from the input directory (default `./suprsend/preference_categories/translations`). English (en.json) is skipped — the API rejects pushes to the source-of-truth locale. Translations have no draft state: pushed files take effect immediately. Use --locale to push a single locale, or omit to push all.
 
 ```
 suprsend category translation push [flags]
@@ -19,8 +19,8 @@ suprsend category translation push [flags]
   # Push a specific locale only
   suprsend category translation push --locale es
 
-  # Push from a custom directory
-  suprsend category translation push --dir ./my-categories
+  # Push from a custom directory (the directory that contains the locale files)
+  suprsend category translation push --dir ./my-categories/translations
 
   # Dry run: preview what would be pushed without making changes
   suprsend category translation push --dry-run

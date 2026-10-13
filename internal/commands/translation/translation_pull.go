@@ -13,7 +13,7 @@ import (
 var translationPullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull translation files",
-	Long:  "Download template translation files from a workspace to local JSON files. Saves one JSON file per translation to the output directory.",
+	Long:  "Download template translation files from a workspace to local JSON files. Saves one JSON file per translation, named by its filename (e.g. `candidate.es.json`), to the output directory (default `./suprsend/translations`), overwriting existing files with the same name.",
 	Example: `  # Pull all translations to default directory (suprsend/translations/)
   suprsend translation pull
 
@@ -79,6 +79,6 @@ var translationPullCmd = &cobra.Command{
 func init() {
 	translationPullCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	translationPullCmd.PersistentFlags().BoolP("force", "F", false, "Skip directory confirmation prompt, use default path")
-	translationPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save translation files to")
+	translationPullCmd.PersistentFlags().StringP("dir", "d", "", "Directory to save translation files to (default: ./suprsend/translations)")
 	TranslationCmd.AddCommand(translationPullCmd)
 }

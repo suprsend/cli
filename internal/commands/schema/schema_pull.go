@@ -14,7 +14,7 @@ import (
 var schemaPullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull schemas",
-	Long:  `Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.`,
+	Long:  "Download schema definitions from a workspace to local JSON files. Each schema is saved as `<dir>/<slug>/schema.json` (slug, name, description) plus `<dir>/<slug>/payload_schema.json` (the JSON Schema), default dir `./suprsend/schemas`. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.",
 	Example: `  # Pull all schemas to default directory (suprsend/schemas/)
   suprsend schema pull
 
@@ -24,7 +24,7 @@ var schemaPullCmd = &cobra.Command{
   # Pull to a custom directory using the flag form
   suprsend schema pull --slug order-placed --dir ./my-schemas`,
 	Annotations: map[string]string{
-		"skills:tip.a-overwrite": "Pull overwrites local schema JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.a-overwrite": "Pull overwrites `<dir>/<slug>/schema.json` and `payload_schema.json` for every pulled slug without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/schemas` doesn't exist. In non-interactive shells pass `--dir` or `--force`, otherwise nothing is pulled.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
 	Args:  cobra.MaximumNArgs(1),

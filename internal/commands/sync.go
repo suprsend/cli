@@ -23,18 +23,25 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync SuprSend assets from one workspace to another",
-	Long:  `Sync notification assets from one workspace to another. Pulls assets from the source workspace and pushes them to the destination. Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.`,
-	Example: `  # Sync all assets from staging to production
+	Long: "Sync notification assets from one workspace to another. For each asset type, sync pulls the source workspace (`--from`, default `staging`, in `--mode`, default `live`) into a local directory (`./suprsend/<type>/`, or `<dir>/<type>/` with `--dir`), then pushes every asset found in that directory to the destination workspace (`--to`, default `production`) and commits it, so synced assets go live in the destination immediately. " +
+		"Supports syncing all asset types or a specific type (workflow, schema, event, category, translation, template). Source and destination workspaces must be different.",
+	Example: `  # Sync all assets from staging to production (pushes and commits to live)
   suprsend sync --from staging --to production
 
   # Sync only workflows
   suprsend sync --from staging --to production --assets workflow
 
-  # Dry run: preview what would be synced without making changes
-  suprsend sync --from staging --to production --dry-run`,
+  # Dry run: pull staging into local files and list what would be pushed (destination untouched)
+  suprsend sync --from staging --to production --dry-run
+
+  # Sync through a fresh directory so only assets that exist in staging are pushed
+  suprsend sync --from staging --to production --dir ./sync-tmp`,
 	Annotations: map[string]string{
-		"skills:tip.a-direction": "`--from` is the source, `--to` is the destination. They must be different workspaces; sync **overwrites** drafts in the destination.",
-		"skills:tip.b-dryrun":    "Pair with `--dry-run` to validate every asset server-side without writing to the destination. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).",
+		"skills:tip.a-direction": "`--from` is the source (default `staging`), `--to` is the destination (default `production`); they must be different workspaces. Sync pushes **and commits** every asset type, so changes go **live** in the destination immediately. There is no draft-only sync.",
+		"skills:tip.b-commit":    "Committing is best-effort per asset: a workflow that fails validation is pushed as a draft with only a warning (the API skips its commit), and template variants that fail pre-commit validation are skipped with a warning while the valid ones are committed.",
+		"skills:tip.c-local":     "Sync pushes **every** asset in the local sync directory, not just what it pulled: local-only workflows, schemas, events, templates or translation files under `./suprsend/<type>/` are pushed and committed too. Pulled assets overwrite local files with the same slug. Use a fresh `--dir` to sync exactly what exists in the source.",
+		"skills:tip.d-dryrun":    "`--dry-run` makes no calls to the destination, but it still pulls the source and **overwrites local files** in the sync directory (template slug directories are deleted and rewritten). Only local checks run (JSON parsing, plus a JSON Schema compile for schemas); nothing is validated server-side. Add `--assets <type>` to scope to one resource type (workflow / schema / event / category / translation / template).",
+		"skills:tip.e-confirm":   "The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) sync starts immediately, even without `--force`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mode, _ := cmd.Flags().GetString("mode")
@@ -143,11 +150,11 @@ func init() {
 	// Flags consumed in Run
 	syncCmd.Flags().StringP("from", "S", "staging", "Source workspace to pull assets from")
 	syncCmd.Flags().StringP("to", "t", "production", "Destination workspace to push assets to")
-	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage during sync")
-	syncCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
+	syncCmd.Flags().StringP("dir", "d", "", "Local directory for intermediate file storage; each asset type uses a subdirectory (default: ./suprsend)")
+	syncCmd.Flags().StringP("mode", "m", "live", "Version of the source assets to pull: draft or live")
 	syncCmd.Flags().StringP("assets", "a", "all", "Asset types to sync: all, workflow, schema, event, category, translation, or template")
 	syncCmd.Flags().String("commit-message", "", "Commit message applied to every committed resource in this sync run")
-	syncCmd.Flags().BoolP("dry-run", "n", false, "Print what would be synced without making any changes")
+	syncCmd.Flags().BoolP("dry-run", "n", false, "Pull the source into local files, then only print what would be pushed (no changes to the destination)")
 	syncCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 }
 

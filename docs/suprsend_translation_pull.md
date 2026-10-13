@@ -4,7 +4,7 @@ Pull translation files
 
 ### Synopsis
 
-Download template translation files from a workspace to local JSON files. Saves one JSON file per translation to the output directory.
+Download template translation files from a workspace to local JSON files. Saves one JSON file per translation, named by its filename (e.g. `candidate.es.json`), to the output directory (default `./suprsend/translations`), overwriting existing files with the same name.
 
 ```
 suprsend translation pull [flags]
@@ -26,7 +26,7 @@ suprsend translation pull [flags]
 ### Options
 
 ```
-  -d, --dir string    Directory to save translation files to
+  -d, --dir string    Directory to save translation files to (default: ./suprsend/translations)
   -F, --force         Skip directory confirmation prompt, use default path
   -h, --help          help for pull
   -m, --mode string   Version mode: draft or live (default "live")

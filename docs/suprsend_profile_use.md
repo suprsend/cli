@@ -4,10 +4,17 @@ Set the active profile
 
 ### Synopsis
 
-Set the active profile in the configs. Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.
+Set the active profile in the configs. Pass the profile name with --name; a positional argument is ignored, and without --name the command prompts for a name (or fails when stdin is not a TTY). Only useful if you have a BYOC/self-hosted SuprSend instance or if you want to manage multiple accounts. Not required for moving assets between workspaces in the same account.
 
 ```
 suprsend profile use [flags]
+```
+
+### Examples
+
+```
+  # Make the "byoc" profile active
+  suprsend profile use --name byoc
 ```
 
 ### Options

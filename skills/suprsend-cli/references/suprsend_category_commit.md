@@ -2,7 +2,7 @@
 
 Commit categories
 
-Promote preference categories from draft to live mode. Also pushes any local translation files from the translations subdirectory before committing.
+Promote preference categories from draft to live mode. Before committing, it also pushes every non-English translation file from the `translations/` subdirectory of --dir (default `./suprsend/preference_categories/translations`); translation push errors are ignored and do not stop the commit.
 
 ```
 suprsend category commit [flags]
@@ -24,7 +24,8 @@ suprsend category commit [flags]
 ### Tips
 
 - Commit is irreversible: it promotes the draft to **live**. End-users immediately see the new preference categories on their notification settings page.
-- Local translation files in the `translations/` subdirectory are pushed before commit. Edit them alongside the categories to keep locales in sync.
+- Local translation files in the `translations/` subdirectory are pushed (live) before the commit. Translation push failures are only logged: the commit still runs and the command exits 0. Check the output for `failed to push` errors, or run `suprsend category translation push` first (it exits non-zero when a locale fails).
+- The confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) the commit proceeds without asking, even without `-F`. Use `--dry-run` if you only want to check the command.
 
 ### Options
 

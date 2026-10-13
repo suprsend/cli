@@ -20,7 +20,7 @@ suprsend event get [<slug>] [flags]
   suprsend event get --slug ORDER_RECEIVED
 
   # Get from a specific workspace
-  suprsend event get --workspace production
+  suprsend event get ORDER_RECEIVED --workspace production
 ```
 
 ### Options

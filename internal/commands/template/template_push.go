@@ -171,7 +171,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 var templatePushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push templates and their variants from local to SuprSend workspace",
-	Long:  `Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.`,
+	Long:  "Push templates and their variants from local to SuprSend workspace. Pass a slug as a positional argument or via --slug to push a single template, or omit to push all.\n\n" + templateLayoutHelp,
 	Example: `  # Push all templates from default directory
   suprsend template push
 
@@ -181,8 +181,10 @@ var templatePushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend template push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live.",
-		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the template server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads the local template directories and logs the variants and channels that would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-force":   "With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If no variant passes, nothing is committed and push still exits 0. Without `-F`, all variants are committed together.",
+		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -365,7 +367,7 @@ func init() {
 	templatePushCmd.PersistentFlags().BoolP("commit", "c", false, "Commit the pushed templates to live")
 	templatePushCmd.PersistentFlags().String("commit-message", "", "Commit message describing the changes")
 	templatePushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to push")
-	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "Force commit by skipping variants with errors")
+	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "With --commit: skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)")
 	templatePushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

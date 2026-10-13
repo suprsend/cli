@@ -4,7 +4,7 @@ Pull categories from a workspace
 
 ### Synopsis
 
-Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.
+Download preference categories and their translations from a workspace to local files. Writes `categories.json` and one `translations/<locale>.json` file per locale to the output directory (default `./suprsend/preference_categories`).
 
 ```
 suprsend category pull [flags]
@@ -13,7 +13,7 @@ suprsend category pull [flags]
 ### Examples
 
 ```
-  # Pull categories to default directory (suprsend/categories/)
+  # Pull categories to default directory (suprsend/preference_categories/)
   suprsend category pull
 
   # Pull to a custom directory

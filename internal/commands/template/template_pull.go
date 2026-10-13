@@ -154,7 +154,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 var templatePullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull templates and their variants from SuprSend workspace",
-	Long:  `Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all.`,
+	Long:  "Pull templates and their variants from SuprSend workspace. Pass a slug as a positional argument or via --slug to pull a single template, or omit to pull all. Each pulled template's `<dir>/<slug>/` directory is deleted and rewritten.\n\n" + templateLayoutHelp,
 	Example: `  # Pull all templates to default directory (suprsend/templates/)
   suprsend template pull
 
@@ -164,7 +164,7 @@ var templatePullCmd = &cobra.Command{
   # Pull to a custom directory using the flag form
   suprsend template pull --slug welcome-email --dir ./my-templates`,
 	Annotations: map[string]string{
-		"skills:tip.a-overwrite": "Pull overwrites local template files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).",
+		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
 	Args:  cobra.MaximumNArgs(1),

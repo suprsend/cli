@@ -2,7 +2,7 @@
 
 Pull categories from a workspace
 
-Download preference categories and their translations from a workspace to local files. Saves categories_preferences.json and locale-specific translation files to the output directory.
+Download preference categories and their translations from a workspace to local files. Writes `categories.json` and one `translations/<locale>.json` file per locale to the output directory (default `./suprsend/preference_categories`).
 
 ```
 suprsend category pull [flags]
@@ -11,7 +11,7 @@ suprsend category pull [flags]
 ## Examples
 
 ```
-  # Pull categories to default directory (suprsend/categories/)
+  # Pull categories to default directory (suprsend/preference_categories/)
   suprsend category pull
 
   # Pull to a custom directory
@@ -23,7 +23,7 @@ suprsend category pull [flags]
 
 ### Tips
 
-- Pull overwrites local `categories_preferences.json` and translation files. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Pull overwrites the local `categories.json` and `translations/<locale>.json` files without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/preference_categories` doesn't exist. In non-interactive shells pass `--dir` or `--force`, otherwise nothing is pulled.
 - Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
 
 ### Options

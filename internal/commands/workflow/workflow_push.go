@@ -15,7 +15,7 @@ import (
 var workflowPushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push workflows from local to SuprSend workspace",
-	Long:  `Upload local workflow JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single workflow, or omit to push all.`,
+	Long:  "Upload local workflow definitions to a workspace. Reads `<dir>/<slug>/workflow.json` for every subdirectory of the input directory (default `./suprsend/workflows`); the directory name is used as the slug. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single workflow, or omit to push all. With --slug, --json pushes an inline workflow definition instead of reading a file.",
 	Example: `  # Push all workflows from default directory
   suprsend workflow push
 
@@ -25,8 +25,10 @@ var workflowPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend workflow push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live.",
-		"skills:tip.b-dryrun": "Pair with `--dry-run` to validate the workflow server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and logs what would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-commit": "Exit 0 with `--commit` does not guarantee the workflow is live: if the workflow fails validation, the API saves the draft but skips the commit, and the CLI only logs a `Workflow <slug> is not valid` warning. Check for that warning, or confirm with `suprsend workflow get <slug> --mode live`.",
+		"skills:tip.d-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

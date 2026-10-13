@@ -23,7 +23,7 @@ suprsend schema get [<slug>] [flags]
 
 ### Tips
 
-- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.
+- Output defaults to `-o json`; `-o yaml` is also supported. `-o pretty` is not supported for this command and is rejected.
 
 ### Options
 

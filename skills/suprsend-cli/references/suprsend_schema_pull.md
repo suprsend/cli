@@ -2,7 +2,7 @@
 
 Pull schemas
 
-Download schema definitions from a workspace to local JSON files. Saves one JSON file per schema (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.
+Download schema definitions from a workspace to local JSON files. Each schema is saved as `<dir>/<slug>/schema.json` (slug, name, description) plus `<dir>/<slug>/payload_schema.json` (the JSON Schema), default dir `./suprsend/schemas`. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.
 
 ```
 suprsend schema pull [<slug>] [flags]
@@ -23,7 +23,7 @@ suprsend schema pull [<slug>] [flags]
 
 ### Tips
 
-- Pull overwrites local schema JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Pull overwrites `<dir>/<slug>/schema.json` and `payload_schema.json` for every pulled slug without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/schemas` doesn't exist. In non-interactive shells pass `--dir` or `--force`, otherwise nothing is pulled.
 - Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
 
 ### Options

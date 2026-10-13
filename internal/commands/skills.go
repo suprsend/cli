@@ -38,7 +38,10 @@ var genSkillsCmd = &cobra.Command{
 				"category": "cli",
 			},
 			Notes: []string{
-				"Commands that return data (list, get) support `-o json` for machine-readable JSON output and `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
+				"`list` commands default to `-o pretty` (a human-friendly table) and also accept `-o json` and `-o yaml`. `workflow get`, `schema get`, `event get` and `translation get` default to `-o json`, accept `-o yaml`, and reject `-o pretty`; `template get` defaults to `-o json` and also accepts `yaml` and `pretty`.",
+				"On `push`, `commit`, `enable` and `disable`, `--dry-run` never calls the API: it reads the local files (schemas also get a local JSON Schema compile) and logs what would happen. It is not a server-side validation. `sync --dry-run` is different: it still pulls the source workspace and overwrites local files, and only skips the destination.",
+				"Confirmation prompts (commit, `push --commit`, `sync`, `workflow disable`) only appear when stdin is a TTY. In non-interactive shells (CI, agents) these commands proceed immediately without asking, even without `--force`, so double-check `--workspace` before running them.",
+				"`sync` pushes **and commits** every synced asset in the destination (default `--to production`), so the changes go live immediately.",
 				"The `profile` command and its subcommands (add, list, modify, remove, use) are only needed for self-hosted/BYOC SuprSend instances or managing multiple accounts. SaaS users do not need them. Profiles are not used for switching between workspaces within the same account; use the `--workspace` flag for that.",
 			},
 		})

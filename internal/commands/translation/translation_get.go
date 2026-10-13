@@ -27,7 +27,7 @@ var translationGetCmd = &cobra.Command{
   suprsend translation get candidate.es.json --output yaml`,
 	Args: cobra.MaximumNArgs(1),
 	Annotations: map[string]string{
-		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.",
+		"skills:tip:output": "Output defaults to `-o json`; `-o yaml` is also supported. `-o pretty` is not supported for this command and is rejected.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := utils.ResolveSlug(cmd, args)

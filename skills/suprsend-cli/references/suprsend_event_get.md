@@ -18,12 +18,12 @@ suprsend event get [<slug>] [flags]
   suprsend event get --slug ORDER_RECEIVED
 
   # Get from a specific workspace
-  suprsend event get --workspace production
+  suprsend event get ORDER_RECEIVED --workspace production
 ```
 
 ### Tips
 
-- Use `-o json` for machine-readable JSON output, `-o yaml` for YAML.
+- Output defaults to `-o json`; `-o yaml` is also supported. `-o pretty` is not supported for this command and is rejected.
 
 ### Options
 

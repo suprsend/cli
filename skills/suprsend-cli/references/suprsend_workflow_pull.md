@@ -2,7 +2,7 @@
 
 Pull workflows from SuprSend workspace to local
 
-Download workflow definitions from a workspace to local JSON files. Saves one JSON file per workflow (named by slug) to the output directory. Pass a slug as a positional argument or via --slug to pull a single workflow, or omit to pull all.
+Download workflow definitions from a workspace to local JSON files. Each workflow is saved as `<dir>/<slug>/workflow.json` (default dir `./suprsend/workflows`). Pass a slug as a positional argument or via --slug to pull a single workflow, or omit to pull all.
 
 ```
 suprsend workflow pull [<slug>] [flags]
@@ -23,7 +23,7 @@ suprsend workflow pull [<slug>] [flags]
 
 ### Tips
 
-- Pull overwrites local workflow JSON files for the matched slugs. Commit local edits first if you don't want them clobbered (or use `--force` to skip the prompt).
+- Pull overwrites `<dir>/<slug>/workflow.json` for every pulled slug without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/workflows` doesn't exist. In non-interactive shells pass `--dir` or `--force`, otherwise nothing is pulled.
 - Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
 
 ### Options

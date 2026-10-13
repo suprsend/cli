@@ -4,7 +4,7 @@ Push categories to a workspace
 
 ### Synopsis
 
-Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are staged as drafts. Use --commit to also promote to live.
+Upload local preference categories and translations to a workspace. Reads `categories.json` and `translations/<locale>.json` from the input directory (default `./suprsend/preference_categories`). Categories are staged as a draft unless --commit is passed. Translation files (every locale except `en`) are pushed first and take effect immediately, with or without --commit.
 
 ```
 suprsend category push [flags]

@@ -15,7 +15,7 @@ import (
 var schemaPushCmd = &cobra.Command{
 	Use:   "push [<slug>]",
 	Short: "Push schemas",
-	Long:  "Upload local schema JSON files to a workspace. Reads .json files from the input directory and pushes them. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema.",
+	Long:  "Upload local schemas to a workspace. For every subdirectory `<dir>/<slug>/` of the input directory (default `./suprsend/schemas`), reads `schema.json` (name, description) and `payload_schema.json` (the JSON Schema), validates the payload schema locally, and pushes both; the directory name is used as the slug. By default, changes are staged as drafts. Use --commit to also promote to live. Pass a slug as a positional argument or via --slug to push a single schema, or omit to push all.",
 	Example: `  # Push all schemas from default directory
   suprsend schema push
 
@@ -25,9 +25,11 @@ var schemaPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live.",
-		"skills:tip.b-dryrun":  "Pair with `--dry-run` to validate the schema server-side without writing to the draft. Pair with `--commit` to push + commit in one step.",
-		"skills:tip.c-regen":   "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
+		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun": "`--dry-run` makes no API calls. It reads the local files, compiles each `payload_schema.json` locally as JSON Schema (draft 2020-12; root `type` must be `object`), and logs what would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-regen":  "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
+		"skills:tip.d-commit": "Exit 0 with `--commit` only means the push request succeeded: the CLI does not check whether the commit itself happened, so a failed commit is not reported. Confirm with `suprsend schema get <slug> --mode live`.",
+		"skills:tip.e-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -14,7 +14,8 @@ var workflowDisableCmd = &cobra.Command{
 	Use:   "disable [<slug>]",
 	Short: "Disable a workflow",
 	Long:  "Disable a workflow to stop it from processing triggers. Pass the workflow slug as a positional argument or via --slug.",
-	Example: `  # Disable a workflow (prompts for confirmation)
+	Example: `  # Disable a workflow (prompts for confirmation in an interactive terminal;
+  # when stdin is not a TTY, e.g. CI or an agent shell, it disables without asking)
   suprsend workflow disable welcome
 
   # Disable without confirmation prompt

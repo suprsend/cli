@@ -2,7 +2,7 @@
 
 Push categories to a workspace
 
-Upload local preference categories and translations to a workspace. Reads categories_preferences.json and translation files from the input directory. By default, changes are staged as drafts. Use --commit to also promote to live.
+Upload local preference categories and translations to a workspace. Reads `categories.json` and `translations/<locale>.json` from the input directory (default `./suprsend/preference_categories`). Categories are staged as a draft unless --commit is passed. Translation files (every locale except `en`) are pushed first and take effect immediately, with or without --commit.
 
 ```
 suprsend category push [flags]
@@ -26,8 +26,10 @@ suprsend category push [flags]
 
 ### Tips
 
-- Push writes to the **draft** state. Run `suprsend category commit` to promote draft → live.
-- Pair with `--dry-run` to validate the categories server-side without writing to the draft. Pair with `--commit` to push + commit in one step.
+- Categories are written to the **draft** state. Run `suprsend category commit` to promote draft → live, or pass `--commit` to push + commit in one step.
+- Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.
+- `--dry-run` makes no API calls: it only reads `categories.json` and the translation files (or `--json`) and logs counts. Nothing is validated server-side.
+- The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.
 
 ### Options
 

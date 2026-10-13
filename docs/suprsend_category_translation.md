@@ -14,7 +14,7 @@ suprsend category translation [flags]
 
 ```
   suprsend category translation list
-  suprsend category translation pull --dir ./suprsend/categories
+  suprsend category translation pull --dir ./suprsend/preference_categories/translations
   suprsend category translation push --locale es
 ```
 

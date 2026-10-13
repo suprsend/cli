@@ -4,7 +4,7 @@ Start SuprSend MCP server
 
 Start an MCP (Model Context Protocol) server that exposes SuprSend tools for AI assistants.
 
-Built-in tool categories: users (get, upsert, preferences, subscriptions), objects (get, upsert, preferences, subscriptions), tenants (get, upsert, preferences), workflows (list), and documentation (search, fetch). Use --tools to select categories (e.g., --tools=users.*,tenants.*) or specific tools (e.g., --tools=users.get,tenants.get_all).
+Built-in tool categories: users (get, upsert, preferences, subscriptions), objects (get, upsert, preferences, subscriptions), tenants (get, get_all, upsert, preferences), workflows (list), and documentation (search, fetch). Use --tools to select categories (e.g., --tools=users.*,tenants.*) or specific tools (e.g., --tools=users.get,tenants.get_all).
 
 Use --events and --workflows to dynamically register tools that trigger specific events or workflows by slug. Both default to none — pass 'all' to register tools for every event/workflow in the workspace, or a comma-separated list of slugs to register specific ones.
 
@@ -16,7 +16,7 @@ suprsend start-mcp-server [flags]
 
 ### Tips
 
-- Requires `SUPRSEND_SERVICE_TOKEN` env var or an active profile (`suprsend profile use <name>`).
+- Requires `SUPRSEND_SERVICE_TOKEN` env var or an active profile (`suprsend profile use --name <name>`).
 - Run `suprsend start-mcp-server list-tools` to inspect the schema (tool names + descriptions) before wiring up an MCP client.
 - stdio is right for IDE/CLI integrations; switch to `--transport sse` or `--transport http` for network-accessible deployments (both listen on :8080).
 

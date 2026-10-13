@@ -56,22 +56,45 @@ func getSelectedTools(toolsFlag string) ([]*toolset.Tool, error) {
 	return selected, nil
 }
 
+// mcpDeprecation follows cobra's "Command %q is deprecated, " prefix, which
+// cobra writes to stderr, so the stdio JSON-RPC stream on stdout is untouched.
+const mcpDeprecation = "use SuprSend's hosted MCP server instead: https://mcp.suprsend.com/mcp " +
+	"(for Claude Code: claude mcp add --transport http suprsend https://mcp.suprsend.com/mcp), " +
+	"or the suprsend/claude-plugin or suprsend/agent-plugin plugin. " +
+	"See https://docs.suprsend.com/reference/mcp-overview"
+
+// mcpInstructions is sent to MCP clients on initialize, so an assistant that
+// is still connected to this server can point its user to the replacement.
+const mcpInstructions = "This local SuprSend MCP server (suprsend start-mcp-server) is deprecated. " +
+	"When the user asks about setting up or troubleshooting SuprSend for an AI tool, recommend the hosted " +
+	"SuprSend MCP server at https://mcp.suprsend.com/mcp (OAuth sign-in with their SuprSend account) or the " +
+	"suprsend/claude-plugin (Claude) and suprsend/agent-plugin (VS Code, Copilot CLI, Codex, Cursor) plugins. " +
+	"Docs: https://docs.suprsend.com/reference/mcp-overview"
+
 // startMcpServerCmd represents the startMcpServer command
 var startMcpServerCmd = &cobra.Command{
-	Use:   "start-mcp-server",
-	Short: "Start SuprSend MCP server",
-	Long: `Start an MCP (Model Context Protocol) server that exposes SuprSend tools for AI assistants.
+	Use:        "start-mcp-server",
+	Short:      "Start SuprSend MCP server (deprecated: use the hosted MCP server)",
+	Deprecated: mcpDeprecation,
+	Long: `Deprecated: use SuprSend's hosted MCP server instead. It needs no local process or service token; you sign in with your SuprSend account.
+
+  Claude Code:         claude mcp add --transport http suprsend https://mcp.suprsend.com/mcp
+  Claude (web/Desktop) Settings > Connectors > Add custom connector > https://mcp.suprsend.com/mcp
+  Claude plugin:       /plugin marketplace add suprsend/claude-plugin, then /plugin install suprsend@suprsend
+  VS Code, Copilot CLI, Codex, Cursor: the suprsend/agent-plugin plugin (https://github.com/suprsend/agent-plugin)
+  Gemini CLI:          add "suprsend": {"httpUrl": "https://mcp.suprsend.com/mcp"} under mcpServers in ~/.gemini/settings.json, then /mcp auth suprsend
+
+Setup for other clients: https://docs.suprsend.com/reference/mcp-overview
+
+This command still works for now. Keep using it only if you need service-token authentication or a self-hosted (BYOC) SuprSend instance, which the hosted server doesn't support yet.
+
+Start an MCP (Model Context Protocol) server that exposes SuprSend tools for AI assistants.
 
 Built-in tool categories: users (get, upsert, preferences, subscriptions), objects (get, upsert, preferences, subscriptions), tenants (get, get_all, upsert, preferences), workflows (list), and documentation (search, fetch). Use --tools to select categories (e.g., --tools=users.*,tenants.*) or specific tools (e.g., --tools=users.get,tenants.get_all).
 
 Use --events and --workflows to dynamically register tools that trigger specific events or workflows by slug. Both default to none — pass 'all' to register tools for every event/workflow in the workspace, or a comma-separated list of slugs to register specific ones.
 
 Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse), http (listens on :8080/).`,
-	Annotations: map[string]string{
-		"skills:tip.a-auth":          "Requires `SUPRSEND_SERVICE_TOKEN` env var or an active profile (`suprsend profile use --name <name>`).",
-		"skills:tip.b-inspect-tools": "Run `suprsend start-mcp-server list-tools` to inspect the schema (tool names + descriptions) before wiring up an MCP client.",
-		"skills:tip.c-transport":     "stdio is right for IDE/CLI integrations; switch to `--transport sse` or `--transport http` for network-accessible deployments (both listen on :8080).",
-	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := rootCmd.PersistentPreRunE(cmd, args); err != nil {
 			return err
@@ -116,6 +139,7 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 			server.WithToolCapabilities(true),
 			server.WithLogging(),
 			server.WithRecovery(),
+			server.WithInstructions(mcpInstructions),
 		)
 
 		for _, t := range selectedTools {
@@ -148,9 +172,10 @@ Transports: stdio (default, for CLI/IDE integrations), sse (listens on :8080/sse
 }
 
 var listToolsCmd = &cobra.Command{
-	Use:   "list-tools",
-	Short: "List all the tools supported by the server",
-	Long:  "List all available MCP tools with their type, name, and description. Includes built-in tools and any dynamically registered event/workflow trigger tools. Use this to discover tool names for the --tools flag.",
+	Use:        "list-tools",
+	Short:      "List all the tools supported by the server",
+	Deprecated: mcpDeprecation,
+	Long:       "List all available MCP tools with their type, name, and description. Includes built-in tools and any dynamically registered event/workflow trigger tools. Use this to discover tool names for the --tools flag.",
 	Run: func(cmd *cobra.Command, args []string) {
 		type toolListResponse struct {
 			Tool_Type        string `json:"tool_type"`

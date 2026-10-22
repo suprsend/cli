@@ -39,7 +39,7 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
         with:
-          cosign-release: 'v3.0.5'
+          cosign-release: 'v3.1.4'
 
       - name: Store public key for signature verification
         run: cosign public-key --key "awskms:///${{ secrets.AWS_KMS_KEY_ID }}" > /tmp/public_key.pem

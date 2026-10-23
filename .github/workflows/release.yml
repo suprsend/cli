@@ -94,23 +94,6 @@ jobs:
       - name: Publish to npm
         run: scripts/publish-npm.sh "${GITHUB_REF_NAME#v}"
 
-      # The CLI's own MCP server (start-mcp-server) is deprecated in favour of
-      # the hosted server, which is listed in the MCP Registry as
-      # com.suprsend/mcp. We no longer publish io.github.suprsend/cli; this
-      # marks every published version deprecated. It is idempotent, so it is
-      # safe on every stable release, and can be dropped once the registry
-      # shows all versions as deprecated. Pre-release tags are skipped, as
-      # the publish steps were.
-      - name: Deprecate the CLI server in the MCP Registry
-        if: ${{ !contains(github.ref_name, '-') }}
-        run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
-            | tar xz mcp-publisher
-          ./mcp-publisher login github-oidc
-          ./mcp-publisher status --status deprecated --all-versions --yes \
-            --message "Deprecated: use com.suprsend/mcp, SuprSend's hosted MCP server (https://mcp.suprsend.com/mcp)." \
-            io.github.suprsend/cli
-
       - name: Clean up keys
         if: always()
         run: |

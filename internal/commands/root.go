@@ -115,6 +115,10 @@ func resolveWorkspace(cmd *cobra.Command) error {
 	return utils.CheckWorkspace(ws.Value)
 }
 
+func isProfileCmd(cmd *cobra.Command) bool {
+	return cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile")
+}
+
 func isCobraUsageError(err error) bool {
 	var notExist *pflag.NotExistError
 	var valueRequired *pflag.ValueRequiredError
@@ -261,7 +265,7 @@ func init() {
 			if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
 				return nil
 			}
-			if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
+			if isProfileCmd(cmd) {
 				return nil
 			}
 
@@ -275,6 +279,12 @@ func init() {
 			config.Cfg.Debug.Value,
 		)
 
+		// profile add/modify's --workspace is the default to store in the
+		// profile, not a workspace to act on: resolving it would fill it in
+		// from the active profile and reject "" (which removes it).
+		if isProfileCmd(cmd) {
+			return nil
+		}
 		return resolveWorkspace(cmd)
 	}
 }

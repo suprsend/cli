@@ -91,7 +91,6 @@ var Cfg = &Config{}
 
 // FlagValues holds the raw values parsed from CLI flags before any resolution.
 type FlagValues struct {
-	Workspace    string
 	CfgFile      string
 	OutputType   string
 	Verbosity    string

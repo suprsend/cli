@@ -14,8 +14,7 @@
     "suprsend",
     "notifications",
     "cli",
-    "workflow",
-    "mcp"
+    "workflow"
   ],
   "repository": {
     "type": "git",

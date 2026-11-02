@@ -192,7 +192,6 @@ func earlySetup() earlyConfig {
 func init() {
 	var flags config.FlagValues
 
-	rootCmd.Flags().StringVarP(&flags.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	rootCmd.PersistentFlags().StringVar(&flags.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&flags.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
 	rootCmd.PersistentFlags().StringVarP(&flags.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
@@ -260,9 +259,6 @@ func init() {
 				return nil
 			}
 			if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
-				return nil
-			}
-			if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
 				return nil
 			}
 			if isProfileCmd(cmd) {

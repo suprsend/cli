@@ -52,23 +52,22 @@ var categoryPullCmd = &cobra.Command{
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			log.Errorf("Error with output directory: %v", err)
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
+		report := utils.NewReport("category pull", workspace, false)
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		categories, err := mgmntClient.ListCategories(workspace, mode)
+		spinner.Stop("")
 		if err != nil {
-			log.WithError(err).Error("Couldn't fetch categories")
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
 		}
 		filePath := filepath.Join(outputDir, "categories.json")
-		spinner.Stop(fmt.Sprintf("Pulled categories from %s", workspace))
-		err = writeCategoriesFile(categories, filePath)
-		if err != nil {
-			log.WithError(err).Error("Couldn't write categories to file")
-			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+		if err := writeCategoriesFile(categories, filePath); err != nil {
+			err = clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+			report.Fail("preference_categories", err)
+			return report.Finish(err)
 		}
 
 		totalSections := 0
@@ -79,17 +78,13 @@ var categoryPullCmd = &cobra.Command{
 				totalCategories += len(s.Categories)
 			}
 		}
-		log.Info("=== Category Pull Summary ===")
-		log.Infof("Sections: %d", totalSections)
-		log.Infof("Categories: %d", totalCategories)
-		log.Infof("Written to: %s", filePath)
+		report.Add("preference_categories", utils.StatusPulled, fmt.Sprintf("%d section%s, %d categor%s", totalSections, pluralS(totalSections), totalCategories, pluralIes(totalCategories)))
 
 		translationDir := filepath.Join(outputDir, "translations")
-		if err := translation.PullTranslations(workspace, translationDir, force); err != nil {
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+		if err := translation.PullTranslations(report, workspace, translationDir, force); err != nil {
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
 		}
-
-		return nil
+		return report.Finish(nil)
 	},
 }
 

@@ -22,13 +22,7 @@ type SchemaWriteStats struct {
 	Success int
 	Failed  int
 	Errors  []string
-}
-
-type SchemaPushStats struct {
-	Total   int
-	Success int
-	Failed  int
-	Errors  []string
+	Written []string // slugs of the schemas written
 }
 
 type FilteredSchema struct {
@@ -36,7 +30,6 @@ type FilteredSchema struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
-
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
@@ -151,8 +144,9 @@ func WriteSchemasToFiles(schemasResp *mgmnt.SchemasResponse, dirPath string) (*S
 			continue
 		}
 
-		log.Infof("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
+		log.Debugf("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
 		stats.Success++
+		stats.Written = append(stats.Written, slug)
 	}
 
 	return stats, nil

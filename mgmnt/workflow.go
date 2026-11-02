@@ -259,9 +259,9 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[string]any, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[string]any, commit bool, commitMessage string) (CommitStatus, error) {
 	if slug == "" {
-		return fmt.Errorf("slug cannot be empty")
+		return NotCommitted, fmt.Errorf("slug cannot be empty")
 	}
 
 	client := client.NewHTTPClient()
@@ -269,11 +269,11 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "/")
 	if err != nil {
-		return fmt.Errorf("failed constructing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed constructing url: %w", err)
 	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
 	q.Add("commit", strconv.FormatBool(commit))
@@ -290,37 +290,36 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 		SetResult(&WorkflowPushResponse{}).
 		Post(urlStr)
 	if err != nil {
-		log.Errorf("Error pushing workflow: %s", err)
-		return err
+		return NotCommitted, requestError("workflows/"+slug, commit, err)
 	}
 	if res.IsError() {
-		return apiError(res)
+		return NotCommitted, apiError(res)
 	}
 	if commit {
 		result := res.Result().(*WorkflowPushResponse)
 		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
-			return clierr.New(fmt.Sprintf("workflows/%s: saved as draft but not committed: workflow is invalid: %v", slug, result.ValidationResult.Errors),
+			return NotCommitted, clierr.New(fmt.Sprintf("workflows/%s: saved as draft but not committed: workflow is invalid: %v", slug, result.ValidationResult.Errors),
 				clierr.CodeSchemaValidation).WithResource("workflows/" + slug)
 		}
 		return commitError("workflows/"+slug, result.CommitResult, clierr.CodeAPIConflict)
 	}
-	return nil
+	return NotCommitted, nil
 }
 
-func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string) (CommitStatus, error) {
 	if slug == "" {
-		return fmt.Errorf("slug cannot be empty")
+		return NotCommitted, fmt.Errorf("slug cannot be empty")
 	}
 	client := client.NewHTTPClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", slug, "commit", "/")
 	if err != nil {
-		return fmt.Errorf("failed constructing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed constructing url: %w", err)
 	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
 	q.Add("commit_message", commitMessage)
@@ -333,12 +332,12 @@ func (c *SS_MgmntClient) FinalizeWorkflow(workspace, slug, commitMessage string)
 		SetHeader("Content-Type", "application/json").
 		Patch(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("workflows/"+slug, true, err)
 	}
 	if res.IsError() {
 		return commitHTTPError(res, "workflows/"+slug)
 	}
-	return nil
+	return Committed, nil
 }
 
 func (c *SS_MgmntClient) ChangeStatusWorkflow(workspace, slug string, enabled bool) error {

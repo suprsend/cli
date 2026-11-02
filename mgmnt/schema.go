@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
 	"github.com/suprsend/cli/internal/clierr"
-	"resty.dev/v3"
 )
 
 type SchemasResponse struct {
@@ -327,16 +326,16 @@ func (c *SS_MgmntClient) GetSchemas(workspace, mode string) (*SchemasResponse, e
 	}, nil
 }
 
-func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[string]any, commit bool, commitMessage string) (CommitStatus, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", schemaSlug, "/")
 	if err != nil {
-		return fmt.Errorf("failed constructing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed constructing url: %w", err)
 	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
 	q.Add("commit", strconv.FormatBool(commit))
@@ -352,35 +351,35 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 		SetResult(&SchemaPushResponse{}).
 		Post(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("schemas/"+schemaSlug, commit, err)
 	}
 	if resp.IsError() {
-		return apiError(resp)
+		return NotCommitted, apiError(resp)
 	}
 	if commit {
 		return commitError("schemas/"+schemaSlug, resp.Result().(*SchemaPushResponse).CommitResult, clierr.CodeAPIConflict)
 	}
-	return nil
+	return NotCommitted, nil
 }
 
 type SchemaPushResponse struct {
 	CommitResult *CommitResult `json:"commit_result"`
 }
 
-func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) (CommitStatus, error) {
 	if slug == "" {
-		return fmt.Errorf("slug cannot be empty")
+		return NotCommitted, fmt.Errorf("slug cannot be empty")
 	}
-	client := resty.New()
+	client := client.NewHTTPClient()
 	defer client.Close()
 
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", slug, "commit", "/")
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, fmt.Errorf("request failed: %w", err)
 	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
 	q.Add("commit_message", commitMessage)
@@ -392,10 +391,10 @@ func (c *SS_MgmntClient) FinalizeSchema(workspace, slug, commitMessage string) e
 		SetHeader("Content-Type", "application/json").
 		Patch(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("schemas/"+slug, true, err)
 	}
 	if res.IsError() {
 		return commitHTTPError(res, "schemas/"+slug)
 	}
-	return nil
+	return Committed, nil
 }

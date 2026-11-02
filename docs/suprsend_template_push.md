@@ -8,7 +8,7 @@ Push templates and their variants from local to SuprSend workspace. Pass a slug 
 
 Local layout: each template lives in `<dir>/<slug>/` (default dir `./suprsend/templates`):
 
-- `template.json`: `slug`, `name`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `enabled_channels` and `variant_order`; `name` is informational and is not pushed.
+- `template.json`: `$schema`, `slug`, `name`, `description`, `tags`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `name`, `description`, `tags`, `enabled_channels` and `variant_order`; a field that is missing or `null` in the file keeps its current value (an explicit `[]` clears `enabled_channels`), and `"description": ""` clears the description. `slug` is informational: the directory name is the slug.
 - `mock_data.json`: mock data used for previews (optional).
 - `<channel>/<variant_id>/variant.json`: one directory per variant.
 - `<channel>/_tenants/<tenant_id>/<variant_id>/variant.json`: tenant-specific variants.
@@ -29,6 +29,9 @@ suprsend template push [<slug>] [flags]
   # Push a single template and commit to live immediately
   suprsend template push welcome-email --commit
 
+  # Commit only the variants that pass validation
+  suprsend template push welcome-email --commit --skip-invalid
+
   # Dry run: preview what would be pushed without making changes
   suprsend template push --dry-run
 ```
@@ -39,9 +42,10 @@ suprsend template push [<slug>] [flags]
   -c, --commit                  Commit the pushed templates to live
       --commit-message string   Commit message describing the changes
   -d, --dir string              Input directory for templates (default: ./suprsend/templates)
-  -n, --dry-run                 Print what would be pushed without making any changes
-  -F, --force                   With --commit: skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)
+  -n, --dry-run                 Report what would be pushed without making any changes
+  -F, --force                   Skip the confirmation prompt for --commit
   -h, --help                    help for push
+      --skip-invalid            With --commit: commit only the variants that pass pre-commit validation and list the ones skipped
   -g, --slug string             Slug of a specific template to push
 ```
 
@@ -54,7 +58,7 @@ suprsend template push [<slug>] [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to list templates from (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 
 ### SEE ALSO

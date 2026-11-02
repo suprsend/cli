@@ -16,7 +16,7 @@ suprsend generate-types typescript [flags]
   -h, --help                 help for typescript
       --mode string          Version mode: draft or live (default "live")
       --output-file string   Output file path for generated types (default "suprsend-types.ts")
-      --workspace string     Workspace name (e.g., staging, production) (default "staging")
+      --workspace string     Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
       --zod                  Generate Zod schemas instead of plain TypeScript types
 ```
 

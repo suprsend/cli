@@ -10,7 +10,7 @@ import (
 // templateLayoutHelp documents the on-disk layout written by `template pull`
 // and read by `template push` (see writeOneTemplate / readTemplateVariants).
 const templateLayoutHelp = "Local layout: each template lives in `<dir>/<slug>/` (default dir `./suprsend/templates`):\n\n" +
-	"- `template.json`: `slug`, `name`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `enabled_channels` and `variant_order`; `name` is informational and is not pushed.\n" +
+	"- `template.json`: `$schema`, `slug`, `name`, `description`, `tags`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `name`, `description`, `tags`, `enabled_channels` and `variant_order`; a field that is missing or `null` in the file keeps its current value (an explicit `[]` clears `enabled_channels`), and `\"description\": \"\"` clears the description. `slug` is informational: the directory name is the slug.\n" +
 	"- `mock_data.json`: mock data used for previews (optional).\n" +
 	"- `<channel>/<variant_id>/variant.json`: one directory per variant.\n" +
 	"- `<channel>/_tenants/<tenant_id>/<variant_id>/variant.json`: tenant-specific variants.\n" +

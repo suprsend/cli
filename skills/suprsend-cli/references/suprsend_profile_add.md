@@ -16,6 +16,7 @@ suprsend profile add [flags]
       --mgmnt-url string       Management URL (default: https://management-api.suprsend.com/)
       --name string            Name of the profile (required)
       --service-token string   Service token (required)
+      --workspace string       Default workspace for commands run with this profile (used when -w and SUPRSEND_WORKSPACE are not set)
 ```
 
 ### Options inherited from parent commands

@@ -25,7 +25,7 @@ var workflowCommitCmd = &cobra.Command{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, and live workflows immediately begin executing the new definition for new trigger events.",
 		"skills:tip.b-inspect":      "If you didn't author the draft locally, run `suprsend workflow get --slug <slug> --mode draft` first to inspect what will become live.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
@@ -36,9 +36,10 @@ var workflowCommitCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		report := utils.NewReport("workflow commit", workspace, dryRun)
 		if dryRun {
-			log.Infof("DRY RUN: would commit workflow '%s' to live", slug)
-			return nil
+			report.Add("workflows/"+slug, utils.StatusWouldCommit, "")
+			return report.Finish(nil)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
@@ -53,22 +54,23 @@ var workflowCommitCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing workflow...")
-
-		err := mgmntClient.FinalizeWorkflow(workspace, slug, commitMessage)
+		commitStatus, err := mgmntClient.FinalizeWorkflow(workspace, slug, commitMessage)
+		spinner.Stop("")
 		if err != nil {
-			log.Error(err.Error())
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			err = clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			report.Fail("workflows/"+slug, err)
+			return report.Finish(err)
 		}
-
-		spinner.Stop(fmt.Sprintf("Workflow '%s' is up to date in live", slug))
-		return nil
+		status, detail := utils.PushStatus(commitStatus)
+		report.Add("workflows/"+slug, status, detail)
+		return report.Finish(nil)
 	},
 }
 
 func init() {
 	workflowCommitCmd.Flags().StringP("slug", "g", "", "Workflow slug")
 	workflowCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
-	workflowCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	workflowCommitCmd.Flags().BoolP("dry-run", "n", false, "Report what would be committed without making any changes")
 	workflowCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	WorkflowCmd.AddCommand(workflowCommitCmd)
 }

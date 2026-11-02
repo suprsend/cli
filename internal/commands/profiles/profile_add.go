@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sabouaram/cobra_ui"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
@@ -19,6 +18,7 @@ var (
 	addBaseUrl      string
 	addMgmntUrl     string
 	addServiceToken string
+	addWorkspace    string
 )
 
 var profilesAddCmd = &cobra.Command{
@@ -30,8 +30,10 @@ var profilesAddCmd = &cobra.Command{
 
 		cfg, path, err := EnsureConfig(path)
 		if err != nil {
-			log.WithError(err).Error("Failed to load or create config")
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
+		}
+		if addWorkspace, err = normalizeProfileWorkspace(addWorkspace); err != nil {
+			return err
 		}
 
 		if addName != "" && addServiceToken != "" {
@@ -60,6 +62,7 @@ var profilesAddCmd = &cobra.Command{
 				BaseUrl:      config.ConfigString{Value: addBaseUrl},
 				MgmntUrl:     config.ConfigString{Value: addMgmntUrl},
 				ServiceToken: config.ConfigString{Value: addServiceToken},
+				Workspace:    config.ConfigString{Value: addWorkspace},
 			}
 
 			err := config.SaveProfileConfig(cfg, path)
@@ -84,15 +87,15 @@ func init() {
 	profilesAddCmd.Flags().StringVar(&addBaseUrl, "base-url", "", "Base URL (default: "+config.DefaultBaseUrl+")")
 	profilesAddCmd.Flags().StringVar(&addMgmntUrl, "mgmnt-url", "", "Management URL (default: "+config.DefaultMgmntUrl+")")
 	profilesAddCmd.Flags().StringVar(&addServiceToken, "service-token", "", "Service token (required)")
+	profilesAddCmd.Flags().StringVar(&addWorkspace, "workspace", "", "Default workspace for commands run with this profile (used when -w and SUPRSEND_WORKSPACE are not set)")
 	ProfileCmd.AddCommand(profilesAddCmd)
 }
 
 func runAddInteractive(cfg *config.ProfileConfig, path string) {
-	ui := cobra_ui.New()
-	var questions []cobra_ui.Question
+	var questions []question
 
 	if addName == "" {
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: "Name: ",
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -109,7 +112,7 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 	}
 
 	if addServiceToken == "" {
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: "Service Token: ",
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -122,13 +125,12 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 		})
 	}
 
-	// URL prompts. cobra_ui has no native "default value" support, so we
-	// embed the default in the prompt text and let the handler treat
-	// empty input as "accept the default". Typed URL is validated and
+	// URL prompts embed the default in the prompt text, and the handler
+	// treats empty input as "accept the default". Typed URL is validated and
 	// stored. The same flow covers BYOC, staging / pre-prod / dev — any
 	// non-default endpoint works the same way.
 	if addBaseUrl == "" {
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: fmt.Sprintf("Base URL [%s]: ", config.DefaultBaseUrl),
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -146,7 +148,7 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 		})
 	}
 	if addMgmntUrl == "" {
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: fmt.Sprintf("Management URL [%s]: ", config.DefaultMgmntUrl),
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -164,9 +166,20 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 		})
 	}
 
-	if len(questions) > 0 {
-		ui.SetQuestions(questions)
-		ui.RunInteractiveUI()
+	if addWorkspace == "" {
+		questions = append(questions, question{
+			Text: fmt.Sprintf("Default workspace [%s]: ", config.DefaultWorkspace),
+			Handler: func(s string) error {
+				ws, err := normalizeProfileWorkspace(cleanInput(s))
+				addWorkspace = ws
+				return err
+			},
+		})
+	}
+
+	if err := ask(questions); err != nil {
+		log.Error(err)
+		return
 	}
 
 	if addName == "" {
@@ -183,6 +196,9 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 	fmt.Printf("   Service Token: [HIDDEN]\n")
 	fmt.Printf("   Base URL: %s\n", addBaseUrl)
 	fmt.Printf("   Management URL: %s\n", addMgmntUrl)
+	if addWorkspace != "" {
+		fmt.Printf("   Default workspace: %s\n", addWorkspace)
+	}
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -214,6 +230,7 @@ func runAddInteractive(cfg *config.ProfileConfig, path string) {
 		BaseUrl:      config.ConfigString{Value: addBaseUrl},
 		MgmntUrl:     config.ConfigString{Value: addMgmntUrl},
 		ServiceToken: config.ConfigString{Value: addServiceToken},
+		Workspace:    config.ConfigString{Value: addWorkspace},
 	}
 
 	err := config.SaveProfileConfig(cfg, path)

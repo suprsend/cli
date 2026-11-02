@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -57,6 +58,6 @@ func init() {
 	translationListCmd.Flags().Int("offset", 0, "Number of translations to skip for pagination")
 	translationListCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
 	translationListCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
-	TranslationCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	TranslationCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	TranslationCmd.AddCommand(translationListCmd)
 }

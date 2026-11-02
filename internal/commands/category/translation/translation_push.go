@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
@@ -39,26 +38,18 @@ var translationPushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend category translation push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-result": "Each locale is reported on stdout as `pushed` (translations go live immediately), `skipped` (English) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		locale, _ := cmd.Flags().GetString("locale")
 		dir, _ := cmd.Flags().GetString("dir")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-		stats, err := PushTranslations(workspace, locale, dir, dryRun)
-		if !dryRun && stats != nil {
-			log.Info("=== Translation Push Summary ===")
-			log.Infof("Total locales processed: %d", stats.Total)
-			log.Infof("Successfully pushed: %d", stats.Success)
-			log.Infof("Failed to push: %d", stats.Failed)
-			if len(stats.Errors) > 0 {
-				log.Info("Errors:")
-				for _, e := range stats.Errors {
-					log.Infof("  - %s", e)
-				}
-			}
-		}
-		return err
+		report := utils.NewReport("category translation push", workspace, dryRun)
+		_, err := PushTranslations(report, workspace, locale, dir, dryRun)
+		return report.Finish(err)
 	},
 }
 
@@ -67,9 +58,9 @@ var translationPushCmd = &cobra.Command{
 const englishLocaleFilename = "en.json"
 
 // PushTranslations uploads non-English locale translation files from dir to
-// the workspace. Returns stats so the caller can render its own end-of-run
-// summary; the helper itself only emits per-locale success/failure logs.
-func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslationStats, error) {
+// the workspace and adds one report item per locale file. Returns stats so
+// the caller can tell what happened.
+func PushTranslations(report *utils.Report, workspace, locale, dir string, dryRun bool) (*PushTranslationStats, error) {
 	if workspace == "" {
 		return nil, clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
@@ -140,57 +131,50 @@ func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslat
 		return stats, clierr.New(fmt.Sprintf("no locale JSON files found in %s", translationsDir), clierr.CodeFileNotFound)
 	}
 
+	for _, fileName := range skippedEnglish {
+		report.Add(translationResource(fileName), utils.StatusSkipped, "English is the source of truth and can't be pushed")
+	}
+
 	if dryRun {
-		log.Infof("DRY RUN: would push %d translation file(s) to %s", len(pushable), workspace)
 		for _, fileName := range pushable {
-			log.Infof("  - %s", strings.TrimSuffix(fileName, ".json"))
-		}
-		for _, fileName := range skippedEnglish {
-			log.Infof("  - %s (skipped: English source of truth)", strings.TrimSuffix(fileName, ".json"))
+			report.Add(translationResource(fileName), utils.StatusWouldPush, "")
 		}
 		return stats, nil
 	}
 
-	for _, fileName := range skippedEnglish {
-		log.Infof("Skipping %s — English translations are the source of truth and cannot be pushed.", fileName)
-	}
-
 	mgmntClient := utils.GetSuprSendMgmntClient()
-	var spinner *utils.Spinner
+	fail := func(fileName, action string, err error) {
+		stats.Failed++
+		stats.Errors = append(stats.Errors, fmt.Sprintf("%s: %s: %v", translationResource(fileName), action, err))
+		report.Fail(translationResource(fileName), err)
+	}
 
 	for _, fileName := range pushable {
 		filePath := filepath.Join(translationsDir, fileName)
 		fileLocale := strings.TrimSuffix(fileName, ".json")
-		spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", fileName))
 
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			spinner.Stop("")
-			log.WithError(err).Debugf("Couldn't read translations from file %s", filePath)
-			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("preference_categories/translations/%s: failed to read: %v", fileName, err))
+			fail(fileName, "failed to read", err)
 			continue
 		}
 
 		var translation mgmnt.PreferenceTranslationContent
 		if err := json.Unmarshal(data, &translation); err != nil {
-			spinner.Stop("")
-			log.WithError(err).Errorf("preference_categories/translations/%s: failed to parse: %v", fileName, err)
-			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("preference_categories/translations/%s: failed to parse: %v", fileName, err))
+			fail(fileName, "failed to parse", err)
 			continue
 		}
 
-		if err := mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation); err != nil {
-			spinner.Stop("")
-			log.WithError(err).Errorf("preference_categories/translations/%s: failed to push", fileName)
-			stats.Failed++
-			stats.Errors = append(stats.Errors, fmt.Sprintf("preference_categories/translations/%s: failed to push: %v", fileName, err))
+		spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", fileName))
+		err = mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation)
+		spinner.Stop("")
+		if err != nil {
+			fail(fileName, "failed to push", err)
 			continue
 		}
 
 		stats.Success++
-		spinner.Stop(fmt.Sprintf("Pushed translation: %s", fileName))
+		report.Add(translationResource(fileName), utils.StatusPushed, "live")
 	}
 
 	if stats.Failed > 0 {
@@ -199,9 +183,13 @@ func PushTranslations(workspace, locale, dir string, dryRun bool) (*PushTranslat
 	return stats, nil
 }
 
+func translationResource(fileName string) string {
+	return "preference_categories/translations/" + fileName
+}
+
 func init() {
 	translationPushCmd.Flags().String("locale", "", "Locale code to push, e.g., es, fr (omit to push all)")
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: "+defaultDir+")")
-	translationPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	translationPushCmd.Flags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	TranslationCmd.AddCommand(translationPushCmd)
 }

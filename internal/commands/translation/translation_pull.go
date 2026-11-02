@@ -1,6 +1,7 @@
 package translation
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,36 +48,30 @@ var translationPullCmd = &cobra.Command{
 			}
 		}
 
+		report := utils.NewReport("translation pull", workspace, false)
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmnt_client := utils.GetSuprSendMgmntClient()
 		translationResp, err := mgmnt_client.GetTranslations(workspace, mode)
+		spinner.Stop("")
 		if err != nil {
-			spinner.Stop("")
-			log.Errorf("Failed to get translations: %v", err)
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
 		}
-		spinner.Stop(fmt.Sprintf("Pulled %d translations from %s", len(translationResp.Results), workspace))
 
 		stats, err := WriteTranslationToFiles(*translationResp, outputDir)
 		if err != nil {
-			log.Errorf("Failed to save translations: %v", err)
-			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeFileParseFailed, ""))
 		}
-
-		log.Info("=== Translation Pull Summary ===")
-		log.Infof("Total translations processed: %d", stats.Total)
-		log.Infof("Successfully written: %d", stats.Success)
-		log.Infof("Failed to write: %d", stats.Failed)
-
+		for _, name := range stats.Written {
+			report.Add("translations/"+name, utils.StatusPulled, "")
+		}
+		for _, e := range stats.Errors {
+			report.Fail("translations", errors.New(e))
+		}
 		if stats.Failed > 0 {
-			log.Info("Failed translations:")
-			for _, errorMsg := range stats.Errors {
-				log.Infof("  - %s", errorMsg)
-			}
-			return clierr.Failures(fmt.Sprintf("%d translation(s) failed to write", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
+			return report.Finish(clierr.Failures(fmt.Sprintf("%d translation(s) failed to write", stats.Failed), stats.Errors, clierr.CodeAPIInternal))
 		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 

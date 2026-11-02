@@ -81,6 +81,7 @@ var listProfilesCmd = &cobra.Command{
 					Active:       isActive,
 					BaseUrl:      profile.BaseUrl.Value,
 					MgmntUrl:     profile.MgmntUrl.Value,
+					Workspace:    profile.Workspace.Value,
 					ServiceToken: profile.ServiceToken.Value,
 				})
 			}

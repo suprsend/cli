@@ -26,11 +26,12 @@ var workflowPushCmd = &cobra.Command{
   suprsend workflow push --dry-run`,
 	Annotations: map[string]string{
 		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
-		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and logs what would be pushed. Nothing is validated server-side.",
+		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and reports what would be pushed. Nothing is validated server-side.",
 		"skills:tip.c-commit": "With `--commit`, a workflow that is saved as a draft but not committed is an error. Pushing one workflow (`workflow push <slug> --commit`) exits 2 for an invalid workflow, with the validation errors in the message, and 1 for any other commit failure. Pushing all workflows exits 1 if any of them fails, and the error lists each failed workflow with its reason. A workflow whose draft already matches live counts as success (nothing to commit).",
 		"skills:tip.d-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
+		"skills:tip.e-result": "Each workflow is reported on stdout as `pushed` (draft only), `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
@@ -40,7 +41,6 @@ var workflowPushCmd = &cobra.Command{
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		force, _ := cmd.Flags().GetBool("force")
-		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
 			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
@@ -60,9 +60,10 @@ var workflowPushCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-
-		hasError := false
-		var spinner *utils.Spinner
+		dryRunStatus := utils.StatusWouldPush
+		if commit {
+			dryRunStatus = utils.StatusWouldCommit
+		}
 
 		if slug != "" {
 			var workflow map[string]any
@@ -89,31 +90,26 @@ var workflowPushCmd = &cobra.Command{
 				if err := json.Unmarshal(data, &workflow); err != nil {
 					return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse JSON for %s", filePath))
 				}
-				// path wins: --slug flag value is authoritative
 				workflow["slug"] = slug
 			}
 
+			report := utils.NewReport("workflow push", workspace, dryRun)
 			if dryRun {
-				action := "push"
-				if commit {
-					action = "push and commit"
-				}
-				log.Infof("DRY RUN: would %s workflow '%s' to %s", action, slug, workspace)
-				return nil
+				report.Add("workflows/"+slug, dryRunStatus, "")
+				return report.Finish(nil)
 			}
 
-			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			commitStatus, err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			spinner.Stop("")
 			if err != nil {
-				spinner.Stop("")
-				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push workflow %s", slug))
+				err = clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push workflow %s", slug))
+				report.Fail("workflows/"+slug, err)
+				return report.Finish(err)
 			}
-			spinner.Stop(fmt.Sprintf("Pushed workflow: %s", slug))
-			return nil
-		}
-
-		stats := &WorkflowPushStats{
-			Errors: []string{},
+			status, detail := utils.PushStatus(commitStatus)
+			report.Add("workflows/"+slug, status, detail)
+			return report.Finish(nil)
 		}
 
 		if path == "" {
@@ -121,25 +117,23 @@ var workflowPushCmd = &cobra.Command{
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Errorf("Directory %s does not exist", path)
-			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+			return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("directory %s does not exist", path))
 		}
 
 		if err := validateInputDirectory(path); err != nil {
-			log.Errorf("Error with input directory: %v\n", err)
-			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "error with input directory")
 		}
 
 		files, err := os.ReadDir(path)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to read local workflows directory")
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
-		for _, file := range files {
-			if file.IsDir() {
-				stats.Total++
-			}
+		report := utils.NewReport("workflow push", workspace, dryRun)
+		var failures []string
+		fail := func(slug, action string, err error) {
+			report.Fail("workflows/"+slug, err)
+			failures = append(failures, clierr.ItemFailure("workflows/"+slug, action, err))
 		}
 
 		for _, file := range files {
@@ -148,87 +142,50 @@ var workflowPushCmd = &cobra.Command{
 			}
 
 			slug := file.Name()
-			if !hasError {
-				spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			}
 			filePath := filepath.Join(path, slug, "workflow.json")
 			data, err := os.ReadFile(filePath)
 			if err != nil {
-				spinner.Stop("")
-				hasError = true
-				log.WithError(err).Errorf("Failed to read file %s", file.Name())
-				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to read file %s: %v", file.Name(), err))
+				fail(slug, "failed to read workflow.json", err)
 				continue
 			}
 
 			var workflow map[string]any
 			if err := json.Unmarshal(data, &workflow); err != nil {
-				spinner.Stop("")
-				hasError = true
-				log.WithError(err).Errorf("Failed to parse JSON for %s", file.Name())
-				stats.Failed++
-				stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to parse JSON for %s: %v", file.Name(), err))
+				fail(slug, "failed to parse workflow.json", err)
 				continue
 			}
 
-			// path wins: directory name is authoritative; warn on mismatch
 			if jsonSlug, _ := workflow["slug"].(string); jsonSlug != slug {
 				log.Warnf("workflows/%s: workflow.json#slug is %q but directory is %q — using directory value", slug, jsonSlug, slug)
 				workflow["slug"] = slug
 			}
 
 			if dryRun {
-				dryRunSlugs = append(dryRunSlugs, slug)
-				stats.Success++
-				spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
-				hasError = false
+				report.Add("workflows/"+slug, dryRunStatus, "")
 				continue
 			}
 
-			err = mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			commitStatus, err := mgmntClient.PushWorkflow(workspace, slug, workflow, commit, commitMessage)
+			spinner.Stop("")
 			if err != nil {
-				spinner.Stop("")
-				hasError = true
-				log.WithError(err).Errorf("workflows/%s: failed to push", slug)
-				stats.Failed++
-				stats.Errors = append(stats.Errors, clierr.ItemFailure("workflows/"+slug, "failed to push", err))
+				fail(slug, "failed to push", err)
 				continue
 			}
-
-			stats.Success++
-			spinner.Stop(fmt.Sprintf("Pushed workflow: %s", slug))
-			hasError = false
+			status, detail := utils.PushStatus(commitStatus)
+			report.Add("workflows/"+slug, status, detail)
 		}
 
-		if dryRun {
-			action := "push"
-			if commit {
-				action = "push and commit"
+		if len(failures) > 0 {
+			code := clierr.CodeAPIInternal
+			summary := fmt.Sprintf("%d workflow(s) failed to push", len(failures))
+			if dryRun {
+				code = clierr.CodeFileParseFailed
+				summary = fmt.Sprintf("%d workflow(s) failed local checks", len(failures))
 			}
-			log.Infof("DRY RUN: would %s %d workflow(s) to %s", action, len(dryRunSlugs), workspace)
-			for _, s := range dryRunSlugs {
-				log.Infof("  - %s", s)
-			}
-			if stats.Failed > 0 {
-				return clierr.Failures(fmt.Sprintf("%d workflow(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
-			}
-			return nil
+			return report.Finish(clierr.Failures(summary, failures, code))
 		}
-
-		log.Info("=== Workflow Push Summary ===")
-		log.Infof("Total workflows processed: %d", stats.Total)
-		log.Infof("Successfully pushed: %d", stats.Success)
-		log.Infof("Failed to push: %d", stats.Failed)
-
-		if stats.Failed > 0 {
-			log.Info("Failed workflows:")
-			for _, errorMsg := range stats.Errors {
-				log.Infof("  - %s", errorMsg)
-			}
-			return clierr.Failures(fmt.Sprintf("%d workflow(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
-		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 
@@ -238,7 +195,7 @@ func init() {
 	workflowPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	workflowPushCmd.PersistentFlags().StringP("slug", "g", "", "Workflow slug to push (omit to push all)")
 	workflowPushCmd.PersistentFlags().StringP("json", "j", "", `Workflow definition as a JSON object (requires --slug). Must be a valid workflow object, e.g. '{"name":"My Workflow","nodes":[...]}'`)
-	workflowPushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	workflowPushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	workflowPushCmd.PersistentFlags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	WorkflowCmd.AddCommand(workflowPushCmd)
 }

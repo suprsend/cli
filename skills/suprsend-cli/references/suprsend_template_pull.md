@@ -6,7 +6,7 @@ Pull templates and their variants from SuprSend workspace. Pass a slug as a posi
 
 Local layout: each template lives in `<dir>/<slug>/` (default dir `./suprsend/templates`):
 
-- `template.json`: `slug`, `name`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `enabled_channels` and `variant_order`; `name` is informational and is not pushed.
+- `template.json`: `$schema`, `slug`, `name`, `description`, `tags`, `enabled_channels`, and `variant_order` (variant ids in order, keyed by `<channel>` or `<channel>/<tenant_id>` for tenant-specific ordering). Push sends `name`, `description`, `tags`, `enabled_channels` and `variant_order`; a field that is missing or `null` in the file keeps its current value (an explicit `[]` clears `enabled_channels`), and `"description": ""` clears the description. `slug` is informational: the directory name is the slug.
 - `mock_data.json`: mock data used for previews (optional).
 - `<channel>/<variant_id>/variant.json`: one directory per variant.
 - `<channel>/_tenants/<tenant_id>/<variant_id>/variant.json`: tenant-specific variants.
@@ -55,6 +55,6 @@ suprsend template pull [<slug>] [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to list templates from (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 

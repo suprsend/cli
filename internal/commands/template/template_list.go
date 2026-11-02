@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -61,6 +62,6 @@ func init() {
 	templateListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})
-	TemplateCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace to list templates from")
+	TemplateCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	TemplateCmd.AddCommand(templateListCmd)
 }

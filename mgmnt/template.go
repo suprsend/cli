@@ -78,7 +78,13 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 	return allVariants, nil
 }
 
-func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels []string) error {
+// TemplateFields are the template-level fields that template.json sets and
+// the upsert endpoint accepts.
+var TemplateFields = []string{"name", "description", "tags", "enabled_channels"}
+
+// CreateTemplate creates or updates the template's own fields (see
+// TemplateFields). Fields left out of fields keep their current value.
+func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, fields map[string]any) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
@@ -94,9 +100,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]any{
-			"enabled_channels": enabledChannels,
-		}).
+		SetBody(fields).
 		Post(urlStr)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -140,10 +144,10 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 }
 
 type PreCommitVariant struct {
-	Channel string                `json:"channel"`
-	ID      string                `json:"id"`
-	HasDiff bool                  `json:"has_diff"`
-	Errors  map[string][]string   `json:"errors"`
+	Channel string              `json:"channel"`
+	ID      string              `json:"id"`
+	HasDiff bool                `json:"has_diff"`
+	Errors  map[string][]string `json:"errors"`
 }
 
 type PreCommitValidateResponse struct {
@@ -178,9 +182,9 @@ func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitVa
 	return resp.Result().(*PreCommitValidateResponse), nil
 }
 
-func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, variants []map[string]any) error {
+func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, variants []map[string]any) (CommitStatus, error) {
 	if slug == "" {
-		return fmt.Errorf("slug cannot be empty")
+		return NotCommitted, fmt.Errorf("slug cannot be empty")
 	}
 
 	client := client.NewHTTPClient()
@@ -203,12 +207,12 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 
 	resp, err := req.Patch(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("templates/"+slug, true, err)
 	}
 	if resp.IsError() {
 		return commitHTTPError(resp, "templates/"+slug)
 	}
-	return nil
+	return Committed, nil
 }
 
 func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string]any, error) {
@@ -240,7 +244,9 @@ func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string
 	return data, nil
 }
 
-func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) error {
+// PatchTemplateMockData saves mock data and returns it as the API stored it,
+// which can differ from what was sent: the API drops some fields silently.
+func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) (map[string]any, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
@@ -254,12 +260,18 @@ func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData 
 		SetBody(map[string]any{"data": mockData}).
 		Patch(url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.IsError() {
-		return apiError(resp)
+		return nil, apiError(resp)
 	}
-	return nil
+	var result map[string]any
+	if err := json.Unmarshal(resp.Bytes(), &result); err == nil {
+		if data, ok := result["data"].(map[string]any); ok {
+			return data, nil
+		}
+	}
+	return c.GetTemplateMockData(workspace, slug)
 }
 
 func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, error) {

@@ -21,14 +21,6 @@ type TemplateWriteStats struct {
 	Errors  []string
 }
 
-type TemplatePushStats struct {
-	Total   int
-	Success int
-	Failed  int
-	Errors  []string
-}
-
-
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
 		return "", false
@@ -91,6 +83,9 @@ func EnsureTemplatesOutputDir(outputDir string) error {
 	return nil
 }
 
+// templateJSONSchema is the JSON Schema for template.json's template-level fields.
+const templateJSONSchema = "https://schema.suprsend.com/template/v2/schema.json"
+
 // WriteOneTemplate writes a single template (template.json + mock_data.json
 // + per-variant directories) into outputDir/<slug>/. The existing per-slug
 // directory is removed first so renames / deletions of variants don't leave
@@ -138,9 +133,16 @@ func writeOneTemplate(tmpl TemplateResult, outputDir string, stats *TemplateWrit
 	}
 
 	// Write template.json with template-level metadata
+	tags := tmpl.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	templateData := map[string]any{
+		"$schema":          templateJSONSchema,
 		"slug":             tmpl.Slug,
 		"name":             tmpl.Name,
+		"description":      tmpl.Description,
+		"tags":             tags,
 		"enabled_channels": tmpl.EnabledChannels,
 	}
 	if tmpl.VariantOrder != nil {
@@ -215,22 +217,20 @@ func writeOneTemplate(tmpl TemplateResult, outputDir string, stats *TemplateWrit
 	}
 
 	stats.Success++
-	log.Infof("Pulled template: %s", tmpl.Slug)
+	log.Debugf("Pulled template: %s", tmpl.Slug)
 	return nil
 }
 
-// selectValidVariants picks the variants for a partial (`-F`) commit: the
-// changed variants that pass pre-commit validation. It returns nil when no
-// changed variant has errors, so the whole draft (including name, channel and
-// mock-data changes) is committed, and an error when every changed variant has
-// errors, since nothing would be committed.
-func selectValidVariants(resp *mgmnt.PreCommitValidateResponse, slug string) ([]map[string]any, error) {
-	var valid []map[string]any
-	skipped := 0
+// selectValidVariants picks the variants for a --skip-invalid commit: the
+// changed variants that pass pre-commit validation. skipped names the others
+// as "<channel>/<id>"; when it is empty, valid is nil so the whole draft
+// (including name, channel and mock-data changes) is committed. It returns an
+// error when every changed variant has errors, since nothing would be committed.
+func selectValidVariants(resp *mgmnt.PreCommitValidateResponse, slug string) (valid []map[string]any, skipped []string, err error) {
 	for _, v := range resp.Variants {
 		if len(v.Errors) > 0 {
-			log.Warnf("Skipping variant %s/%s for template %s due to errors: %v", v.Channel, v.ID, slug, v.Errors)
-			skipped++
+			log.Warnf("templates/%s: skipping variant %s/%s: %v", slug, v.Channel, v.ID, v.Errors)
+			skipped = append(skipped, v.Channel+"/"+v.ID)
 			continue
 		}
 		valid = append(valid, map[string]any{
@@ -238,12 +238,12 @@ func selectValidVariants(resp *mgmnt.PreCommitValidateResponse, slug string) ([]
 			"id":      v.ID,
 		})
 	}
-	if skipped == 0 {
-		return nil, nil
+	if len(skipped) == 0 {
+		return nil, nil, nil
 	}
 	if len(valid) == 0 {
-		return nil, clierr.New(fmt.Sprintf("templates/%s: all %d changed variant(s) failed pre-commit validation; nothing committed", slug, skipped),
-			clierr.CodeAPIInternal).WithResource("templates/" + slug)
+		return nil, skipped, clierr.New(fmt.Sprintf("templates/%s: all %d changed variant(s) failed pre-commit validation; nothing committed", slug, len(skipped)),
+			clierr.CodeSchemaValidation).WithResource("templates/" + slug)
 	}
-	return valid, nil
+	return valid, skipped, nil
 }

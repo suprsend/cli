@@ -16,6 +16,7 @@ suprsend profile modify [flags]
       --mgmnt-url string       Management URL (default: https://management-api.suprsend.com/)
       --name string            Name of the profile to modify
       --service-token string   Service Token
+      --workspace string       Default workspace for commands run with this profile; "" removes it
 ```
 
 ### Options inherited from parent commands

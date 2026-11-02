@@ -24,7 +24,7 @@ suprsend workflow enable [<slug>] [flags]
 ### Options
 
 ```
-  -n, --dry-run       Print what would be changed without making any changes
+  -n, --dry-run       Report what would be changed without making any changes
   -h, --help          help for enable
   -g, --slug string   Workflow slug
 ```
@@ -38,6 +38,6 @@ suprsend workflow enable [<slug>] [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 

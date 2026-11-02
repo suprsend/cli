@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -60,6 +61,6 @@ func init() {
 	schemaListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	schemaListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 
-	SchemaCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	SchemaCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	SchemaCmd.AddCommand(schemaListCmd)
 }

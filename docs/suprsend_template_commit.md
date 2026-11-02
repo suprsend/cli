@@ -19,6 +19,9 @@ suprsend template commit [<slug>] [flags]
   # Commit using the flag form
   suprsend template commit --slug welcome-email
 
+  # Commit only the variants that pass validation
+  suprsend template commit welcome-email --skip-invalid
+
   # Dry run: see what would be committed without making changes
   suprsend template commit welcome-email --dry-run
 ```
@@ -27,9 +30,10 @@ suprsend template commit [<slug>] [flags]
 
 ```
       --commit-message string   Commit message describing the changes
-  -n, --dry-run                 Print what would be committed without making any changes
-  -F, --force                   Skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)
+  -n, --dry-run                 Report what would be committed without making any changes
+  -F, --force                   Skip the confirmation prompt
   -h, --help                    help for commit
+      --skip-invalid            Commit only the variants that pass pre-commit validation and list the ones skipped
   -g, --slug string             Template slug
 ```
 
@@ -42,7 +46,7 @@ suprsend template commit [<slug>] [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace to list templates from (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 
 ### SEE ALSO

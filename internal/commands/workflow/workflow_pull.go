@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 )
 
 var workflowPullCmd = &cobra.Command{
@@ -28,7 +30,7 @@ var workflowPullCmd = &cobra.Command{
 		"skills:tip.a-overwrite": "Pull overwrites `<dir>/<slug>/workflow.json` for every pulled slug without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/workflows` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -53,63 +55,64 @@ var workflowPullCmd = &cobra.Command{
 			}
 		}
 		if err := ensureOutputDirectory(outputDir); err != nil {
-			log.Errorf("Error with output directory: %v", err)
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
+		report := utils.NewReport("workflow pull", workspace, false)
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
-			workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+			err := pullOneWorkflow(mgmntClient, workspace, mode, slug, outputDir)
+			spinner.Stop("")
 			if err != nil {
-				log.Errorf("Failed to get workflow detail: %v", err)
-				return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+				report.Fail("workflows/"+slug, err)
+				return report.Finish(err)
 			}
-			workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
-			if err != nil {
-				log.Errorf("Failed to marshal workflow: %v", err)
-				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
-			}
-			slugDir := filepath.Join(outputDir, slug)
-			if err := os.MkdirAll(slugDir, 0o755); err != nil {
-				log.Errorf("Failed to create workflow directory: %v", err)
-				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
-			}
-			if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
-				log.Errorf("Failed to write workflow file: %v", err)
-				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
-			}
-			spinner.Stop(fmt.Sprintf("Pulled %s from %s", slug, workspace))
-			return nil
+			report.Add("workflows/"+slug, utils.StatusPulled, "")
+			return report.Finish(nil)
 		}
 
 		workflows_resp, err := mgmntClient.GetWorkflows(workspace, mode)
+		spinner.Stop("")
 		if err != nil {
-			log.Errorf("Failed to get workflows: %v", err)
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
 		}
-		spinner.Stop(fmt.Sprintf("Pulled %d workflows from %s", len(workflows_resp.Results), workspace))
 
 		stats, err := WriteWorkflowsToFiles(*workflows_resp, outputDir)
 		if err != nil {
-			log.Errorf("Failed to save workflows: %v", err)
-			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeFileParseFailed, ""))
 		}
-
-		log.Info("=== Workflow Pull Summary ===")
-		log.Infof("Total workflows processed: %d", stats.Total)
-		log.Infof("Successfully updated: %d", stats.Success)
-		log.Infof("Failed to pull: %d", stats.Failed)
-
+		for _, s := range stats.Written {
+			report.Add("workflows/"+s, utils.StatusPulled, "")
+		}
+		for _, e := range stats.Errors {
+			report.Fail("workflows", errors.New(e))
+		}
 		if stats.Failed > 0 {
-			log.Info("Failed workflows:")
-			for _, errorMsg := range stats.Errors {
-				log.Infof("  - %s", errorMsg)
-			}
-			return clierr.Failures(fmt.Sprintf("%d workflow(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
+			return report.Finish(clierr.Failures(fmt.Sprintf("%d workflow(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal))
 		}
-		return nil
+		return report.Finish(nil)
 	},
+}
+
+// pullOneWorkflow writes <outputDir>/<slug>/workflow.json.
+func pullOneWorkflow(mgmntClient *mgmnt.SS_MgmntClient, workspace, mode, slug, outputDir string) error {
+	workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
+	if err != nil {
+		return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+	}
+	workflowJson, err := json.MarshalIndent(workflowResp, "", "  ")
+	if err != nil {
+		return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+	}
+	slugDir := filepath.Join(outputDir, slug)
+	if err := os.MkdirAll(slugDir, 0o755); err != nil {
+		return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+	}
+	if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
+		return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+	}
+	return nil
 }
 
 func init() {

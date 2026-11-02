@@ -77,7 +77,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 	limit := 50
 	offset := 0
 	allEvents := []any{}
-	totalCount := 0
+	totalCount := -1
 
 	for {
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
@@ -91,7 +91,6 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 		q := u.Query()
 		q.Add("limit", strconv.Itoa(limit))
 		q.Add("offset", strconv.Itoa(offset))
-		q.Add("has_linked_schema", "true")
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		res, err := client.R().
@@ -107,14 +106,18 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 			return nil, apiError(res)
 		}
 		events := res.Result().(*EventsResponse)
+		if totalCount < 0 {
+			totalCount = events.Meta.Count
+		}
 		if len(events.Results) == 0 {
 			break
 		}
 		allEvents = append(allEvents, events.Results...)
-		totalCount += len(events.Results)
 		offset += limit
 	}
-	return &EventsResponse{Results: allEvents}, nil
+	resp := &EventsResponse{Results: allEvents}
+	resp.Meta.Count = max(totalCount, 0)
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, error) {

@@ -100,10 +100,15 @@ func NewSpinner(text string) *Spinner {
 	return s
 }
 
-// Stop stops the spinner with the given message. Safe to call multiple times or on a no-op Spinner.
+// Stop stops the spinner with the given message, or clears it without a
+// trace when msg is empty. Safe to call multiple times or on a no-op Spinner.
 func (s *Spinner) Stop(msg string) {
 	if s.p != nil {
-		s.p.Stop(msg)
+		if msg == "" {
+			s.p.Stop()
+		} else {
+			s.p.Stop(msg)
+		}
 		s.cancel()
 		s.p = nil
 		termio.MarkSpinnerStop()
@@ -118,18 +123,26 @@ func (s *Spinner) UpdateMessage(msg string) {
 	}
 }
 
-// WriteError writes err to stderr as a structured JSON CLIError when in JSON errors mode.
-// Pass outputType when the call site runs before Resolve has populated Cfg.OutputType
-// (e.g. flag-parse-time errors); pass "" otherwise.
+// WriteError writes err to stderr: as a structured JSON CLIError in JSON
+// errors mode, otherwise as "Error: <message>" followed by the hint, if any.
+// Pass outputType when the call site runs before Resolve has populated
+// Cfg.OutputType (e.g. flag-parse-time errors); pass "" otherwise.
 func WriteError(err error, outputType string) {
-	if err == nil || !config.ShouldJSONErrors(outputType) {
+	if err == nil {
 		return
 	}
 	var ce *clierr.CLIError
 	if !errors.As(err, &ce) {
 		ce = clierr.Wrap(err, clierr.CodeUnknown, "")
 	}
-	fmt.Fprintln(os.Stderr, string(ce.JSON()))
+	if config.ShouldJSONErrors(outputType) {
+		fmt.Fprintln(os.Stderr, string(ce.JSON()))
+		return
+	}
+	fmt.Fprintln(termio.LogWriter(os.Stderr), color.RedString("Error:"), ce.Message)
+	if ce.Hint != "" {
+		fmt.Fprintln(os.Stderr, "Hint:", ce.Hint)
+	}
 }
 
 func supportsColor() bool {

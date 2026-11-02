@@ -78,6 +78,14 @@ After installation, you can use the CLI by running the `suprsend` command. For e
 suprsend --help
 ```
 
+### Using the CLI from scripts and agents
+
+- **Target.** Commands act on the workspace from `-w`, else `SUPRSEND_WORKSPACE`, else the active profile's `workspace`, else `staging`. The service token comes from `--service-token`, else `SUPRSEND_SERVICE_TOKEN`, else the profile. Run `suprsend whoami --check` to see the profile, host and workspace without opening the config file, and to confirm the token works and the workspace exists. Write commands also check the workspace before writing and warn when they fall back to `staging`.
+- **Results.** `push`, `pull`, `commit`, `enable`, `disable`, `sync` and `generate-types` print their result on stdout even when it is piped: one line per item (`pushed`, `committed`, `unchanged`, `pulled`, `would-push`, `failed`, ...) and a summary. Add `-o json` for one JSON object with `ok`, `counts` and `items`.
+- **Errors.** When stderr is piped or with `-o json`, an error is one JSON object on stderr (`error`, `code`, `hint`, and `details.failures` for runs over several items). Exit codes: 0 success, 1 API error or any failed item, 2 local validation, 3 auth, 4 not found, 5 rate limited, 64 invalid usage.
+- **No prompts.** Confirmation prompts only appear when stdin is a terminal, so `--commit` runs without asking in scripts. `template push|commit --skip-invalid` commits only the variants that pass validation; without it, an invalid variant fails the commit.
+- **Retries.** Dropped connections and 429/502/503/504 answers are retried twice. Re-running a commit is safe: it reports `unchanged` when there is nothing left to commit.
+
 ## Documentation
 Please refer to documentation [here](https://docs.suprsend.com/reference/cli-intro) OR if you want to access the cobra generated docs those are [here](docs/suprsend.md)
 

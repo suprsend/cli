@@ -30,16 +30,20 @@ func readTemplateJSON(templateDir string) (map[string]any, error) {
 	return templateData, nil
 }
 
-
-func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit bool, force bool, dryRun bool) error {
+// PushTemplate pushes one template directory and, with commit, promotes it
+// to live. It returns the report status for the template (pushed, committed,
+// unchanged, or would-push/would-commit on a dry run) and a detail note.
+// With skipInvalid, only the variants that pass pre-commit validation are
+// committed; otherwise all of them are, and an invalid variant fails the commit.
+func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit, skipInvalid, dryRun bool) (string, string, error) {
 	templateData, err := readTemplateJSON(templateDir)
 	if err != nil {
-		return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template.json for template %s", slug))
+		return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template.json for template %s", slug))
 	}
 
 	variants, err := readTemplateVariants(templateDir)
 	if err != nil {
-		return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template %s", slug))
+		return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template %s", slug))
 	}
 
 	if dryRun {
@@ -52,31 +56,25 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 				seen[ch] = true
 			}
 		}
-		log.Infof("DRY RUN: would push template '%s' — %d variant(s), channels: %v", slug, len(variants), channels)
-		return nil
+		status := utils.StatusWouldPush
+		if commit {
+			status = utils.StatusWouldCommit
+		}
+		return status, fmt.Sprintf("%d variant(s), channels: %s", len(variants), strings.Join(channels, ", ")), nil
 	}
 
-	var enabledChannels []string
-	if channels, ok := templateData["enabled_channels"].([]any); ok {
-		for _, ch := range channels {
-			if s, ok := ch.(string); ok {
-				enabledChannels = append(enabledChannels, s)
-			}
-		}
-	}
-	if err := mgmntClient.CreateTemplate(workspace, slug, enabledChannels); err != nil {
-		return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to create template %s", slug))
+	if err := mgmntClient.CreateTemplate(workspace, slug, templateFields(templateData)); err != nil {
+		return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to create template %s", slug))
 	}
 
 	var pushErrs []string
 	for _, variant := range variants {
 		if err := mgmntClient.PushTemplateVariant(workspace, slug, variant); err != nil {
-			log.WithError(err).Errorf("templates/%s: failed to push variant", slug)
 			pushErrs = append(pushErrs, err.Error())
 		}
 	}
 	if len(pushErrs) > 0 {
-		return clierr.New(fmt.Sprintf("templates/%s: failed to push %d variant(s): %s", slug, len(pushErrs), strings.Join(pushErrs, "; ")), clierr.CodeAPIInternal)
+		return "", "", clierr.New(fmt.Sprintf("templates/%s: failed to push %d variant(s): %s", slug, len(pushErrs), strings.Join(pushErrs, "; ")), clierr.CodeAPIInternal)
 	}
 
 	// Push mock_data.json if it exists
@@ -84,18 +82,20 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	if mockDataBytes, err := os.ReadFile(mockDataFile); err == nil {
 		var mockData map[string]any
 		if err := json.Unmarshal(mockDataBytes, &mockData); err != nil {
-			return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse mock_data.json for template %s", slug))
+			return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse mock_data.json for template %s", slug))
 		}
-		if err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData); err != nil {
-			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push mock data for template %s", slug))
+		stored, err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData)
+		if err != nil {
+			return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push mock data for template %s", slug))
 		}
+		warnDroppedMockData(slug, mockData, stored)
 	}
 
 	// Push variant order if present in template.json
 	if variantOrderRaw, ok := templateData["variant_order"]; ok && variantOrderRaw != nil {
 		flatOrder, ok := variantOrderRaw.(map[string]any)
 		if !ok {
-			return clierr.New(fmt.Sprintf("invalid variant_order format for template %s", slug), clierr.CodeFileParseFailed)
+			return "", "", clierr.New(fmt.Sprintf("invalid variant_order format for template %s", slug), clierr.CodeFileParseFailed)
 		}
 		channelMap := map[string]*mgmnt.VariantOrderChannel{}
 		for key, variantsRaw := range flatOrder {
@@ -128,37 +128,98 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 			variantOrder.Channels = append(variantOrder.Channels, *ch)
 		}
 		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", &variantOrder); err != nil {
-			return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push variant order for template %s", slug))
+			return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push variant order for template %s", slug))
 		}
 	}
 
-	if commit {
-		if force {
-			validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
-			if err != nil {
-				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to pre-commit validate template %s", slug))
-			}
+	if !commit {
+		return utils.StatusPushed, "", nil
+	}
+	return commitTemplate(mgmntClient, workspace, slug, commitMessage, skipInvalid)
+}
 
-			if !validateResp.HasChanges {
-				log.Infof("Template %s: no changes to commit", slug)
-				return nil
-			}
-			validVariants, err := selectValidVariants(validateResp, slug)
-			if err != nil {
-				return err
-			}
-
-			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, validVariants); err != nil {
-				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit template %s", slug))
-			}
-		} else {
-			if err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, nil); err != nil {
-				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to commit template %s", slug))
-			}
+// commitTemplate commits a template's draft and returns its report status and
+// detail. With skipInvalid it commits only the changed variants that pass
+// pre-commit validation and names the ones it skipped.
+func commitTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, commitMessage string, skipInvalid bool) (string, string, error) {
+	var variants []map[string]any
+	detail := ""
+	if skipInvalid {
+		validateResp, err := mgmntClient.PreCommitValidate(workspace, slug)
+		if err != nil {
+			return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to pre-commit validate template %s", slug))
+		}
+		if !validateResp.HasChanges {
+			return utils.StatusUnchanged, "no changes to commit", nil
+		}
+		valid, skipped, err := selectValidVariants(validateResp, slug)
+		if err != nil {
+			return "", "", err
+		}
+		if len(skipped) > 0 {
+			variants = valid
+			detail = fmt.Sprintf("skipped %d invalid variant(s): %s", len(skipped), strings.Join(skipped, ", "))
 		}
 	}
 
-	return nil
+	status, err := mgmntClient.CommitTemplate(workspace, slug, commitMessage, variants)
+	if err != nil {
+		hint := ""
+		if !skipInvalid {
+			hint = "to commit only the variants that pass validation, add --skip-invalid"
+		}
+		return "", "", withHint(clierr.Wrap(err, clierr.CodeAPIInternal, ""), hint)
+	}
+	if status == mgmnt.NoChanges {
+		return utils.StatusUnchanged, "no changes to commit", nil
+	}
+	return utils.StatusCommitted, detail, nil
+}
+
+// withHint sets hint on err unless it already has one.
+func withHint(err *clierr.CLIError, hint string) error {
+	if err.Hint == "" {
+		err.Hint = hint
+	}
+	return err
+}
+
+// templateFields picks the fields of template.json that the template upsert
+// accepts. A field that is missing or null in the file is left out so the
+// template keeps its current value: sending "enabled_channels": null clears the
+// draft's channels. An empty name is left out because the API rejects it.
+func templateFields(templateData map[string]any) map[string]any {
+	fields := map[string]any{}
+	for _, key := range mgmnt.TemplateFields {
+		if v, ok := templateData[key]; ok && v != nil {
+			fields[key] = v
+		}
+	}
+	if name, ok := fields["name"].(string); ok && strings.TrimSpace(name) == "" {
+		delete(fields, "name")
+	}
+	return fields
+}
+
+// mockDataIDFields are the mock data fields the API is known to drop without
+// an error (it stores null instead).
+var mockDataIDFields = []string{"recipient_distinct_id", "actor_distinct_id", "tenant_id"}
+
+// warnDroppedMockData warns about mock_data.json fields that the API didn't
+// store as sent.
+func warnDroppedMockData(slug string, sent, stored map[string]any) {
+	if stored == nil {
+		return
+	}
+	for _, key := range mockDataIDFields {
+		want, ok := sent[key]
+		if !ok || want == nil || want == "" {
+			continue
+		}
+		if got := stored[key]; fmt.Sprint(got) != fmt.Sprint(want) {
+			log.Warnf("templates/%s: mock_data.json sets %s to %v, but the API stored %v", slug, key, want, got)
+		}
+	}
 }
 
 var templatePushCmd = &cobra.Command{
@@ -171,15 +232,19 @@ var templatePushCmd = &cobra.Command{
   # Push a single template and commit to live immediately
   suprsend template push welcome-email --commit
 
+  # Commit only the variants that pass validation
+  suprsend template push welcome-email --commit --skip-invalid
+
   # Dry run: preview what would be pushed without making changes
   suprsend template push --dry-run`,
 	Annotations: map[string]string{
 		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend template commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
-		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads the local template directories and logs the variants and channels that would be pushed. Nothing is validated server-side.",
-		"skills:tip.c-force":   "With `--commit`, `-F/--force` does two things: it skips the confirmation prompt **and** switches to a partial commit. The CLI runs a pre-commit validation and commits only the variants that pass; invalid variants are skipped with a warning. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, push succeeds without committing. Without `-F`, all variants are committed together.",
-		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
+		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads the local template directories and reports the variants and channels that would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-invalid": "With `--commit`, all changed variants are committed together, and one invalid variant fails the commit. `--skip-invalid` runs a pre-commit validation and commits only the variants that pass; the skipped ones are listed in the result. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, the template is reported as `unchanged`.",
+		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking; `-F/--force` skips it on a TTY too.",
+		"skills:tip.e-result":  "Each template is reported on stdout as `pushed`, `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		path, _ := cmd.Flags().GetString("dir")
@@ -187,8 +252,12 @@ var templatePushCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		slug := utils.ResolveSlug(cmd, args)
 		force, _ := cmd.Flags().GetBool("force")
+		skipInvalid, _ := cmd.Flags().GetBool("skip-invalid")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		var dryRunSlugs []string
+
+		if skipInvalid && !commit {
+			return clierr.New("--skip-invalid only applies with --commit", clierr.CodeInvalidUsage)
+		}
 
 		if commit && !dryRun && !force {
 			target := "all templates"
@@ -208,14 +277,11 @@ var templatePushCmd = &cobra.Command{
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Errorf("Directory %s does not exist", path)
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-
-		hasError := false
-		var spinner *utils.Spinner
+		report := utils.NewReport("template push", workspace, dryRun)
 
 		if slug != "" {
 			templateDir := filepath.Join(path, slug)
@@ -223,37 +289,23 @@ var templatePushCmd = &cobra.Command{
 				return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("template directory %s does not exist", templateDir))
 			}
 
-			spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
-			err := PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, force, dryRun)
+			spinner := utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
+			status, detail, err := PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, skipInvalid, dryRun)
+			spinner.Stop("")
 			if err != nil {
-				spinner.Stop("")
-				return err
+				report.Fail("templates/"+slug, err)
+				return report.Finish(err)
 			}
-			if dryRun {
-				spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
-			} else {
-				spinner.Stop(fmt.Sprintf("Pushed template: %s", slug))
-			}
-			return nil
+			report.Add("templates/"+slug, status, detail)
+			return report.Finish(nil)
 		}
 
-		stats := &TemplatePushStats{
-			Errors: []string{},
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
-		// Push all templates
-		entries, err2 := os.ReadDir(path)
-		if err2 != nil {
-			log.WithError(err2).Errorf("Failed to read templates directory")
-			return clierr.Wrap(err2, clierr.CodeFileNotFound, "")
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				stats.Total++
-			}
-		}
-
+		var failures []string
 		for _, entry := range entries {
 			if !entry.IsDir() {
 				continue
@@ -262,57 +314,27 @@ var templatePushCmd = &cobra.Command{
 			templateSlug := entry.Name()
 			templateDir := filepath.Join(path, templateSlug)
 
-			if !hasError {
-				spinner = utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
-			}
-
-			if err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, force, dryRun); err != nil {
-				spinner.Stop("")
-				hasError = true
-				log.WithError(err).Errorf("templates/%s: failed to push", templateSlug)
-				stats.Failed++
-				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+templateSlug, "failed to push", err))
+			spinner := utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
+			status, detail, err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, skipInvalid, dryRun)
+			spinner.Stop("")
+			if err != nil {
+				report.Fail("templates/"+templateSlug, err)
+				failures = append(failures, clierr.ItemFailure("templates/"+templateSlug, "failed to push", err))
 				continue
 			}
+			report.Add("templates/"+templateSlug, status, detail)
+		}
 
-			stats.Success++
+		if len(failures) > 0 {
+			code := clierr.CodeAPIInternal
+			summary := fmt.Sprintf("%d template(s) failed to push", len(failures))
 			if dryRun {
-				dryRunSlugs = append(dryRunSlugs, templateSlug)
-				spinner.Stop(fmt.Sprintf("(dry run) %s", templateSlug))
-			} else {
-				spinner.Stop(fmt.Sprintf("Pushed template: %s", templateSlug))
+				code = clierr.CodeFileParseFailed
+				summary = fmt.Sprintf("%d template(s) failed local checks", len(failures))
 			}
-			hasError = false
+			return report.Finish(clierr.Failures(summary, failures, code))
 		}
-
-		if dryRun {
-			action := "push"
-			if commit {
-				action = "push and commit"
-			}
-			log.Infof("DRY RUN: would %s %d template(s) to %s", action, len(dryRunSlugs), workspace)
-			for _, s := range dryRunSlugs {
-				log.Infof("  - %s", s)
-			}
-			if stats.Failed > 0 {
-				return clierr.Failures(fmt.Sprintf("%d template(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
-			}
-			return nil
-		}
-
-		log.Info("=== Template Push Summary ===")
-		log.Infof("Total templates processed: %d", stats.Total)
-		log.Infof("Successfully pushed: %d", stats.Success)
-		log.Infof("Failed to push: %d", stats.Failed)
-
-		if stats.Failed > 0 {
-			log.Info("Failed templates:")
-			for _, errorMsg := range stats.Errors {
-				log.Infof("  - %s", errorMsg)
-			}
-			return clierr.Failures(fmt.Sprintf("%d template(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
-		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 
@@ -363,7 +385,8 @@ func init() {
 	templatePushCmd.PersistentFlags().BoolP("commit", "c", false, "Commit the pushed templates to live")
 	templatePushCmd.PersistentFlags().String("commit-message", "", "Commit message describing the changes")
 	templatePushCmd.PersistentFlags().StringP("slug", "g", "", "Slug of a specific template to push")
-	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "With --commit: skip the confirmation prompt and commit only the variants that pass pre-commit validation (invalid variants are skipped)")
-	templatePushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "Skip the confirmation prompt for --commit")
+	templatePushCmd.PersistentFlags().Bool("skip-invalid", false, "With --commit: commit only the variants that pass pre-commit validation and list the ones skipped")
+	templatePushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

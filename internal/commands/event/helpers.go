@@ -20,12 +20,12 @@ type EventWriteStats struct {
 	Success int
 	Failed  int
 	Errors  []string
+	Written []string // names of the events written
 }
 
 var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 var leadingNonAlphanumRe = regexp.MustCompile(`^[^a-zA-Z0-9]+`)
 var trailingNonAlphanumRe = regexp.MustCompile(`[^a-zA-Z0-9]+$`)
-
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
@@ -147,8 +147,9 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 			continue
 		}
 
-		log.Infof("Wrote event to %s", filename)
+		log.Debugf("Wrote event to %s", filename)
 		stats.Success++
+		stats.Written = append(stats.Written, name)
 	}
 
 	return stats, nil
@@ -188,26 +189,32 @@ func ReadEventsFromDir(dirPath string) ([]any, error) {
 func PushFailures(events []any, records []mgmnt.EventPushRecord) error {
 	var lines []string
 	for i, rec := range records {
-		if !rec.Failed() {
-			continue
+		if rec.Failed() {
+			lines = append(lines, fmt.Sprintf("events/%s: %s", EventName(events, i), RecordMessage(rec)))
 		}
-		name := fmt.Sprintf("#%d", i)
-		if i < len(events) {
-			if obj, ok := events[i].(map[string]any); ok {
-				if n, _ := obj["name"].(string); n != "" {
-					name = n
-				}
-			}
-		}
-		msg := rec.Message
-		if msg == "" && rec.Error != nil {
-			msg = rec.Error.Message
-		}
-		log.Errorf("events/%s: %s", name, msg)
-		lines = append(lines, fmt.Sprintf("events/%s: %s", name, msg))
 	}
 	if len(lines) == 0 {
 		return nil
 	}
 	return clierr.Failures(fmt.Sprintf("%d of %d event(s) failed to push", len(lines), len(events)), lines, clierr.CodeAPIInternal)
+}
+
+// EventName returns the name of events[i], or "#i" when it has none.
+func EventName(events []any, i int) string {
+	if i < len(events) {
+		if obj, ok := events[i].(map[string]any); ok {
+			if n, _ := obj["name"].(string); n != "" {
+				return n
+			}
+		}
+	}
+	return fmt.Sprintf("#%d", i)
+}
+
+// RecordMessage returns why the API rejected an event.
+func RecordMessage(rec mgmnt.EventPushRecord) string {
+	if rec.Message == "" && rec.Error != nil {
+		return rec.Error.Message
+	}
+	return rec.Message
 }

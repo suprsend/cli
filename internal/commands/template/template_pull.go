@@ -27,6 +27,8 @@ const templateFetchConcurrency = 20
 type TemplateResult struct {
 	Slug            string                      `json:"slug"`
 	Name            string                      `json:"name"`
+	Description     string                      `json:"description"`
+	Tags            []string                    `json:"tags"`
 	EnabledChannels []string                    `json:"enabled_channels"`
 	Variants        []map[string]any            `json:"variants"`
 	MockData        map[string]any              `json:"mock_data,omitempty"`
@@ -83,6 +85,8 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 		r := TemplateResult{
 			Slug:            slug,
 			Name:            tmpl.Name,
+			Description:     tmpl.Description,
+			Tags:            tmpl.Tags,
 			EnabledChannels: tmpl.EnabledChannels,
 			Variants:        variants,
 			MockData:        mockData,
@@ -146,6 +150,8 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 			r := TemplateResult{
 				Slug:            t.Slug,
 				Name:            t.Name,
+				Description:     t.Description,
+				Tags:            t.Tags,
 				EnabledChannels: t.EnabledChannels,
 				Variants:        variants,
 				MockData:        mockData,
@@ -184,7 +190,7 @@ var templatePullCmd = &cobra.Command{
 		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -218,6 +224,7 @@ var templatePullCmd = &cobra.Command{
 			return err
 		}
 
+		report := utils.NewReport("template pull", workspace, false)
 		spinner := utils.NewSpinner("Listing templates...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -229,9 +236,8 @@ var templatePullCmd = &cobra.Command{
 		var statsMu sync.Mutex
 		var done atomic.Int32
 		var total atomic.Int32
-		var totalVariants atomic.Int32
 
-		results, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
+		_, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
 			OnListed: func(n int) {
 				total.Store(int32(n))
 				stats.Total = n
@@ -239,9 +245,13 @@ var templatePullCmd = &cobra.Command{
 			},
 			OnResult: func(t TemplateResult) {
 				statsMu.Lock()
-				_ = WriteOneTemplate(t, outputDir, stats)
+				failedBefore := stats.Failed
+				if err := WriteOneTemplate(t, outputDir, stats); err != nil || stats.Failed > failedBefore {
+					report.Fail("templates/"+t.Slug, err)
+				} else {
+					report.Add("templates/"+t.Slug, utils.StatusPulled, fmt.Sprintf("%d variant(s)", len(t.Variants)))
+				}
 				statsMu.Unlock()
-				totalVariants.Add(int32(len(t.Variants)))
 				n := done.Add(1)
 				spinner.UpdateMessage(fmt.Sprintf("Pulled %d/%d templates", n, total.Load()))
 			},
@@ -249,27 +259,18 @@ var templatePullCmd = &cobra.Command{
 				statsMu.Lock()
 				stats.Failed++
 				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+slug, "couldn't fetch variants", err))
+				report.Fail("templates/"+slug, err)
 				statsMu.Unlock()
 			},
 		})
+		spinner.Stop("")
 		if fetchErr != nil {
-			spinner.Stop("Failed")
-			return fetchErr
-		}
-
-		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants.Load(), workspace))
-
-		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
-		if len(stats.Errors) > 0 {
-			log.Info("Errors:")
-			for _, e := range stats.Errors {
-				log.Infof("  - %s", e)
-			}
+			return report.Finish(fetchErr)
 		}
 		if stats.Failed > 0 {
-			return clierr.Failures(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
+			return report.Finish(clierr.Failures(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal))
 		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 

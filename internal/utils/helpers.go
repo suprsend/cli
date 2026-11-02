@@ -198,6 +198,10 @@ func FetchEventsMcp(workspace string, eventsFlag string) []EventInfo {
 				info.PayloadSchema.Version = versionNo
 			}
 		}
+		// Tools are only built for events linked to a payload schema.
+		if info.PayloadSchema.Schema == "" {
+			continue
+		}
 
 		if matchesSelector(info.Name, info.Name, nil, all, names, tags) {
 			result = append(result, info)

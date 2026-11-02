@@ -11,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/suprsend/cli/internal/clierr"
@@ -24,6 +25,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/workspace"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
+	"go.szostok.io/version"
 	"go.szostok.io/version/extension"
 )
 
@@ -60,9 +62,57 @@ func Execute() error {
 		if isCobraUsageError(err) {
 			err = clierr.Wrap(err, clierr.CodeInvalidUsage, "")
 		}
+		err = explainNotFound(err)
 		utils.WriteError(err, early.OutputType)
 	}
 	return err
+}
+
+// explainNotFound turns a bare "not found" from the API into "unknown
+// workspace" when the workspace itself is what doesn't exist, which the API
+// reports the same way as a missing template or workflow.
+func explainNotFound(err error) error {
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAPINotFound || config.Cfg.Workspace.Value == "" {
+		return err
+	}
+	if wsErr := utils.CheckWorkspace(config.Cfg.Workspace.Value); wsErr != nil {
+		return wsErr
+	}
+	return err
+}
+
+// writeVerbs are the subcommand names that change a workspace. Before they
+// run, the workspace is checked to exist, and a warning is logged when it
+// came from the built-in default rather than -w, SUPRSEND_WORKSPACE or the
+// profile.
+var writeVerbs = map[string]bool{"push": true, "commit": true, "enable": true, "disable": true, "trigger": true}
+
+// resolveWorkspace applies ResolveWorkspace to commands with a --workspace
+// flag and writes the result back to the flag, so every command reads the
+// resolved value with cmd.Flags().GetString("workspace").
+func resolveWorkspace(cmd *cobra.Command) error {
+	f := cmd.Flags().Lookup("workspace")
+	if f == nil {
+		return nil
+	}
+	ws, err := config.Cfg.ResolveWorkspace(f.Value.String(), f.Changed)
+	if err != nil {
+		return err
+	}
+	if err := f.Value.Set(ws.Value); err != nil {
+		return clierr.Wrap(err, clierr.CodeInvalidUsage, "")
+	}
+	if !writeVerbs[cmd.Name()] {
+		return nil
+	}
+	if ws.Source == config.ConfigSourceDefault {
+		log.Warnf("no workspace given; using the default workspace %q (pass -w, set SUPRSEND_WORKSPACE, or set workspace in the profile)", ws.Value)
+	}
+	if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
+		return nil
+	}
+	return utils.CheckWorkspace(ws.Value)
 }
 
 func isCobraUsageError(err error) bool {
@@ -127,8 +177,9 @@ func earlySetup() earlyConfig {
 			ec.OutputType = "json"
 		}
 	}
+	// Execute prints errors itself (with hints, or as JSON), so cobra mustn't.
+	rootCmd.SilenceErrors = true
 	if config.ShouldJSONErrors(ec.OutputType) {
-		rootCmd.SilenceErrors = true
 		rootCmd.SilenceUsage = true
 	}
 	return ec
@@ -158,6 +209,8 @@ func init() {
   suprsend version -o yaml
   suprsend version -o short`
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.Version = version.Get().Version
+	rootCmd.SetVersionTemplate("suprsend version {{.Version}}\n")
 	rootCmd.DisableAutoGenTag = true
 
 	rootCmd.AddCommand(profiles.ProfileCmd)
@@ -179,6 +232,7 @@ func init() {
 			)
 		}
 
+		flags.VerbositySet = cmd.Flags().Changed("verbosity")
 		resolveErr := config.Cfg.Resolve(flags)
 
 		if err := config.SetUpLogs(); err != nil {
@@ -192,7 +246,7 @@ func init() {
 		if resolveErr != nil {
 			// env runs without a token so users can verify setup, but other Resolve failures leave Cfg half-populated and would render a misleading table.
 			var ce *clierr.CLIError
-			if cmd.Name() == "env" && errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
+			if (cmd.Name() == "env" || cmd.Name() == "whoami") && errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
 				return nil
 			}
 			if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
@@ -221,6 +275,6 @@ func init() {
 			config.Cfg.Debug.Value,
 		)
 
-		return nil
+		return resolveWorkspace(cmd)
 	}
 }

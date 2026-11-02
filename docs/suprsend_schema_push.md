@@ -32,7 +32,7 @@ suprsend schema push [<slug>] [flags]
   -c, --commit                  Promote changes from draft to live after pushing
       --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing schema files (default: ./suprsend/schemas)
-  -n, --dry-run                 Print what would be pushed without making any changes
+  -n, --dry-run                 Report what would be pushed without making any changes
   -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
   -j, --json string             Payload JSON Schema as a JSON object, used instead of payload_schema.json (requires --slug). Must be a valid JSON Schema with root type "object", e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'
@@ -48,7 +48,7 @@ suprsend schema push [<slug>] [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 
 ### SEE ALSO

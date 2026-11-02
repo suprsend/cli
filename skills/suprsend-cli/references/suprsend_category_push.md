@@ -28,8 +28,9 @@ suprsend category push [flags]
 
 - Categories are written to the **draft** state. Run `suprsend category commit` to promote draft → live, or pass `--commit` to push + commit in one step.
 - Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.
-- `--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and logs counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.
+- `--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and reports counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.
 - The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.
+- The result lists each translation locale and then `preference_categories` as `pushed` (draft only), `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` it is one JSON object with `items` and `counts`.
 
 ### Options
 
@@ -37,7 +38,7 @@ suprsend category push [flags]
   -c, --commit                  Promote changes from draft to live after pushing
       --commit-message string   Message describing the changes being committed
   -d, --dir string              Directory containing category files (default: ./suprsend/preference_categories)
-  -n, --dry-run                 Print what would be pushed without making any changes
+  -n, --dry-run                 Report what would be pushed without making any changes
   -F, --force                   Skip confirmation prompt when --commit is set
   -h, --help                    help for push
   -j, --json string             Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'
@@ -52,6 +53,6 @@ suprsend category push [flags]
   -q, --quiet                  Suppress info/warn output (errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 

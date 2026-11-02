@@ -32,7 +32,7 @@ suprsend sync [flags]
   -a, --assets string           Asset types to sync: all, workflow, schema, event, category, translation, or template (default "all")
       --commit-message string   Commit message applied to every committed resource in this sync run
   -d, --dir string              Local directory for intermediate file storage; each asset type uses a subdirectory (default: ./suprsend)
-  -n, --dry-run                 Pull the source into local files, then only print what would be pushed (no changes to the destination)
+  -n, --dry-run                 Pull the source into local files, then only report what would be pushed (no changes to the destination)
   -F, --force                   Skip confirmation prompt
   -S, --from string             Source workspace to pull assets from (default "staging")
   -h, --help                    help for sync

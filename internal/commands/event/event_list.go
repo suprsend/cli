@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -42,6 +43,6 @@ func init() {
 	eventListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of events to return")
 	eventListCmd.PersistentFlags().Int("offset", 0, "Number of events to skip for pagination")
 	eventListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
-	EventCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	EventCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	EventCmd.AddCommand(eventListCmd)
 }

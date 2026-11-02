@@ -101,16 +101,16 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	return result, nil
 }
 
-func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) error {
+func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) (CommitStatus, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, fmt.Errorf("request failed: %w", err)
 	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
 	q.Add("commit", strconv.FormatBool(commit))
@@ -125,34 +125,34 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		SetResult(&CategoryPushResponse{}).
 		Post(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("preference_categories", commit, err)
 	}
 	if resp.IsError() {
-		return apiError(resp)
+		return NotCommitted, apiError(resp)
 	}
 	if commit {
 		// Like the workflow and schema endpoints, this answers 201 even when
 		// the commit fails; the outcome is in commit_result.
 		result := resp.Result().(*CategoryPushResponse)
 		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
-			return clierr.New(fmt.Sprintf("preference_categories: saved as draft but not committed: categories are invalid: %v", result.ValidationResult.Errors),
+			return NotCommitted, clierr.New(fmt.Sprintf("preference_categories: saved as draft but not committed: categories are invalid: %v", result.ValidationResult.Errors),
 				clierr.CodeSchemaValidation).WithResource("preference_categories")
 		}
 		return commitError("preference_categories", result.CommitResult, clierr.CodeAPIConflict)
 	}
-	return nil
+	return NotCommitted, nil
 }
 
-func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) (CommitStatus, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "commit", "/")
 	if err != nil {
-		return fmt.Errorf("failed constructing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed constructing url: %w", err)
 	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("failed parsing url: %w", err)
+		return NotCommitted, fmt.Errorf("failed parsing url: %w", err)
 	}
 	q := u.Query()
 	q.Add("commit_message", commitMessage)
@@ -164,10 +164,10 @@ func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage stri
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		Patch(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("preference_categories", true, err)
 	}
 	if resp.IsError() {
 		return commitHTTPError(resp, "preference_categories")
 	}
-	return nil
+	return Committed, nil
 }

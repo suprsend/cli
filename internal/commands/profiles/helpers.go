@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -20,12 +21,52 @@ type ProfileListItem struct {
 	Active       string `json:"active" yaml:"active"`
 	BaseUrl      string `json:"base_url,omitempty" yaml:"base_url,omitempty"`
 	MgmntUrl     string `json:"mgmnt_url,omitempty" yaml:"mgmnt_url,omitempty"`
+	Workspace    string `json:"workspace,omitempty" yaml:"workspace,omitempty"`
 	ServiceToken string `json:"service_token,omitempty" yaml:"service_token,omitempty"`
 }
 
 type SimpleProfileListItem struct {
 	Name   string `json:"name" yaml:"name"`
 	Active string `json:"active" yaml:"active"`
+}
+
+// question is one interactive prompt. Handler validates and stores the
+// answer; an error is printed and the question asked again. With Options, the
+// answer may be an option's number or its text.
+type question struct {
+	Text    string
+	Options []string
+	Handler func(string) error
+}
+
+// ask runs questions in order on stdin. It reads plain lines rather than
+// using a terminal UI library, so it never sends terminal queries or escape
+// sequences.
+func ask(questions []question) error {
+	reader := bufio.NewReader(os.Stdin)
+	for _, q := range questions {
+		for {
+			for i, opt := range q.Options {
+				fmt.Printf("  %d) %s\n", i+1, opt)
+			}
+			fmt.Print(q.Text)
+			line, err := reader.ReadString('\n')
+			if err != nil && line == "" {
+				fmt.Println()
+				return fmt.Errorf("no answer to %q: %w", strings.TrimSpace(q.Text), err)
+			}
+			answer := strings.TrimSpace(line)
+			if n, convErr := strconv.Atoi(answer); convErr == nil && n >= 1 && n <= len(q.Options) {
+				answer = q.Options[n-1]
+			}
+			if err := q.Handler(answer); err != nil {
+				fmt.Printf("  %v\n", err)
+				continue
+			}
+			break
+		}
+	}
+	return nil
 }
 
 func cleanInput(input string) string {
@@ -138,4 +179,13 @@ func MaskServiceToken(token string) string {
 	}
 	maxCut := int(math.Min(4, float64(length)))
 	return token[:maxCut] + "****" + token[length-4:]
+}
+
+// normalizeProfileWorkspace validates a --workspace value for a profile;
+// empty means "no default workspace".
+func normalizeProfileWorkspace(ws string) (string, error) {
+	if strings.TrimSpace(ws) == "" {
+		return "", nil
+	}
+	return config.NormalizeWorkspace(ws, "--workspace")
 }

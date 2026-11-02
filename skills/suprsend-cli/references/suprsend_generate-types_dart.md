@@ -14,7 +14,7 @@ suprsend generate-types dart [flags]
   -h, --help                 help for dart
       --mode string          Version mode: draft or live (default "live")
       --output-file string   Output file path for generated types (default "suprsend_types.dart")
-      --workspace string     Workspace name (e.g., staging, production) (default "staging")
+      --workspace string     Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 
 ### Options inherited from parent commands

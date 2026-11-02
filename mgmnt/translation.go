@@ -138,7 +138,7 @@ func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation
 	return nil
 }
 
-func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) (CommitStatus, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	encodedCommitMessage := url.QueryEscape(commitMessage)
@@ -149,10 +149,10 @@ func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) er
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		Patch(url)
 	if err != nil {
-		return err
+		return NotCommitted, requestError("translations", true, err)
 	}
 	if res.IsError() {
 		return commitHTTPError(res, "translations")
 	}
-	return nil
+	return Committed, nil
 }

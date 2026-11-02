@@ -26,9 +26,10 @@ var translationCommitCmd = &cobra.Command{
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		report := utils.NewReport("translation commit", workspace, dryRun)
 		if dryRun {
-			log.Infof("DRY RUN: would commit translations in %s", workspace)
-			return nil
+			report.Add("translations", utils.StatusWouldCommit, "")
+			return report.Finish(nil)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
@@ -43,19 +44,22 @@ var translationCommitCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing translation...")
-		err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
+		commitStatus, err := mgmntClient.FinalizeTranslation(workspace, commitMessage)
+		spinner.Stop("")
 		if err != nil {
-			log.Errorf("%s", err)
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			err = clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			report.Fail("translations", err)
+			return report.Finish(err)
 		}
-		spinner.Stop(fmt.Sprintf("Translations in %s are up to date in live", workspace))
-		return nil
+		status, detail := utils.PushStatus(commitStatus)
+		report.Add("translations", status, detail)
+		return report.Finish(nil)
 	},
 }
 
 func init() {
 	translationCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
-	translationCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	translationCommitCmd.Flags().BoolP("dry-run", "n", false, "Report what would be committed without making any changes")
 	translationCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	TranslationCmd.AddCommand(translationCommitCmd)
 }

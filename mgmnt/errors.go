@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -25,7 +26,11 @@ func apiError(resp *resty.Response) error {
 			WithHint("Ensure the service token has the required permissions")
 	case http.StatusNotFound:
 		msg := extractMessage(resp, "resource not found")
-		return clierr.New(msg, clierr.CodeAPINotFound)
+		if req := requestLabel(resp); req != "" {
+			msg += " (" + req + ")"
+		}
+		return clierr.New(msg, clierr.CodeAPINotFound).
+			WithHint("check the slug and the workspace (-w); `suprsend workspace list` shows the workspaces")
 	}
 	msg := extractMessage(resp, "")
 	if msg != "" {
@@ -42,23 +47,64 @@ type CommitResult struct {
 	Errors      []any `json:"errors"`
 }
 
+// CommitStatus says what a request that could commit did.
+type CommitStatus string
+
+const (
+	NotCommitted CommitStatus = ""          // no commit was requested, or it failed
+	Committed    CommitStatus = "committed" // the draft went live
+	NoChanges    CommitStatus = "unchanged" // the draft already matched live
+)
+
 // commitError turns a failed commit_result into a CLI error. "No uncommitted
 // changes" means the draft already matches live, so it is not a failure.
-func commitError(resource string, cr *CommitResult, code string) error {
+func commitError(resource string, cr *CommitResult, code string) (CommitStatus, error) {
 	if cr == nil || cr.IsCommitted {
-		return nil
+		return Committed, nil
 	}
 	msgs := make([]string, 0, len(cr.Errors))
 	for _, e := range cr.Errors {
-		msgs = append(msgs, fmt.Sprint(e))
+		msgs = append(msgs, describeCommitError(fmt.Sprint(e)))
 	}
 	msg := strings.Join(msgs, "; ")
 	if isNoChanges(msg) {
-		log.Infof("%s: no changes to commit", resource)
-		return nil
+		log.Debugf("%s: no changes to commit", resource)
+		return NoChanges, nil
 	}
-	return clierr.New(fmt.Sprintf("%s: saved as draft but not committed: %s", resource, msg), code).
+	return NotCommitted, clierr.New(fmt.Sprintf("%s: saved as draft but not committed: %s", resource, msg), code).
 		WithResource(resource)
+}
+
+// bareFieldName matches a commit error that is only a quoted field name, such
+// as 'variable_ns': the API's way of saying a required field is missing.
+var bareFieldName = regexp.MustCompile(`^'([A-Za-z_][A-Za-z0-9_.]*)'$`)
+
+func describeCommitError(msg string) string {
+	if m := bareFieldName.FindStringSubmatch(strings.TrimSpace(msg)); m != nil {
+		return fmt.Sprintf("required field %q is missing somewhere in the definition (the API doesn't say where)", m[1])
+	}
+	return msg
+}
+
+// requestError describes a request that got no HTTP response, even after
+// retries. For a commit the outcome is unknown: the server may have committed
+// before the connection dropped.
+func requestError(resource string, commit bool, err error) error {
+	if !commit {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	return clierr.New(fmt.Sprintf("%s: commit status unknown: request failed: %v", resource, err), clierr.CodeAPIInternal).
+		WithResource(resource).
+		WithHint("the commit may have gone through; run the same command again: it reports \"unchanged\" if it did")
+}
+
+// requestLabel returns "METHOD /path" for the request behind resp, so errors
+// show which workspace and resource the API was asked about.
+func requestLabel(resp *resty.Response) string {
+	if resp == nil || resp.Request == nil || resp.Request.RawRequest == nil {
+		return ""
+	}
+	return resp.Request.Method + " " + resp.Request.RawRequest.URL.Path
 }
 
 // The phrases the commit endpoints use when the draft already matches live
@@ -78,13 +124,13 @@ func isNoChanges(msg string) bool {
 // commitHTTPError is apiError for commit endpoints. They answer 400 or 409
 // when there is nothing to commit; that is not a failure (a re-run of sync or
 // commit should succeed), so it returns nil.
-func commitHTTPError(resp *resty.Response, resource string) error {
+func commitHTTPError(resp *resty.Response, resource string) (CommitStatus, error) {
 	code := resp.StatusCode()
 	if (code == http.StatusBadRequest || code == http.StatusConflict) && isNoChanges(resp.String()) {
-		log.Infof("%s: no changes to commit", resource)
-		return nil
+		log.Debugf("%s: no changes to commit", resource)
+		return NoChanges, nil
 	}
-	return apiError(resp)
+	return NotCommitted, apiError(resp)
 }
 
 func extractMessage(resp *resty.Response, fallback string) string {

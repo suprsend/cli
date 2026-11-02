@@ -15,7 +15,7 @@ suprsend generate-types kotlin [flags]
       --mode string          Version mode: draft or live (default "live")
       --output-file string   Output file path for generated types (default "SuprsendTypes.kt")
       --package string       Kotlin package name for generated data classes (default "suprsend")
-      --workspace string     Workspace name (e.g., staging, production) (default "staging")
+      --workspace string     Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 
 ### Options inherited from parent commands

@@ -111,8 +111,12 @@ async function main() {
     console.error("Error parsing schema JSON:", err);
     Deno.exit(1);
   }
-  //log all inputs in a single line
-  console.log("Inputs: language=", language, "schemaInput=", schemaInput, "schemaName=", schemaName, "outputPath=", outputPath, "rendererOptions=", rendererOptions);
+  // Plain TypeScript types have no parsing step, and a JSON payload carries
+  // dates as strings, so type them as string, not Date. (Zod output coerces
+  // strings to dates itself and keeps the formats.)
+  if (language.toLowerCase() === "typescript") {
+    stripDateFormats(schema);
+  }
   const transformedSchema = transformSchema({
     schema: { ...schema },
     parentTitle: schemaName + "Data",
@@ -337,6 +341,19 @@ function fixRefsDeep(s: any, renameMap: Record<string, string>) {
   for (const k of Object.keys(s)) {
     const v = (s as any)[k];
     if (v && typeof v === "object") fixRefsDeep(v, renameMap);
+  }
+}
+
+const DATE_FORMATS = new Set(["date-time", "date", "time"]);
+
+// stripDateFormats removes date formats from string schemas, in place.
+function stripDateFormats(s: any) {
+  if (!s || typeof s !== "object") return;
+  if (typeof s.format === "string" && DATE_FORMATS.has(s.format) && (s.type === undefined || s.type === "string" || Array.isArray(s.type))) {
+    delete s.format;
+  }
+  for (const k of Object.keys(s)) {
+    if (s[k] && typeof s[k] === "object") stripDateFormats(s[k]);
   }
 }
 

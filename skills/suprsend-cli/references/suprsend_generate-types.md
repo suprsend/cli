@@ -7,7 +7,8 @@ Generate typed code from trigger payload JSON schemas. Fetches schemas linked to
 ### Tips
 
 - Run after every `suprsend schema commit` so consuming code stays in sync with the live trigger payloads.
-- Pick the right subcommand for your stack: `python` (Pydantic), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.
+- Pick the right subcommand for your stack: `python` (Pydantic `BaseModel`s by default, which need the `pydantic` package; `--pydantic=false` for plain dataclasses), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.
+- Plain `typescript` output types `date-time`, `date` and `time` fields as `string`, which is what a JSON payload carries; `--zod` output coerces them to `Date`. A schema with no properties gives an empty type, and the command warns about it.
 
 ### Options
 

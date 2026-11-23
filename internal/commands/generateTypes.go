@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -36,14 +37,15 @@ var generateTypesCmd = &cobra.Command{
 	Long:  "Generate typed code from trigger payload JSON schemas. Fetches schemas linked to workflows and events from a workspace and generates type definitions in the target language.",
 	Annotations: map[string]string{
 		"skills:tip.a-after-commit": "Run after every `suprsend schema commit` so consuming code stays in sync with the live trigger payloads.",
-		"skills:tip.b-language":     "Pick the right subcommand for your stack: `python` (Pydantic), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.",
+		"skills:tip.b-language":     "Pick the right subcommand for your stack: `python` (Pydantic `BaseModel`s by default, which need the `pydantic` package; `--pydantic=false` for plain dataclasses), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.",
+		"skills:tip.c-dates":        "Plain `typescript` output types `date-time`, `date` and `time` fields as `string`, which is what a JSON payload carries; `--zod` output coerces them to `Date`. A schema with no properties gives an empty type, and the command warns about it.",
 	},
 }
 
 var generateTypesPythonCmd = &cobra.Command{
 	Use:   "python [flags]",
 	Short: "Generate Python types from JSON Schema",
-	Long:  "Generate Python type definitions from trigger payload schemas. Fetches linked schemas from the workspace and generates a single Python file with type classes. Supports Pydantic models (enabled by default).",
+	Long:  "Generate Python type definitions from trigger payload schemas. Fetches linked schemas from the workspace and generates a single Python file with type classes. By default the classes are Pydantic `BaseModel`s, so the generated file imports `pydantic` and the project must have it installed; pass `--pydantic=false` for plain dataclasses with no dependency.",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pydantic, _ := cmd.Flags().GetBool("pydantic")
@@ -121,6 +123,9 @@ var generateTypesJavaCmd = &cobra.Command{
 			schemaName := targetSchema.TriggerName
 			javaFileName := filepath.Join(outputDir, schemaName+".java")
 			log.Debugf("Processing TargetSchema: %v", targetSchema)
+			if len(targetSchema.JSONSchema.Properties) == 0 {
+				log.Warnf("%s (schema %s) has no properties, so its generated type is empty", targetSchema.TriggerName, targetSchema.Slug)
+			}
 
 			if _, err := os.Stat(javaFileName); err == nil {
 				if err := os.WriteFile(javaFileName, []byte(""), 0o644); err != nil {
@@ -303,6 +308,9 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 		for _, targetSchema := range schemasToBeGenerated {
 			schemaName := targetSchema.TriggerName
 			log.Debugf("Processing TargetSchema: %v", targetSchema)
+			if len(targetSchema.JSONSchema.Properties) == 0 {
+				log.Warnf("%s (schema %s) has no properties, so its generated type is empty", targetSchema.TriggerName, targetSchema.Slug)
+			}
 
 			schemaJSON := map[string]interface{}{
 				"type":       targetSchema.JSONSchema.Type,
@@ -342,13 +350,13 @@ func init() {
 	}
 
 	for _, cmd := range commonFlags {
-		cmd.Flags().String("workspace", "", config.WorkspaceFlagHelp)
+		cmd.Flags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 		cmd.Flags().String("mode", "live", "Version mode: draft or live")
 		cmd.Flags().String("build-flags", "", "Flags to generate types in a certain way.")
 		cmd.Flags().MarkHidden("build-flags")
 	}
 	// Python
-	generateTypesPythonCmd.Flags().Bool("pydantic", true, "Generate Pydantic BaseModel classes instead of plain dataclasses")
+	generateTypesPythonCmd.Flags().Bool("pydantic", true, "Generate Pydantic BaseModel classes (needs the pydantic package) instead of plain dataclasses")
 	generateTypesPythonCmd.Flags().String("output-file", "suprsend_types.py", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesPythonCmd)
 	// Java
@@ -392,11 +400,21 @@ func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) err
 		args = append(args, "--build-flags="+buildFlags)
 	}
 
+	// The generator's own output is not the command's result: keep it off
+	// stdout (debug log only) and put what it wrote to stderr in the error.
+	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	if out := strings.TrimSpace(stdout.String()); out != "" {
+		log.Debugf("type generator: %s", out)
+	}
+	if err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return fmt.Errorf("type generation failed for %s: %w: %s", fileName, err, msg)
+		}
 		return fmt.Errorf("type generation failed for %s: %w", fileName, err)
 	}
 	return nil

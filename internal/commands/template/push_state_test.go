@@ -20,11 +20,14 @@ import (
 
 // fakeTemplateAPI serves one template's draft and records variant pushes.
 type fakeTemplateAPI struct {
-	mu       sync.Mutex
-	fields   map[string]any
-	variants map[string]map[string]any // "<channel>/<id>"
-	pushed   []string                  // "<channel>/<id>" of each variant push
-	saves    int
+	mu         sync.Mutex
+	fields     map[string]any
+	variants   map[string]map[string]any // "<channel>/<id>"
+	pushed     []string                  // "<channel>/<id>" of each variant push
+	saves      int
+	live       map[string]map[string]any // committed variants
+	commits    int
+	fieldSaves int
 }
 
 func (f *fakeTemplateAPI) handler(t *testing.T) http.HandlerFunc {
@@ -39,11 +42,22 @@ func (f *fakeTemplateAPI) handler(t *testing.T) http.HandlerFunc {
 		case len(rest) == 0 && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode(f.fields)
 		case len(rest) == 0 && r.Method == http.MethodPost:
+			f.fieldSaves++
 			_ = json.NewDecoder(r.Body).Decode(&f.fields)
+		case len(rest) == 1 && rest[0] == "commit" && r.Method == http.MethodPatch:
+			f.commits++
+			f.live = map[string]map[string]any{}
+			for k, v := range f.variants {
+				f.live[k] = v
+			}
 		case len(rest) == 1 && rest[0] == "variant": // list
+			from := f.variants
+			if r.URL.Query().Get("mode") == "live" {
+				from = f.live
+			}
 			results := []map[string]any{}
-			for _, key := range sortedKeys(f.variants) {
-				results = append(results, f.variants[key])
+			for _, key := range sortedKeys(from) {
+				results = append(results, from[key])
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"results": results, "meta": map[string]int{"count": len(results)}})
 		case len(rest) == 4 && rest[0] == "channel" && r.Method == http.MethodPost:
@@ -192,5 +206,117 @@ func TestPushTemplateUsesState(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, state.FileName)); err != nil {
 		t.Fatalf("state file not written: %v", err)
+	}
+}
+
+// pullFake pulls the fake's template into a new directory and records it.
+func pullFake(t *testing.T, client *mgmnt.SS_MgmntClient, slug string) (string, *state.File) {
+	t.Helper()
+	outDir := t.TempDir()
+	st, err := state.Load(outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft, exists, err := fetchDraft(client, "staging", slug)
+	if err != nil || !exists {
+		t.Fatalf("fetch: %v, exists %v", err, exists)
+	}
+	stats := &TemplateWriteStats{}
+	if err := WriteOneTemplate(draft, outDir, stats); err != nil || stats.Failed > 0 {
+		t.Fatalf("write: %v %v", err, stats.Errors)
+	}
+	RecordPulled(st, "staging", outDir, draft)
+	return filepath.Join(outDir, slug), st
+}
+
+// Filling in a field that template.json had as null (or adding one it
+// lacked) is a local change, not a conflict: nobody touched the workspace.
+func TestPushTemplateFieldAdded(t *testing.T) {
+	api := &fakeTemplateAPI{
+		fields:   map[string]any{"slug": "t1", "name": "T1", "description": "", "tags": []any{}, "enabled_channels": nil},
+		variants: map[string]map[string]any{},
+	}
+	api.store("sms/default", map[string]any{"id": "default", "channel": "sms", "content": map[string]any{"text": "hi"}})
+	srv := httptest.NewServer(api.handler(t))
+	defer srv.Close()
+	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+	dir, st := pullFake(t, client, "t1")
+	opts := PushOptions{State: st}
+
+	if status, _, err := PushTemplate(client, "staging", "t1", dir, opts); err != nil || status != utils.StatusUnchanged {
+		t.Fatalf("right after pull: %q, %v", status, err)
+	}
+
+	path := filepath.Join(dir, "template.json")
+	data, _ := os.ReadFile(path)
+	var tj map[string]any
+	if err := json.Unmarshal(data, &tj); err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := tj["enabled_channels"]; !ok || v != nil {
+		t.Fatalf("expected the pulled file to have enabled_channels: null, got %v", tj)
+	}
+	tj["enabled_channels"] = []any{"sms"}
+	data, _ = json.Marshal(tj)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	status, detail, err := PushTemplate(client, "staging", "t1", dir, opts)
+	if err != nil || status != utils.StatusUpdated || !strings.Contains(detail, "template fields") {
+		t.Fatalf("after setting enabled_channels: %q (%s), %v; want updated", status, detail, err)
+	}
+	if fmt.Sprint(api.fields["enabled_channels"]) != "[sms]" {
+		t.Fatalf("workspace enabled_channels = %v", api.fields["enabled_channels"])
+	}
+	if status, _, err := PushTemplate(client, "staging", "t1", dir, opts); err != nil || status != utils.StatusUnchanged {
+		t.Fatalf("push again: %q, %v", status, err)
+	}
+}
+
+// A commit publishes the whole draft. A variant that is in the workspace's
+// draft but not in the local files, and not live as it stands, must not go
+// live unnoticed.
+func TestPushTemplateCommitUnseenVariant(t *testing.T) {
+	api := &fakeTemplateAPI{
+		fields:   map[string]any{"slug": "t1", "name": "T1", "description": "", "tags": []any{}, "enabled_channels": []any{"sms"}},
+		variants: map[string]map[string]any{},
+	}
+	api.store("sms/default", map[string]any{"id": "default", "channel": "sms", "content": map[string]any{"text": "hi"}})
+	api.live = map[string]map[string]any{"sms/default": api.variants["sms/default"]}
+	srv := httptest.NewServer(api.handler(t))
+	defer srv.Close()
+	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+	dir, st := pullFake(t, client, "t1")
+
+	// Someone adds a variant in the dashboard.
+	api.mu.Lock()
+	api.store("sms/promo", map[string]any{"id": "promo", "channel": "sms", "content": map[string]any{"text": "50% off"}})
+	api.mu.Unlock()
+
+	// Without --commit the push is unaffected.
+	if status, _, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st}); err != nil || status != utils.StatusUnchanged {
+		t.Fatalf("push without commit: %q, %v", status, err)
+	}
+
+	_, _, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: true})
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAPIConflict || !strings.Contains(ce.Message, "sms/promo") {
+		t.Fatalf("commit with an unseen draft variant: got %v, want a conflict naming sms/promo", err)
+	}
+	if api.commits != 0 {
+		t.Fatal("the draft was committed")
+	}
+
+	status, detail, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: true, Overwrite: true})
+	if err != nil || status != utils.StatusCommitted || !strings.Contains(detail, "sms/promo") {
+		t.Fatalf("--overwrite: %q (%s), %v; want committed, naming sms/promo", status, detail, err)
+	}
+
+	// Once it is live as it stands, it no longer blocks a commit.
+	editVariant(t, dir, "sms/default", "hello")
+	status, _, err = PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: true})
+	if err != nil || status != utils.StatusCommitted {
+		t.Fatalf("commit after the variant went live: %q, %v", status, err)
 	}
 }

@@ -78,15 +78,17 @@ func remoteParts(t TemplateResult) templateParts {
 	return p
 }
 
-// partFingerprint fingerprints one part. The fields part is compared on the
-// fields template.json sets (fieldKeys): a field left out keeps the
-// workspace's value, so it can't differ.
-func partFingerprint(key string, v any, fieldKeys []string) string {
+// partFingerprint fingerprints one part. The fields part always covers all
+// of mgmnt.TemplateFields, with a field the file leaves out (or sets to
+// null, or an empty name) counting as null on both sides: fingerprints then
+// stay comparable when template.json gains or loses a field.
+func partFingerprint(key string, v any) string {
 	switch {
 	case key == partFields:
 		m, _ := v.(map[string]any)
+		m = templateFields(m)
 		picked := map[string]any{}
-		for _, k := range fieldKeys {
+		for _, k := range mgmnt.TemplateFields {
 			picked[k] = m[k]
 		}
 		return state.Fingerprint(picked)
@@ -118,11 +120,6 @@ func (p templateParts) partKeys() []string {
 		}
 	}
 	return keys
-}
-
-func (p templateParts) fieldKeys() []string {
-	m, _ := p[partFields].(map[string]any)
-	return sortedKeys(m)
 }
 
 type partPlan struct {
@@ -187,34 +184,65 @@ func isNotFound(err error) bool {
 	return errors.As(err, &ce) && ce.Code == clierr.CodeAPINotFound
 }
 
-// planParts decides what to do with each local part.
-func planParts(client *mgmnt.SS_MgmntClient, workspace, slug string, local templateParts, opts PushOptions) (plan, bool, error) {
+// planParts decides what to do with each local part. It also returns the
+// workspace draft's parts (nil for PushAll, which doesn't fetch them).
+func planParts(client *mgmnt.SS_MgmntClient, workspace, slug string, local templateParts, opts PushOptions) (plan, templateParts, bool, error) {
 	var p plan
 	if opts.PushAll {
 		for _, key := range local.partKeys() {
 			p = append(p, partPlan{key: key, action: state.Update})
 		}
-		return p, true, nil
+		return p, nil, true, nil
 	}
 	draft, exists, err := fetchDraft(client, workspace, slug)
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	remote := templateParts{}
 	if exists {
 		remote = remoteParts(draft)
 	}
-	fieldKeys := local.fieldKeys()
 	for _, key := range local.partKeys() {
-		pp := partPlan{key: key, local: partFingerprint(key, local[key], fieldKeys)}
+		pp := partPlan{key: key, local: partFingerprint(key, local[key])}
 		if v, ok := remote[key]; ok {
-			pp.remote = partFingerprint(key, v, fieldKeys)
+			pp.remote = partFingerprint(key, v)
 		}
 		base, hasBase := opts.State.Get(workspace, slug+"/"+key)
 		pp.action = state.Decide(pp.local, pp.remote, base, hasBase, opts.Overwrite)
 		p = append(p, pp)
 	}
-	return p, exists, nil
+	return p, remote, exists, nil
+}
+
+// unseenDraftVariants lists the variants a commit would publish that the
+// local files don't have: variants in the workspace's draft, missing
+// locally, that are new or differ from the live version. Nobody running
+// this push has seen them.
+func unseenDraftVariants(client *mgmnt.SS_MgmntClient, workspace, slug string, local, remote templateParts) ([]string, error) {
+	var missing []string
+	for _, key := range sortedKeys(remote) {
+		if _, ok := local[key]; !ok && strings.HasPrefix(key, variantPrefix) {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) == 0 {
+		return nil, nil
+	}
+	liveVariants, err := client.GetTemplateVariants(workspace, slug, "live")
+	if err != nil && !isNotFound(err) { // not found: nothing is live yet
+		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live variants of template %s", slug))
+	}
+	live := map[string]string{}
+	for _, v := range liveVariants {
+		live[variantKey(v)] = partFingerprint(variantKey(v), v)
+	}
+	var unseen []string
+	for _, key := range missing {
+		if fp, ok := live[key]; !ok || fp != partFingerprint(key, remote[key]) {
+			unseen = append(unseen, key)
+		}
+	}
+	return unseen, nil
 }
 
 func toPush(a state.Action) bool { return a == state.Create || a == state.Update }
@@ -295,20 +323,19 @@ func recordParts(client *mgmnt.SS_MgmntClient, st *state.File, workspace, slug s
 			log.Debugf("templates/%s: couldn't read the template back after pushing: %v", slug, err)
 		}
 	}
-	fieldKeys := local.fieldKeys()
 	for _, pp := range p {
 		key := slug + "/" + pp.key
 		switch {
 		case wasPushed[pp.key]:
 			if v, ok := after[pp.key]; ok {
-				st.Set(workspace, key, state.Entry{Remote: partFingerprint(pp.key, v, fieldKeys), Local: pp.local})
+				st.Set(workspace, key, state.Entry{Remote: partFingerprint(pp.key, v), Local: pp.local})
 			} else {
 				st.Delete(workspace, key, false)
 			}
 		case pp.action == state.Unchanged:
 			remote := pp.remote
 			if v, ok := after[pp.key]; ok {
-				remote = partFingerprint(pp.key, v, fieldKeys)
+				remote = partFingerprint(pp.key, v)
 			}
 			st.Set(workspace, key, state.Entry{Remote: remote, Local: pp.local})
 		}
@@ -387,15 +414,14 @@ func RecordPulled(st *state.File, workspace, outputDir string, t TemplateResult)
 		return
 	}
 	remote := remoteParts(t)
-	fieldKeys := local.fieldKeys()
 	for _, key := range local.partKeys() {
 		v, ok := remote[key]
 		if !ok {
 			continue
 		}
 		st.Set(workspace, t.Slug+"/"+key, state.Entry{
-			Remote: partFingerprint(key, v, fieldKeys),
-			Local:  partFingerprint(key, local[key], fieldKeys),
+			Remote: partFingerprint(key, v),
+			Local:  partFingerprint(key, local[key]),
 		})
 	}
 }

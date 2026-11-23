@@ -96,7 +96,7 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	}
 
 	local := localParts(templateData, variants, mockData)
-	plan, exists, err := planParts(mgmntClient, workspace, slug, local, opts)
+	plan, remote, exists, err := planParts(mgmntClient, workspace, slug, local, opts)
 	if err != nil {
 		return "", "", err
 	}
@@ -110,6 +110,21 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 		return "", "", clierr.New(fmt.Sprintf("%s: not committed: the workspace's draft changed since the last pull or push, and your copy didn't: %s", resource, describeParts(skipped)), clierr.CodeAPIConflict).
 			WithResource(resource).
 			WithHint("pull the template to see the change before committing, or pass --overwrite to push and commit your copy")
+	}
+
+	// A commit publishes the whole draft, including variants the local files
+	// don't have. Refuse to publish ones nobody here has seen; with
+	// --overwrite they are committed and named in the result.
+	var unseen []string
+	if opts.Commit && !opts.PushAll {
+		if unseen, err = unseenDraftVariants(mgmntClient, workspace, slug, local, remote); err != nil {
+			return "", "", err
+		}
+		if len(unseen) > 0 && !opts.Overwrite {
+			return "", "", clierr.New(fmt.Sprintf("%s: not committed: the workspace's draft has variants that aren't in your files and aren't live yet (or differ from live): %s", resource, describeParts(unseen)), clierr.CodeAPIConflict).
+				WithResource(resource).
+				WithHint("committing would publish them too: pull the template with --mode draft to review them, or pass --overwrite to commit them as they are")
+		}
 	}
 
 	pushed, pushErr := applyParts(mgmntClient, workspace, slug, plan, local, variantOrder)
@@ -131,6 +146,9 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	var notes []string
 	if len(pushed) > 0 && !opts.PushAll {
 		notes = append(notes, "pushed "+describeParts(pushed))
+	}
+	if len(unseen) > 0 {
+		notes = append(notes, "also committed from the workspace's draft, not in your files: "+describeParts(unseen))
 	}
 	if commitDetail != "" {
 		notes = append(notes, commitDetail)
@@ -301,7 +319,7 @@ var templatePushCmd = &cobra.Command{
 		"skills:tip.c-invalid": "With `--commit`, all changed variants are committed together, and one invalid variant fails the commit. `--skip-invalid` runs a pre-commit validation and commits only the variants that pass; the skipped ones are listed in the result. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, the template is reported as `unchanged`.",
 		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking; `-F/--force` skips it on a TTY too.",
 		"skills:tip.e-result":  "Each template is reported on stdout as `created`, `updated` (the detail names the parts sent, such as `email/default` or `mock data`), `unchanged` (nothing differed from the workspace's draft, so nothing was sent; with `--commit`, the draft already matched live), `skipped` (see the state tip), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
-		"skills:tip.f-state":   "A template is pushed in parts: its fields (name, description, tags, enabled_channels), each variant, mock data and variant order, and only the parts that differ from the workspace's draft are sent. Pull and push keep `.suprsend-state.json` in the templates directory (commit it with the files): what each part looked like, per workspace, at the last pull or push. A part changed only in the workspace since then (say, a variant edited in the dashboard) is skipped rather than overwritten, and named in the detail; with `--commit` that is an error, so nobody else's draft goes live unseen. A part changed on both sides fails the template as a conflict (code `api-conflict`) before anything is sent. Pull again to get the workspace's version, or pass `--overwrite` to push your copy anyway. Without a record for that workspace, every part that differs is sent.",
+		"skills:tip.f-state":   "A template is pushed in parts: its fields (name, description, tags, enabled_channels), each variant, mock data and variant order, and only the parts that differ from the workspace's draft are sent. Pull and push keep `.suprsend-state.json` in the templates directory (commit it with the files): what each part looked like, per workspace, at the last pull or push. A part changed only in the workspace since then (say, a variant edited in the dashboard) is skipped rather than overwritten, and named in the detail; with `--commit` that is an error, so nobody else's draft goes live unseen. For the same reason `--commit` fails when the workspace's draft has a variant that isn't in your files and is new or differs from live (a commit publishes the whole draft): pull with `--mode draft` to review it, or pass `--overwrite` to commit it as it is (the result names it). A part changed on both sides fails the template as a conflict (code `api-conflict`) before anything is sent. Pull again to get the workspace's version, or pass `--overwrite` to push your copy anyway. Without a record for that workspace, every part that differs is sent.",
 	},
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -100,3 +100,20 @@ func TestClosestSlug(t *testing.T) {
 		t.Errorf("closestSlug(totally-different-name) = %q, want no suggestion", got)
 	}
 }
+
+// -q hides the header and warnings, never the results.
+func TestReportQuietKeepsResults(t *testing.T) {
+	withOutputType(t, "pretty")
+	config.Cfg.Quiet = config.ConfigBool{Value: true}
+	out := captureStdout(t, func() {
+		r := NewReport("workflow push", "staging", true)
+		r.Add("workflows/welcome", StatusWouldPush, "")
+		_ = r.Finish(nil)
+	})
+	if !strings.Contains(out, "would-push   workflows/welcome") || !strings.Contains(out, "Done: 1 would-push") {
+		t.Errorf("quiet output is missing the results:\n%s", out)
+	}
+	if strings.Contains(out, "workflow push (dry run):") {
+		t.Errorf("quiet output has the header:\n%s", out)
+	}
+}

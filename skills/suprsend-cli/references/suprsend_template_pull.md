@@ -35,6 +35,7 @@ suprsend template pull [<slug>] [flags]
 
 - Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.
 - Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
+- Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the templates.
 
 ### Options
 
@@ -52,7 +53,8 @@ suprsend template pull [<slug>] [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)

@@ -70,6 +70,8 @@ type Property struct {
 	Ref  *string `json:"$ref,omitempty"`
 }
 
+// ListSchema lists a workspace's schemas, starting at offset: limit of them,
+// or all of them when limit <= 0. Meta.Count is the total the API reports.
 func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode string) (*ListSchemaResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
@@ -77,69 +79,44 @@ func (c *SS_MgmntClient) ListSchema(workspace string, limit, offset int, mode st
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	apiLimit := 50
-	allSchemas := []SchemaResponse{}
-	currentOffset := offset
-	remainingLimit := limit
-
-	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
-
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]SchemaResponse, int, error) {
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "schema", "/")
 		if err != nil {
-			return nil, fmt.Errorf("failed constructing url: %w", err)
+			return nil, 0, fmt.Errorf("failed constructing url: %w", err)
 		}
 		u, err := url.Parse(urlStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed parsing url: %w", err)
+			return nil, 0, fmt.Errorf("failed parsing url: %w", err)
 		}
 		q := u.Query()
-		q.Add("limit", strconv.Itoa(currentLimit))
-		q.Add("offset", strconv.Itoa(currentOffset))
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
 		q.Add("mode", mode)
 		u.RawQuery = q.Encode()
-		urlStr = u.String()
 		resp, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetHeader("Content-Type", "application/json").
 			SetResult(&ListSchemaResponse{}).
-			Get(urlStr)
+			Get(u.String())
 		if err != nil {
-			return nil, fmt.Errorf("request failed: %w", err)
+			return nil, 0, fmt.Errorf("request failed: %w", err)
 		}
 		if resp.IsError() {
-			return nil, apiError(resp)
+			return nil, 0, apiError(resp)
 		}
-
-		schemas := resp.Result().(*ListSchemaResponse)
-		if len(schemas.Results) == 0 {
-			break
-		}
-
-		allSchemas = append(allSchemas, schemas.Results...)
-		remainingLimit -= len(schemas.Results)
-		currentOffset += len(schemas.Results)
-		if len(schemas.Results) < currentLimit {
-			break
-		}
+		page := resp.Result().(*ListSchemaResponse)
+		return page.Results, page.Meta.Count, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return &ListSchemaResponse{
-		Results: allSchemas,
-		Meta: struct {
-			Count  int `json:"count"`
-			Limit  int `json:"limit"`
-			Offset int `json:"offset"`
-		}{
-			Count:  len(allSchemas),
-			Limit:  limit,
-			Offset: offset,
-		},
-	}, nil
+	resp := &ListSchemaResponse{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetSchema(workspace, slug string, version string) (*SchemaResponse, error) {
@@ -357,7 +334,7 @@ func (c *SS_MgmntClient) PushSchema(workspace, schemaSlug string, payload map[st
 		return NotCommitted, apiError(resp)
 	}
 	if commit {
-		return commitError("schemas/"+schemaSlug, resp.Result().(*SchemaPushResponse).CommitResult, clierr.CodeAPIConflict)
+		return commitError("schemas/"+schemaSlug, resp.Result().(*SchemaPushResponse).CommitResult, clierr.CodeAPIConflict, nil)
 	}
 	return NotCommitted, nil
 }

@@ -119,9 +119,11 @@ func promptForProfileName() string {
 	return strings.TrimSpace(name)
 }
 
-// EnsureConfig loads the profile config file, creating a default one if it
-// doesn't exist and the terminal is interactive.
-func EnsureConfig(path string) (*config.ProfileConfig, string, error) {
+// EnsureConfig loads the profile config file. When it doesn't exist, it
+// creates an empty one: without asking when create is set (a scripted
+// `profile add` that has every value it needs), else after asking on an
+// interactive terminal.
+func EnsureConfig(path string, create bool) (*config.ProfileConfig, string, error) {
 	var configPath string
 	if path != "" {
 		configPath = path
@@ -135,6 +137,11 @@ func EnsureConfig(path string) (*config.ProfileConfig, string, error) {
 	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if create {
+			defaultCfg := &config.ProfileConfig{Profiles: make(map[string]config.Profile)}
+			log.Infof("Creating config file %s", configPath)
+			return defaultCfg, configPath, nil
+		}
 		if !utils.IsInputInteractive() {
 			return nil, configPath, clierr.New("config file not found and cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
 		}

@@ -32,7 +32,7 @@ var schemaPushCmd = &cobra.Command{
 		"skills:tip.c-regen":   "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
 		"skills:tip.d-commit":  "With `--commit`, a schema that is saved as a draft but not committed (for example an empty JSON Schema) is an error: the command exits non-zero with the API's reason. A schema whose draft already matches live counts as success (nothing to commit).",
 		"skills:tip.f-enabled": "Enabled/disabled is a property of the schema, not a version: it applies on push, without `--commit`. If `schema.json` has no `is_enabled` key, the API currently **enables** the schema on every push, re-enabling a disabled one (this includes `sync`). To keep a schema disabled, set `\"is_enabled\": false` in its `schema.json`. `--json` pushes never send `is_enabled`.",
-		"skills:tip.g-result":  "Each schema is reported on stdout as `pushed` (draft only), `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.g-result":  "Each schema is compared with the workspace's draft (name, description, JSON Schema and `is_enabled`) and reported on stdout as `created` or `updated` (saved as draft), `unchanged` (the draft already matches, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
 		"skills:tip.e-force":   "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
 	Args: cobra.MaximumNArgs(1),
@@ -102,14 +102,13 @@ var schemaPushCmd = &cobra.Command{
 			}
 
 			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			commitStatus, err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			status, detail, err := pushSchema(mgmntClient, workspace, slug, schema, commit, commitMessage)
 			spinner.Stop("")
 			if err != nil {
 				err = clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
 				report.Fail("schemas/"+slug, err)
 				return report.Finish(err)
 			}
-			status, detail := utils.PushStatus(commitStatus)
 			report.Add("schemas/"+slug, status, detail)
 			return report.Finish(nil)
 		}
@@ -126,13 +125,14 @@ var schemaPushCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "error with input directory")
 		}
 
-		entries, err := os.ReadDir(path)
+		entries, err := utils.ReadDir(path)
 		if err != nil {
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		report := utils.NewReport("schema push", workspace, dryRun)
 		var failures []string
+		var failedErrs []error
 		for _, entry := range entries {
 			if !entry.IsDir() {
 				continue
@@ -141,8 +141,10 @@ var schemaPushCmd = &cobra.Command{
 
 			schema, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
 			if err != nil {
+				err = clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 				report.Fail("schemas/"+slug, err)
 				failures = append(failures, err.Error())
+				failedErrs = append(failedErrs, err)
 				continue
 			}
 
@@ -152,22 +154,21 @@ var schemaPushCmd = &cobra.Command{
 			}
 
 			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			commitStatus, err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			status, detail, err := pushSchema(mgmntClient, workspace, slug, schema, commit, commitMessage)
 			spinner.Stop("")
 			if err != nil {
 				report.Fail("schemas/"+slug, err)
 				failures = append(failures, clierr.ItemFailure("schemas/"+slug, "failed to push", err))
+				failedErrs = append(failedErrs, err)
 				continue
 			}
-			status, detail := utils.PushStatus(commitStatus)
 			report.Add("schemas/"+slug, status, detail)
 		}
 
 		if len(failures) > 0 {
-			code := clierr.CodeAPIInternal
+			code := clierr.FailuresCode(failedErrs)
 			summary := fmt.Sprintf("%d schema(s) failed to push", len(failures))
-			if dryRun {
-				code = clierr.CodeFileParseFailed
+			if code == clierr.CodeFileParseFailed {
 				summary = fmt.Sprintf("%d schema(s) failed local checks", len(failures))
 			}
 			return report.Finish(clierr.Failures(summary, failures, code))

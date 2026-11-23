@@ -246,6 +246,8 @@ func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string
 
 // PatchTemplateMockData saves mock data and returns it as the API stored it,
 // which can differ from what was sent: the API drops some fields silently.
+// The stored value is read back with a GET rather than taken from the PATCH
+// response, which for a new template can echo the request.
 func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) (map[string]any, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
@@ -265,13 +267,13 @@ func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData 
 	if resp.IsError() {
 		return nil, apiError(resp)
 	}
-	var result map[string]any
-	if err := json.Unmarshal(resp.Bytes(), &result); err == nil {
-		if data, ok := result["data"].(map[string]any); ok {
-			return data, nil
-		}
+	stored, err := c.GetTemplateMockData(workspace, slug)
+	if err != nil {
+		// The save worked; only the check of what was stored can't run.
+		log.Debugf("templates/%s: couldn't read back mock data: %v", slug, err)
+		return nil, nil
 	}
-	return c.GetTemplateMockData(workspace, slug)
+	return stored, nil
 }
 
 func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, error) {
@@ -299,6 +301,8 @@ func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, e
 	return resp.Result().(*Template), nil
 }
 
+// ListTemplates lists a workspace's templates, starting at offset: limit of
+// them, or all of them when limit <= 0. Meta.Count is the total the API reports.
 func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
@@ -307,55 +311,31 @@ func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, 
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	apiLimit := 50
-	allTemplates := []Template{}
-	currentOffset := offset
-	remainingLimit := limit
-	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
-
-		log.Debugf("Getting templates for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]Template, int, error) {
+		log.Debugf("Getting templates for workspace: %s, limit: %d, offset: %d", workspace, limit, offset)
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&TemplateAPIResponse{}).
-			Get(c.mgmnt_base_URL + "v2/" + workspace + "/template/?limit=" + strconv.Itoa(currentLimit) + "&offset=" + strconv.Itoa(currentOffset) + "&mode=" + mode)
+			Get(c.mgmnt_base_URL + "v2/" + workspace + "/template/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
 		if err != nil {
-			log.Errorf("Error getting templates: %s", err)
-			return nil, err
+			return nil, 0, fmt.Errorf("request failed: %w", err)
 		}
 		if res.IsError() {
-			return nil, apiError(res)
+			return nil, 0, apiError(res)
 		}
-
-		templates := res.Result().(*TemplateAPIResponse)
-		if len(templates.Results) == 0 {
-			break
-		}
-
-		allTemplates = append(allTemplates, templates.Results...)
-		remainingLimit -= len(templates.Results)
-		currentOffset += len(templates.Results)
-		if len(templates.Results) < currentLimit {
-			break
-		}
+		page := res.Result().(*TemplateAPIResponse)
+		return page.Results, page.Meta.Count, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return &TemplateAPIResponse{
-		Results: allTemplates,
-		Meta: struct {
-			Count  int `json:"count"`
-			Limit  int `json:"limit"`
-			Offset int `json:"offset"`
-		}{
-			Count:  len(allTemplates),
-			Limit:  limit,
-			Offset: currentOffset,
-		},
-	}, nil
+	resp := &TemplateAPIResponse{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 type VariantOrderTenant struct {

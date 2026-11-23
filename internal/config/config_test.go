@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/suprsend/cli/internal/clierr"
@@ -72,4 +73,69 @@ func TestServiceTokenPrecedence(t *testing.T) {
 	if _, err := GetResolvedServiceToken("", Profile{}); err == nil {
 		t.Error("no token anywhere: expected an error")
 	}
+}
+
+// --profile beats SUPRSEND_PROFILE, which beats the config file's active
+// profile; a name that isn't in the file is an error, not a silent fallback.
+func TestResolveProfile(t *testing.T) {
+	path := t.TempDir() + "/suprsend.yaml"
+	cfgFile := `active_profile: a
+profiles:
+  a:
+    mgmnt_url: https://a.example.test/
+    service_token: tok-a
+  b:
+    mgmnt_url: https://b.example.test/
+    service_token: tok-b
+    workspace: dev
+`
+	if err := os.WriteFile(path, []byte(cfgFile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SUPRSEND_SERVICE_TOKEN", "")
+	t.Setenv("SUPRSEND_MGMNT_URL", "")
+	t.Setenv("SUPRSEND_WORKSPACE", "")
+	prev := *Cfg
+	t.Cleanup(func() { *Cfg = prev })
+
+	tests := []struct {
+		name, flag, env, want string
+		source                ConfigSource
+		host                  string
+	}{
+		{"active profile", "", "", "a", ConfigSourceActive, "https://a.example.test/"},
+		{"env", "", "b", "b", ConfigSourceEnv, "https://b.example.test/"},
+		{"flag beats env", "a", "b", "a", ConfigSourceFlag, "https://a.example.test/"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("SUPRSEND_PROFILE", tt.env)
+			if err := Cfg.Resolve(FlagValues{CfgFile: path, Profile: tt.flag}); err != nil {
+				t.Fatal(err)
+			}
+			if Cfg.Profile.Value != tt.want || Cfg.Profile.Source != tt.source || Cfg.MgmntUrl.Value != tt.host {
+				t.Errorf("got profile %q from %s on %s, want %q from %s on %s",
+					Cfg.Profile.Value, Cfg.Profile.Source, Cfg.MgmntUrl.Value, tt.want, tt.source, tt.host)
+			}
+		})
+	}
+
+	t.Run("profile workspace follows the chosen profile", func(t *testing.T) {
+		t.Setenv("SUPRSEND_PROFILE", "b")
+		if err := Cfg.Resolve(FlagValues{CfgFile: path}); err != nil {
+			t.Fatal(err)
+		}
+		if ws, _ := Cfg.ResolveWorkspace("", false); ws.Value != "dev" {
+			t.Errorf("workspace = %q, want dev from profile b", ws.Value)
+		}
+	})
+
+	t.Run("unknown profile", func(t *testing.T) {
+		t.Setenv("SUPRSEND_PROFILE", "")
+		err := Cfg.Resolve(FlagValues{CfgFile: path, Profile: "nope"})
+		var ce *clierr.CLIError
+		if !errors.As(err, &ce) || ce.Code != clierr.CodeConfigInvalid {
+			t.Errorf("got %v, want a config-invalid error", err)
+		}
+	})
 }

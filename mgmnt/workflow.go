@@ -56,6 +56,8 @@ type WorkflowDetailResponse struct {
 	LastExecutedAt string `json:"last_executed_at"`
 }
 
+// ListWorkflows lists a workspace's workflows, starting at offset: limit of
+// them, or all of them when limit <= 0. Meta.Count is the total the API reports.
 func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, mode string) (*WorkflowAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
@@ -64,69 +66,44 @@ func (c *SS_MgmntClient) ListWorkflows(workspace string, limit int, offset int, 
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	apiLimit := 50
-	allWorkflows := []Workflow{}
-	currentOffset := offset
-	remainingLimit := limit
-	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
-
-		log.Debugf("Getting workflows for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]Workflow, int, error) {
+		log.Debugf("Getting workflows for workspace: %s, limit: %d, offset: %d", workspace, limit, offset)
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "workflow", "/")
 		if err != nil {
-			return nil, fmt.Errorf("failed constructing url: %w", err)
+			return nil, 0, fmt.Errorf("failed constructing url: %w", err)
 		}
 		u, err := url.Parse(urlStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed parsing url: %w", err)
+			return nil, 0, fmt.Errorf("failed parsing url: %w", err)
 		}
 		q := u.Query()
-		q.Add("limit", strconv.Itoa(currentLimit))
-		q.Add("offset", strconv.Itoa(currentOffset))
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
 		q.Add("mode", mode)
 		u.RawQuery = q.Encode()
-		urlStr = u.String()
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&WorkflowAPIResponse{}).
-			Get(urlStr)
+			Get(u.String())
 		if err != nil {
-			log.Errorf("Error getting workflows: %s", err)
-			return nil, err
+			return nil, 0, fmt.Errorf("request failed: %w", err)
 		}
 		if res.IsError() {
-			return nil, apiError(res)
+			return nil, 0, apiError(res)
 		}
-
-		workflows := res.Result().(*WorkflowAPIResponse)
-		if len(workflows.Results) == 0 {
-			break
-		}
-
-		allWorkflows = append(allWorkflows, workflows.Results...)
-		remainingLimit -= len(workflows.Results)
-		currentOffset += len(workflows.Results)
-		if len(workflows.Results) < currentLimit {
-			break
-		}
+		page := res.Result().(*WorkflowAPIResponse)
+		return page.Results, page.Meta.Count, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return &WorkflowAPIResponse{
-		Results: allWorkflows,
-		Meta: struct {
-			Count  int `json:"count"`
-			Limit  int `json:"limit"`
-			Offset int `json:"offset"`
-		}{
-			Count:  len(allWorkflows),
-			Limit:  limit,
-			Offset: currentOffset,
-		},
-	}, nil
+	resp := &WorkflowAPIResponse{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetWorkflowDetailBySlug(workspace, slug, mode string) (*map[string]any, error) {
@@ -295,13 +272,18 @@ func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[strin
 	if res.IsError() {
 		return NotCommitted, apiError(res)
 	}
+	result := res.Result().(*WorkflowPushResponse)
 	if commit {
-		result := res.Result().(*WorkflowPushResponse)
 		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
 			return NotCommitted, clierr.New(fmt.Sprintf("workflows/%s: saved as draft but not committed: workflow is invalid: %v", slug, result.ValidationResult.Errors),
-				clierr.CodeSchemaValidation).WithResource("workflows/" + slug)
+				clierr.CodeAPIValidation).WithResource("workflows/" + slug)
 		}
-		return commitError("workflows/"+slug, result.CommitResult, clierr.CodeAPIConflict)
+		return commitError("workflows/"+slug, result.CommitResult, clierr.CodeAPIConflict, workflow)
+	}
+	// A draft is saved even when it is invalid; say so now rather than
+	// leaving it to the next commit.
+	if result.ValidationResult.Errors != nil && !result.ValidationResult.IsValid {
+		log.Warnf("workflows/%s: saved as draft, but the API reports the draft as invalid, so committing it will fail: %v", slug, result.ValidationResult.Errors)
 	}
 	return NotCommitted, nil
 }

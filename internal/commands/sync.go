@@ -56,6 +56,9 @@ var syncCmd = &cobra.Command{
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		force, _ := cmd.Flags().GetBool("force")
 
+		if config.RequireWorkspace() && (!cmd.Flags().Changed("from") || !cmd.Flags().Changed("to")) {
+			return clierr.New("sync needs both --from and --to when SUPRSEND_REQUIRE_WORKSPACE is set", clierr.CodeInvalidUsage)
+		}
 		var err error
 		if fromWorkspace, err = config.NormalizeWorkspace(fromWorkspace, "--from"); err != nil {
 			return err
@@ -191,7 +194,7 @@ func syncWorkflows(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, from
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing workflows to files")
 	}
 
-	entries, err := os.ReadDir(dirPath)
+	entries, err := utils.ReadDir(dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local workflows directory")
@@ -269,7 +272,7 @@ func syncSchemas(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fromWo
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing schemas to files")
 	}
 
-	entries, err := os.ReadDir(dirPath)
+	entries, err := utils.ReadDir(dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local schemas directory")
@@ -517,7 +520,7 @@ func syncTranslation(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fr
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error writing translations to files")
 	}
-	files, err := os.ReadDir(dirPath)
+	files, err := utils.ReadDir(dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local translations directory")
@@ -620,7 +623,7 @@ func syncTemplates(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, from
 	}
 	log.Debugf("Wrote %d templates locally (%d failed)", writeStats.Success, writeStats.Failed)
 
-	entries, err := os.ReadDir(dirPath)
+	entries, err := utils.ReadDir(dirPath)
 	if err != nil {
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local templates directory")
@@ -636,7 +639,9 @@ func syncTemplates(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, from
 		slug := entry.Name()
 		templateDir := filepath.Join(dirPath, slug)
 		// Sync commits only the variants that pass pre-commit validation.
-		status, detail, err := template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, commitMessage, commit, true, dryRun)
+		status, detail, err := template.PushTemplate(mgmntClient, toWorkspace, slug, templateDir, template.PushOptions{
+			CommitMessage: commitMessage, Commit: commit, SkipInvalid: true, DryRun: dryRun, PushAll: true,
+		})
 		if err != nil {
 			pushErrors = append(pushErrors, clierr.ItemFailure("templates/"+slug, "failed to push", err))
 			report.Fail("templates/"+slug, err)

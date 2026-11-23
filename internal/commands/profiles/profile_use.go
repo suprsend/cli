@@ -35,7 +35,7 @@ var profileUseCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeUnknown, "")
 		}
 
-		cfg, path, err := EnsureConfig(path)
+		cfg, path, err := EnsureConfig(path, false)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")

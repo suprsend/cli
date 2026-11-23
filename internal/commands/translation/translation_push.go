@@ -10,7 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/state"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 )
 
 var translationPushCmd = &cobra.Command{
@@ -25,6 +27,9 @@ var translationPushCmd = &cobra.Command{
 
   # Dry run: preview what would be pushed without making changes
   suprsend translation push --dry-run`,
+	Annotations: map[string]string{
+		"skills:tip.a-result": "Push first lists the workspace's draft translation files and sends only the files whose content differs. Each file is reported on stdout as `created`, `updated`, `unchanged` (not sent) or `failed`; with `--commit`, a final `translations` line says `committed` or `unchanged`. With `-o json` the result is one JSON object with `items` and `counts`.",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		outputDir, _ := cmd.Flags().GetString("dir")
@@ -46,14 +51,30 @@ var translationPushCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		report := utils.NewReport("translation push", workspace, dryRun)
 		var failures []string
+		var failedErrs []error
 		fail := func(resource, action string, err error) {
 			report.Fail(resource, err)
 			failures = append(failures, clierr.ItemFailure(resource, action, err))
+			failedErrs = append(failedErrs, err)
+		}
+		// The workspace's draft files, to send only the files that differ.
+		var remote map[string]string
+		if !dryRun {
+			r, err := draftFingerprints(mgmntClient, workspace)
+			if err != nil {
+				return report.Finish(err)
+			}
+			remote = r
 		}
 		push := func(fileName string, content map[string]any) {
 			resource := "translations/" + fileName
 			if dryRun {
 				report.Add(resource, utils.StatusWouldPush, "")
+				return
+			}
+			fp, exists := remote[fileName]
+			if exists && fp == state.Fingerprint(content) {
+				report.Add(resource, utils.StatusUnchanged, "")
 				return
 			}
 			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", fileName))
@@ -63,7 +84,11 @@ var translationPushCmd = &cobra.Command{
 				fail(resource, "failed to push", err)
 				return
 			}
-			report.Add(resource, utils.StatusPushed, "")
+			status := utils.StatusUpdated
+			if !exists {
+				status = utils.StatusCreated
+			}
+			report.Add(resource, status, "")
 		}
 
 		if jsonPayload != "" {
@@ -80,7 +105,7 @@ var translationPushCmd = &cobra.Command{
 				outputDir = filepath.Join(".", "suprsend", "translations")
 			}
 
-			files, err := os.ReadDir(outputDir)
+			files, err := utils.ReadDir(outputDir)
 			if err != nil {
 				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 			}
@@ -92,12 +117,12 @@ var translationPushCmd = &cobra.Command{
 				resource := "translations/" + file.Name()
 				data, err := os.ReadFile(filepath.Join(outputDir, file.Name()))
 				if err != nil {
-					fail(resource, "failed to read", err)
+					fail(resource, "failed to read", clierr.Wrap(err, clierr.CodeFileNotFound, ""))
 					continue
 				}
 				var content map[string]any
 				if err := json.Unmarshal(data, &content); err != nil {
-					fail(resource, "failed to parse", err)
+					fail(resource, "failed to parse", clierr.Wrap(err, clierr.CodeFileParseFailed, ""))
 					continue
 				}
 				push(file.Name(), content)
@@ -128,7 +153,12 @@ var translationPushCmd = &cobra.Command{
 		}
 
 		if len(failures) > 0 {
-			return report.Finish(clierr.Failures(fmt.Sprintf("%d translation(s) failed to push", len(failures)), failures, clierr.CodeAPIInternal))
+			code := clierr.FailuresCode(failedErrs)
+			summary := fmt.Sprintf("%d translation(s) failed to push", len(failures))
+			if code == clierr.CodeFileParseFailed {
+				summary = fmt.Sprintf("%d translation(s) failed local checks", len(failures))
+			}
+			return report.Finish(clierr.Failures(summary, failures, code))
 		}
 		return report.Finish(nil)
 	},
@@ -142,4 +172,24 @@ func init() {
 	translationPushCmd.Flags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	translationPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	TranslationCmd.AddCommand(translationPushCmd)
+}
+
+// draftFingerprints fingerprints the content of each of the workspace's
+// draft translation files, by file name.
+func draftFingerprints(client *mgmnt.SS_MgmntClient, workspace string) (map[string]string, error) {
+	resp, err := client.GetTranslations(workspace, "draft")
+	if err != nil {
+		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't list the workspace's translations")
+	}
+	fps := map[string]string{}
+	for _, r := range resp.Results {
+		obj, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, _ := obj["filename"].(string); name != "" {
+			fps[name] = state.Fingerprint(obj["content"])
+		}
+	}
+	return fps, nil
 }

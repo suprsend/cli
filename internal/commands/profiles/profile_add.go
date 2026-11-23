@@ -28,7 +28,7 @@ var profilesAddCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
-		cfg, path, err := EnsureConfig(path)
+		cfg, path, err := EnsureConfig(path, addName != "" && addServiceToken != "")
 		if err != nil {
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}
@@ -63,6 +63,11 @@ var profilesAddCmd = &cobra.Command{
 				MgmntUrl:     config.ConfigString{Value: addMgmntUrl},
 				ServiceToken: config.ConfigString{Value: addServiceToken},
 				Workspace:    config.ConfigString{Value: addWorkspace},
+			}
+			// The first profile becomes the active one, as in the prompted flow.
+			if cfg.ActiveProfile == "" {
+				cfg.ActiveProfile = addName
+				log.Infof("Set '%s' as the active profile", addName)
 			}
 
 			err := config.SaveProfileConfig(cfg, path)

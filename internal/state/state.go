@@ -1,0 +1,231 @@
+// Package state keeps .suprsend-state.json, the record that lets push tell
+// what changed since the last pull or push, and where.
+//
+// The file lives in an asset directory (next to the workflow or template
+// directories it describes) and holds, for each workspace and item, two
+// fingerprints taken the last time the CLI pulled or pushed that item: one of
+// the item as the workspace had it, one of the local copy. On the next push,
+// comparing both with the current values says whether the item changed
+// locally, in the workspace, or both. Fingerprints are kept per workspace, so
+// files pulled from one workspace and pushed to another don't read as a
+// conflict. The file is meant to be committed with the asset files, like a
+// lockfile.
+package state
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/suprsend/cli/internal/clierr"
+)
+
+// FileName is the state file's name inside an asset directory.
+const FileName = ".suprsend-state.json"
+
+const version = 1
+
+// Entry holds an item's fingerprints from the last pull or push.
+type Entry struct {
+	Remote string `json:"remote"` // the item as the workspace had it
+	Local  string `json:"local"`  // the local copy
+}
+
+// File is a loaded state file. Its methods are safe for concurrent use.
+type File struct {
+	Version    int                         `json:"version"`
+	Workspaces map[string]map[string]Entry `json:"workspaces"`
+
+	path  string
+	dirty bool
+	mu    sync.Mutex
+}
+
+// Load reads dir's state file. A missing file is an empty state: push then
+// has no record to compare with and pushes what differs from the workspace.
+func Load(dir string) (*File, error) {
+	f := &File{Version: version, Workspaces: map[string]map[string]Entry{}, path: filepath.Join(dir, FileName)}
+	data, err := os.ReadFile(f.path)
+	if os.IsNotExist(err) {
+		return f, nil
+	}
+	if err != nil {
+		return nil, clierr.Wrap(err, clierr.CodeFileNotFound, "")
+	}
+	if err := json.Unmarshal(data, f); err != nil {
+		return nil, clierr.New(fmt.Sprintf("%s is not valid JSON: %v", f.path, err), clierr.CodeFileParseFailed).
+			WithHint("fix it, or delete it: the next pull writes a new one, and until then push can't tell what changed in the workspace since your last pull")
+	}
+	if f.Version > version {
+		return nil, clierr.New(fmt.Sprintf("%s was written by a newer version of the CLI (state version %d)", f.path, f.Version), clierr.CodeFileParseFailed).
+			WithHint("upgrade the CLI")
+	}
+	f.Version = version
+	if f.Workspaces == nil {
+		f.Workspaces = map[string]map[string]Entry{}
+	}
+	return f, nil
+}
+
+// Get returns the entry for key in workspace. A nil File has no entries.
+func (f *File) Get(workspace, key string) (Entry, bool) {
+	if f == nil {
+		return Entry{}, false
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	e, ok := f.Workspaces[workspace][key]
+	return e, ok
+}
+
+// Set records the entry for key in workspace. A nil File ignores it.
+func (f *File) Set(workspace, key string, e Entry) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Workspaces[workspace] == nil {
+		f.Workspaces[workspace] = map[string]Entry{}
+	}
+	if f.Workspaces[workspace][key] != e {
+		f.Workspaces[workspace][key] = e
+		f.dirty = true
+	}
+}
+
+// Delete removes key from workspace, and with prefix set every key that
+// starts with key. A nil File ignores it.
+func (f *File) Delete(workspace, key string, prefix bool) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k := range f.Workspaces[workspace] {
+		if k == key || (prefix && strings.HasPrefix(k, key)) {
+			delete(f.Workspaces[workspace], k)
+			f.dirty = true
+		}
+	}
+	if len(f.Workspaces[workspace]) == 0 {
+		delete(f.Workspaces, workspace)
+	}
+}
+
+// Save writes the file if anything changed. Keys are sorted, so the file
+// diffs and merges cleanly. A nil File does nothing.
+func (f *File) Save() error {
+	if f == nil {
+		return nil
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.dirty {
+		return nil
+	}
+	data, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := f.path + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+	}
+	if err := os.Rename(tmp, f.path); err != nil {
+		os.Remove(tmp)
+		return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+	}
+	f.dirty = false
+	return nil
+}
+
+// Fingerprint returns a short hash of v's JSON form, leaving out the
+// top-level keys in ignore when v is an object. Map keys are sorted by
+// encoding/json, so equal values give equal fingerprints whatever their key
+// order, and a []string hashes the same as the []any a JSON file decodes to.
+func Fingerprint(v any, ignore ...string) string {
+	if m, ok := v.(map[string]any); ok && len(ignore) > 0 {
+		trimmed := make(map[string]any, len(m))
+		maps.Copy(trimmed, m)
+		for _, k := range ignore {
+			delete(trimmed, k)
+		}
+		v = trimmed
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		data = fmt.Append(nil, v)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:8])
+}
+
+// Action is what push does with an item.
+type Action string
+
+const (
+	Create    Action = "create"    // not in the workspace
+	Update    Action = "update"    // push the local copy
+	Unchanged Action = "unchanged" // nothing to push
+	// Skip: not changed locally, but changed (or deleted) in the workspace
+	// since the last pull or push. Pushing the local copy would undo that
+	// change, so it is left alone.
+	Skip Action = "skip"
+	// Conflict: changed both locally and in the workspace since the last
+	// pull or push.
+	Conflict Action = "conflict"
+)
+
+// Decide picks what to do with one item from its current local and remote
+// fingerprints (remote is "" when the workspace doesn't have the item) and,
+// when hasBase is set, the entry from the last pull or push. Without an
+// entry the local copy is pushed whenever it differs: there is nothing to
+// tell which side changed. With overwrite, the local copy is pushed even
+// over changes made in the workspace.
+func Decide(local, remote string, base Entry, hasBase, overwrite bool) Action {
+	push := Update
+	if remote == "" {
+		push = Create
+	}
+	if overwrite {
+		if remote != "" && local == remote {
+			return Unchanged
+		}
+		return push
+	}
+	if remote == "" {
+		if !hasBase {
+			return Create
+		}
+		if local == base.Local {
+			return Skip // deleted in the workspace, untouched locally
+		}
+		return Conflict
+	}
+	if local == remote {
+		return Unchanged
+	}
+	if !hasBase {
+		return Update
+	}
+	localChanged := local != base.Local
+	remoteChanged := remote != base.Remote
+	switch {
+	case localChanged && remoteChanged:
+		return Conflict
+	case localChanged:
+		return Update
+	case remoteChanged:
+		return Skip
+	}
+	// Neither side changed since the last pull or push; they differ only in
+	// how the API stores the item.
+	return Unchanged
+}

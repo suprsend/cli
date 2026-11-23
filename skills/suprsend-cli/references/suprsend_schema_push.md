@@ -32,7 +32,7 @@ suprsend schema push [<slug>] [flags]
 - With `--commit`, a schema that is saved as a draft but not committed (for example an empty JSON Schema) is an error: the command exits non-zero with the API's reason. A schema whose draft already matches live counts as success (nothing to commit).
 - `-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.
 - Enabled/disabled is a property of the schema, not a version: it applies on push, without `--commit`. If `schema.json` has no `is_enabled` key, the API currently **enables** the schema on every push, re-enabling a disabled one (this includes `sync`). To keep a schema disabled, set `"is_enabled": false` in its `schema.json`. `--json` pushes never send `is_enabled`.
-- Each schema is reported on stdout as `pushed` (draft only), `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.
+- Each schema is compared with the workspace's draft (name, description, JSON Schema and `is_enabled`) and reported on stdout as `created` or `updated` (saved as draft), `unchanged` (the draft already matches, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.
 
 ### Options
 
@@ -53,7 +53,8 @@ suprsend schema push [<slug>] [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)

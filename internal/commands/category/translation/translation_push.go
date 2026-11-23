@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/state"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -39,7 +40,7 @@ var translationPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend category translation push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-result": "Each locale is reported on stdout as `pushed` (translations go live immediately), `skipped` (English) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.a-result": "Each locale is compared with the workspace's and reported on stdout as `created` or `updated` (translations go live immediately), `unchanged` (the workspace already has the same, so nothing was sent), `skipped` (English) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -78,7 +79,7 @@ func PushTranslations(report *utils.Report, workspace, locale, dir string, dryRu
 		return nil, clierr.New(fmt.Sprintf("directory %s does not exist", translationsDir), clierr.CodeFileNotFound)
 	}
 
-	files, err := os.ReadDir(translationsDir)
+	files, err := utils.ReadDir(translationsDir)
 	if err != nil {
 		return nil, clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("couldn't read directory %s", translationsDir))
 	}
@@ -166,7 +167,7 @@ func PushTranslations(report *utils.Report, workspace, locale, dir string, dryRu
 		}
 
 		spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", fileName))
-		err = mgmntClient.PushPreferenceTranslation(workspace, fileLocale, translation)
+		status, err := PushLocale(mgmntClient, workspace, fileLocale, translation)
 		spinner.Stop("")
 		if err != nil {
 			fail(fileName, "failed to push", err)
@@ -174,7 +175,7 @@ func PushTranslations(report *utils.Report, workspace, locale, dir string, dryRu
 		}
 
 		stats.Success++
-		report.Add(translationResource(fileName), utils.StatusPushed, "live")
+		report.Add(translationResource(fileName), status, "live")
 	}
 
 	if stats.Failed > 0 {
@@ -192,4 +193,27 @@ func init() {
 	translationPushCmd.Flags().StringP("dir", "d", "", "Directory containing translation JSON files (default: "+defaultDir+")")
 	translationPushCmd.Flags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	TranslationCmd.AddCommand(translationPushCmd)
+}
+
+// PushLocale pushes one locale's translations unless the workspace already
+// has the same, and returns the report status: created, updated or unchanged.
+func PushLocale(client *mgmnt.SS_MgmntClient, workspace, locale string, translation mgmnt.PreferenceTranslationContent) (string, error) {
+	remote, err := client.GetPreferenceTranslationsForLocale(workspace, locale)
+	exists := true
+	switch {
+	case clierr.HasCode(err, clierr.CodeAPINotFound):
+		exists = false
+	case err != nil:
+		return "", err
+	}
+	if exists && remote != nil && state.Fingerprint(*remote) == state.Fingerprint(translation) {
+		return utils.StatusUnchanged, nil
+	}
+	if err := client.PushPreferenceTranslation(workspace, locale, translation); err != nil {
+		return "", err
+	}
+	if !exists {
+		return utils.StatusCreated, nil
+	}
+	return utils.StatusUpdated, nil
 }

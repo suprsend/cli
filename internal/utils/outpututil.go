@@ -172,6 +172,22 @@ func ValidateOutputType(format string, allowed ...string) error {
 	)
 }
 
+// LimitFlagHelp is the help text for the --limit flag of list commands.
+func LimitFlagHelp(kind string) string {
+	return fmt.Sprintf("Maximum number of %s to return (default: all)", kind)
+}
+
+// NoteMoreResults tells the user on stderr when a list shows only part of
+// what exists, so a --limit doesn't read as the whole list. The note goes to
+// stderr so -o json output stays a plain array.
+func NoteMoreResults(kind string, shown, offset, total int) {
+	if total <= offset+shown || config.Cfg.Quiet.Value {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "note: showing %s %d-%d of %d; pass --offset %d for the next page, or leave out --limit to list all\n",
+		kind, offset+1, offset+shown, total, offset+shown)
+}
+
 // OutputData chooses the output format based on the flag
 func OutputData(data any, format string) {
 	switch format {

@@ -158,7 +158,7 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 // ReadEventsFromDir reads per-event subdirectories and returns the events slice
 // ready for the push wire format. $schema is stripped before returning.
 func ReadEventsFromDir(dirPath string) ([]any, error) {
-	entries, err := os.ReadDir(dirPath)
+	entries, err := utils.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read events directory %q: %w", dirPath, err)
 	}
@@ -178,9 +178,25 @@ func ReadEventsFromDir(dirPath string) ([]any, error) {
 			return nil, fmt.Errorf("events/%s/event.json: invalid JSON: %w", entry.Name(), err)
 		}
 		delete(obj, "$schema")
+		warnIfRenamed(entry.Name(), obj)
 		events = append(events, obj)
 	}
 	return events, nil
+}
+
+// warnIfRenamed warns when event.json names a different event than the one
+// its directory was pulled for. The API has no rename: pushing the new name
+// creates a second event, and the old one (with the workflows it triggers)
+// stays as it is.
+func warnIfRenamed(dirName string, obj map[string]any) {
+	name, _ := obj["name"].(string)
+	if name == "" {
+		return
+	}
+	if want, err := slugifyEventName(name); err == nil && !strings.EqualFold(want, dirName) {
+		log.Warnf("events/%s: event.json#name is %q, so this push creates a new event %s; it doesn't rename the event in this directory, and workflows triggered by that event keep using it",
+			dirName, name, strings.ToUpper(name))
+	}
 }
 
 // PushFailures returns an error listing every event the bulk push rejected,

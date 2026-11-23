@@ -15,7 +15,7 @@ import (
 var templateListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List templates for a workspace",
-	Long:  `List templates in a workspace with pagination. Returns template slug, name, and enabled channel info. Use --mode to switch between draft and live versions.`,
+	Long:  `List the templates in a workspace: all of them unless --limit is given. Returns template slug, name, and enabled channel info. Use --mode to switch between draft and live versions.`,
 	Example: `  # List all templates (live mode)
   suprsend template list
 
@@ -50,12 +50,13 @@ var templateListCmd = &cobra.Command{
 			return nil
 		}
 		utils.OutputData(templates.Results, outputType)
+		utils.NoteMoreResults("templates", len(templates.Results), offset, templates.Meta.Count)
 		return nil
 	},
 }
 
 func init() {
-	templateListCmd.PersistentFlags().IntP("limit", "l", 20, "Limit the number of templates to list")
+	templateListCmd.PersistentFlags().IntP("limit", "l", 0, utils.LimitFlagHelp("templates"))
 	templateListCmd.PersistentFlags().Int("offset", 0, "Offset the number of templates to list (default: 0)")
 	templateListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	templateListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output Style (pretty, yaml, json)")

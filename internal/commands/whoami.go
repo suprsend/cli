@@ -12,6 +12,7 @@ import (
 
 type whoamiInfo struct {
 	Profile            string `json:"profile" yaml:"profile"`
+	ProfileSource      string `json:"profile_source" yaml:"profile_source"`
 	ConfigFile         string `json:"config_file" yaml:"config_file"`
 	Workspace          string `json:"workspace" yaml:"workspace"`
 	WorkspaceSource    string `json:"workspace_source" yaml:"workspace_source"`
@@ -25,7 +26,8 @@ type whoamiInfo struct {
 var whoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Show which profile, host and workspace commands will use",
-	Long: `Print where commands will go: the active profile, the management API host,
+	Long: `Print where commands will go: the profile (and where it came from:
+--profile, SUPRSEND_PROFILE, or the config file's active profile), the management API host,
 the workspace a command would use (and where that value came from: -w,
 SUPRSEND_WORKSPACE, the profile, or the built-in default), and where the
 service token came from. The token itself is never printed. With --check, it
@@ -51,6 +53,7 @@ also calls the API to confirm the token works and the workspace exists.`,
 		cfg := config.Cfg
 		info := whoamiInfo{
 			Profile:            orNone(cfg.Profile.Value),
+			ProfileSource:      orNone(string(cfg.Profile.Source)),
 			ConfigFile:         config.GetConfigFilePath(),
 			Workspace:          ws.Value,
 			WorkspaceSource:    string(ws.Source),
@@ -75,7 +78,11 @@ also calls the API to confirm the token works and the workspace exists.`,
 			utils.OutputData(info, cfg.OutputType.Value)
 			return nil
 		}
-		fmt.Printf("profile:       %s (%s)\n", info.Profile, info.ConfigFile)
+		if cfg.Profile.Value == "" {
+			fmt.Printf("profile:       (none) (%s)\n", info.ConfigFile)
+		} else {
+			fmt.Printf("profile:       %s (from %s, %s)\n", info.Profile, info.ProfileSource, info.ConfigFile)
+		}
 		fmt.Printf("host:          %s\n", hostname(info.MgmntURL))
 		fmt.Printf("workspace:     %s (from %s)\n", info.Workspace, info.WorkspaceSource)
 		fmt.Printf("service token: %s (from %s)\n", info.ServiceToken, info.ServiceTokenSource)

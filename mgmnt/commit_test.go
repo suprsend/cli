@@ -56,7 +56,7 @@ func TestPushWorkflowInvalidIsValidationError(t *testing.T) {
 	c := NewClientWithUrls("token", srv.URL, srv.URL, false)
 
 	_, err := c.PushWorkflow("staging", "welcome", map[string]any{}, true, "")
-	checkCode(t, "workflow", err, clierr.CodeSchemaValidation)
+	checkCode(t, "workflow", err, clierr.CodeAPIValidation)
 }
 
 func checkStatus(t *testing.T, kind string, got, want CommitStatus) {
@@ -142,7 +142,7 @@ func TestPushCategoriesCommitResult(t *testing.T) {
 	}{
 		{"committed", `{"validation_result":{"is_valid":true},"commit_result":{"is_committed":true}}`, ""},
 		{"nothing to publish", `{"validation_result":{"is_valid":true},"commit_result":{"is_committed":false,"errors":["no changes to publish"]}}`, ""},
-		{"invalid", `{"validation_result":{"is_valid":false,"errors":["bad section"]},"commit_result":{"is_committed":false,"errors":["error in preference categories"]}}`, clierr.CodeSchemaValidation},
+		{"invalid", `{"validation_result":{"is_valid":false,"errors":["bad section"]},"commit_result":{"is_committed":false,"errors":["error in preference categories"]}}`, clierr.CodeAPIValidation},
 		{"commit failed", `{"validation_result":{"is_valid":true},"commit_result":{"is_committed":false,"errors":["db down"]}}`, clierr.CodeAPIConflict},
 	}
 	for _, tt := range tests {
@@ -164,9 +164,27 @@ func TestPushCategoriesCommitResult(t *testing.T) {
 // A commit error that is only a quoted field name is the API's KeyError for a
 // missing field; the message should say so instead of printing 'variable_ns'.
 func TestCommitErrorDescribesMissingField(t *testing.T) {
-	_, err := commitError("workflows/welcome", &CommitResult{Errors: []any{"'variable_ns'"}}, clierr.CodeAPIConflict)
+	_, err := commitError("workflows/welcome", &CommitResult{Errors: []any{"'variable_ns'"}}, clierr.CodeAPIConflict, nil)
 	if err == nil || !strings.Contains(err.Error(), `required field "variable_ns" is missing`) {
 		t.Errorf("got %v, want a message naming the missing field", err)
+	}
+}
+
+// With the pushed definition, the message says which condition lacks the field.
+func TestCommitErrorLocatesMissingField(t *testing.T) {
+	def := map[string]any{"tree": map[string]any{"nodes": []any{
+		map[string]any{"name": "delay"},
+		map[string]any{"branches": []any{map[string]any{"conditions": []any{map[string]any{
+			"expression_v1": map[string]any{"args": []any{
+				map[string]any{"variable": "plan", "op": "==", "value": "pro", "variable_ns": "$recipient"},
+				map[string]any{"variable": "done", "op": "==", "value": "true"},
+			}},
+		}}}}},
+	}}}
+	_, err := commitError("workflows/welcome", &CommitResult{Errors: []any{"'variable_ns'"}}, clierr.CodeAPIConflict, def)
+	want := `required field "variable_ns" is missing at tree.nodes[1].branches[0].conditions[0].expression_v1.args[1]`
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("got %v, want %q", err, want)
 	}
 }
 

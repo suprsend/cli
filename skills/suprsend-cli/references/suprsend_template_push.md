@@ -40,7 +40,8 @@ suprsend template push [<slug>] [flags]
 - `--dry-run` makes no API calls: it only reads the local template directories and reports the variants and channels that would be pushed. Nothing is validated server-side.
 - With `--commit`, all changed variants are committed together, and one invalid variant fails the commit. `--skip-invalid` runs a pre-commit validation and commits only the variants that pass; the skipped ones are listed in the result. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, the template is reported as `unchanged`.
 - The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking; `-F/--force` skips it on a TTY too.
-- Each template is reported on stdout as `pushed`, `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.
+- Each template is reported on stdout as `created`, `updated` (the detail names the parts sent, such as `email/default` or `mock data`), `unchanged` (nothing differed from the workspace's draft, so nothing was sent; with `--commit`, the draft already matched live), `skipped` (see the state tip), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.
+- A template is pushed in parts: its fields (name, description, tags, enabled_channels), each variant, mock data and variant order, and only the parts that differ from the workspace's draft are sent. Pull and push keep `.suprsend-state.json` in the templates directory (commit it with the files): what each part looked like, per workspace, at the last pull or push. A part changed only in the workspace since then (say, a variant edited in the dashboard) is skipped rather than overwritten, and named in the detail; with `--commit` that is an error, so nobody else's draft goes live unseen. A part changed on both sides fails the template as a conflict (code `api-conflict`) before anything is sent. Pull again to get the workspace's version, or pass `--overwrite` to push your copy anyway. Without a record for that workspace, every part that differs is sent.
 
 ### Options
 
@@ -51,6 +52,7 @@ suprsend template push [<slug>] [flags]
   -n, --dry-run                 Report what would be pushed without making any changes
   -F, --force                   Skip the confirmation prompt for --commit
   -h, --help                    help for push
+      --overwrite               Push your copy of each part even when the workspace's version changed since the last pull or push, replacing that change
       --skip-invalid            With --commit: commit only the variants that pass pre-commit validation and list the ones skipped
   -g, --slug string             Slug of a specific template to push
 ```
@@ -61,7 +63,8 @@ suprsend template push [<slug>] [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)

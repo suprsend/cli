@@ -45,6 +45,7 @@ suprsend template push [<slug>] [flags]
   -n, --dry-run                 Report what would be pushed without making any changes
   -F, --force                   Skip the confirmation prompt for --commit
   -h, --help                    help for push
+      --overwrite               Push your copy of each part even when the workspace's version changed since the last pull or push, replacing that change
       --skip-invalid            With --commit: commit only the variants that pass pre-commit validation and list the ones skipped
   -g, --slug string             Slug of a specific template to push
 ```
@@ -55,7 +56,8 @@ suprsend template push [<slug>] [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)

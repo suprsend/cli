@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/state"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -29,6 +30,7 @@ var workflowPullCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-overwrite": "Pull overwrites `<dir>/<slug>/workflow.json` for every pulled slug without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/workflows` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
+		"skills:tip.c-state":     "Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the workflows.",
 	},
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,10 +62,15 @@ var workflowPullCmd = &cobra.Command{
 		report := utils.NewReport("workflow pull", workspace, false)
 		spinner := utils.NewSpinner("Loading...")
 
+		st, err := state.Load(outputDir)
+		if err != nil {
+			return err
+		}
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		if slug != "" {
-			err := pullOneWorkflow(mgmntClient, workspace, mode, slug, outputDir)
+			err := pullOneWorkflow(mgmntClient, workspace, mode, slug, outputDir, st)
 			spinner.Stop("")
+			saveState(st)
 			if err != nil {
 				report.Fail("workflows/"+slug, err)
 				return report.Finish(err)
@@ -82,6 +89,18 @@ var workflowPullCmd = &cobra.Command{
 		if err != nil {
 			return report.Finish(clierr.Wrap(err, clierr.CodeFileParseFailed, ""))
 		}
+		written := map[string]bool{}
+		for _, s := range stats.Written {
+			written[s] = true
+		}
+		for _, wf := range workflows_resp.Results {
+			if obj, ok := wf.(map[string]any); ok {
+				if s, _ := obj["slug"].(string); written[s] {
+					RecordPulled(st, workspace, obj)
+				}
+			}
+		}
+		saveState(st)
 		for _, s := range stats.Written {
 			report.Add("workflows/"+s, utils.StatusPulled, "")
 		}
@@ -95,8 +114,8 @@ var workflowPullCmd = &cobra.Command{
 	},
 }
 
-// pullOneWorkflow writes <outputDir>/<slug>/workflow.json.
-func pullOneWorkflow(mgmntClient *mgmnt.SS_MgmntClient, workspace, mode, slug, outputDir string) error {
+// pullOneWorkflow writes <outputDir>/<slug>/workflow.json and records it in st.
+func pullOneWorkflow(mgmntClient *mgmnt.SS_MgmntClient, workspace, mode, slug, outputDir string, st *state.File) error {
 	workflowResp, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, mode)
 	if err != nil {
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "")
@@ -112,6 +131,7 @@ func pullOneWorkflow(mgmntClient *mgmnt.SS_MgmntClient, workspace, mode, slug, o
 	if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 	}
+	RecordPulled(st, workspace, *workflowResp)
 	return nil
 }
 

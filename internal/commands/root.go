@@ -63,6 +63,7 @@ func Execute() error {
 			err = clierr.Wrap(err, clierr.CodeInvalidUsage, "")
 		}
 		err = explainNotFound(err)
+		err = explainAuth(err)
 		utils.WriteError(err, early.OutputType)
 	}
 	return err
@@ -79,6 +80,24 @@ func explainNotFound(err error) error {
 	if wsErr := utils.CheckWorkspace(config.Cfg.Workspace.Value); wsErr != nil {
 		return wsErr
 	}
+	return err
+}
+
+// explainAuth adds the host and where it and the token came from to an
+// invalid-token error: a token only works on the host it was issued for, so
+// a valid token sent to the wrong host reads as "invalid service token".
+func explainAuth(err error) error {
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAuthInvalidToken || config.Cfg.MgmntUrl.Value == "" {
+		return err
+	}
+	cfg := config.Cfg
+	ce.Message = strings.TrimRight(ce.Message, ".") + fmt.Sprintf(" (host %s from %s, token from %s", hostname(cfg.MgmntUrl.Value), cfg.MgmntUrl.Source, cfg.ServiceToken.Source)
+	if cfg.Profile.Value != "" {
+		ce.Message += fmt.Sprintf(", profile %q", cfg.Profile.Value)
+	}
+	ce.Message += ")"
+	ce.Hint = "a token works only on the host it was issued for: check the host (the profile's mgmnt_url, or SUPRSEND_MGMNT_URL) as well as the token; `suprsend whoami` shows both"
 	return err
 }
 
@@ -107,6 +126,10 @@ func resolveWorkspace(cmd *cobra.Command) error {
 		return nil
 	}
 	if ws.Source == config.ConfigSourceDefault {
+		if config.RequireWorkspace() {
+			return clierr.New("no workspace given, and SUPRSEND_REQUIRE_WORKSPACE is set", clierr.CodeInvalidUsage).
+				WithHint("pass -w, set SUPRSEND_WORKSPACE, or set workspace in the profile")
+		}
 		log.Warnf("no workspace given; using the default workspace %q (pass -w, set SUPRSEND_WORKSPACE, or set workspace in the profile)", ws.Value)
 	}
 	if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
@@ -196,8 +219,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flags.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
 	rootCmd.PersistentFlags().StringVarP(&flags.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.PersistentFlags().StringVarP(&flags.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
+	rootCmd.PersistentFlags().StringVar(&flags.Profile, "profile", "", config.ProfileFlagHelp)
 	rootCmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable color output (default: $NO_COLOR)")
-	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
+	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info and warning output (results and errors are still shown)")
 
 	// Register the 'version' command with the upgrade notice enabled.
 	versionCmd := extension.NewVersionCobraCmd(

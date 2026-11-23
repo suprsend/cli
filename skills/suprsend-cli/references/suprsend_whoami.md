@@ -2,7 +2,8 @@
 
 Show which profile, host and workspace commands will use
 
-Print where commands will go: the active profile, the management API host,
+Print where commands will go: the profile (and where it came from:
+--profile, SUPRSEND_PROFILE, or the config file's active profile), the management API host,
 the workspace a command would use (and where that value came from: -w,
 SUPRSEND_WORKSPACE, the profile, or the built-in default), and where the
 service token came from. The token itself is never printed. With --check, it
@@ -43,7 +44,8 @@ suprsend whoami [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```

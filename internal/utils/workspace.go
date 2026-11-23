@@ -28,7 +28,7 @@ func CheckWorkspace(slug string) error {
 // VerifyWorkspace is CheckWorkspace that also returns the error from listing
 // the workspaces (an invalid token, for example).
 func VerifyWorkspace(slug string) error {
-	resp, err := SDKInstance.ListWorkspaces(1000, 0)
+	resp, err := SDKInstance.ListWorkspaces(0, 0)
 	if err != nil {
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 	}

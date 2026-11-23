@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/state"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 )
@@ -30,23 +31,54 @@ func readTemplateJSON(templateDir string) (map[string]any, error) {
 	return templateData, nil
 }
 
-// PushTemplate pushes one template directory and, with commit, promotes it
-// to live. It returns the report status for the template (pushed, committed,
-// unchanged, or would-push/would-commit on a dry run) and a detail note.
-// With skipInvalid, only the variants that pass pre-commit validation are
-// committed; otherwise all of them are, and an invalid variant fails the commit.
-func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir, commitMessage string, commit, skipInvalid, dryRun bool) (string, string, error) {
+// PushOptions control how PushTemplate pushes a template.
+type PushOptions struct {
+	CommitMessage string
+	Commit        bool
+	// SkipInvalid, with Commit, commits only the variants that pass
+	// pre-commit validation; otherwise an invalid variant fails the commit.
+	SkipInvalid bool
+	DryRun      bool
+	// Overwrite pushes the local copy of each part even over changes made in
+	// the workspace since the last pull or push.
+	Overwrite bool
+	// PushAll sends every part without comparing with the workspace first
+	// (sync, which makes the destination match the source).
+	PushAll bool
+	// State is the record of earlier pulls and pushes; nil for none.
+	State *state.File
+}
+
+// PushTemplate pushes one template directory and, with opts.Commit, promotes
+// it to live. Each part (the template's fields, each variant, mock data,
+// variant order) is compared with the workspace's draft and with the record
+// of the last pull or push, and only the parts changed locally are sent. A
+// part changed in the workspace since then is left alone, and one changed on
+// both sides fails the template, unless opts.Overwrite is set. It returns the
+// report status (created, updated, unchanged, skipped, committed, pushed for
+// PushAll, or would-push/would-commit on a dry run) and a detail note.
+func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDir string, opts PushOptions) (string, string, error) {
+	resource := "templates/" + slug
 	templateData, err := readTemplateJSON(templateDir)
 	if err != nil {
 		return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template.json for template %s", slug))
 	}
-
 	variants, err := readTemplateVariants(templateDir)
 	if err != nil {
 		return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to read template %s", slug))
 	}
+	mockData, err := readMockData(templateDir)
+	if err != nil {
+		return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse mock_data.json for template %s", slug))
+	}
+	var variantOrder *mgmnt.VariantOrderResponse
+	if raw, ok := templateData["variant_order"]; ok && raw != nil {
+		if variantOrder, err = variantOrderFromFile(raw); err != nil {
+			return "", "", clierr.New(fmt.Sprintf("invalid variant_order format for template %s", slug), clierr.CodeFileParseFailed)
+		}
+	}
 
-	if dryRun {
+	if opts.DryRun {
 		channels := make([]string, 0, len(variants))
 		seen := map[string]bool{}
 		for _, v := range variants {
@@ -57,85 +89,111 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 			}
 		}
 		status := utils.StatusWouldPush
-		if commit {
+		if opts.Commit {
 			status = utils.StatusWouldCommit
 		}
 		return status, fmt.Sprintf("%d variant(s), channels: %s", len(variants), strings.Join(channels, ", ")), nil
 	}
 
-	if err := mgmntClient.CreateTemplate(workspace, slug, templateFields(templateData)); err != nil {
-		return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to create template %s", slug))
+	local := localParts(templateData, variants, mockData)
+	plan, exists, err := planParts(mgmntClient, workspace, slug, local, opts)
+	if err != nil {
+		return "", "", err
+	}
+	if conflicts := plan.keys(state.Conflict); len(conflicts) > 0 {
+		return "", "", clierr.New(fmt.Sprintf("%s: changed in workspace %q since the last pull or push, and also changed locally: %s", resource, workspace, describeParts(conflicts)), clierr.CodeAPIConflict).
+			WithResource(resource).
+			WithHint("copy your edits, pull the template to get the workspace's version, and reapply them; or pass --overwrite to replace the workspace's version with yours")
+	}
+	skipped := plan.keys(state.Skip)
+	if opts.Commit && len(skipped) > 0 {
+		return "", "", clierr.New(fmt.Sprintf("%s: not committed: the workspace's draft changed since the last pull or push, and your copy didn't: %s", resource, describeParts(skipped)), clierr.CodeAPIConflict).
+			WithResource(resource).
+			WithHint("pull the template to see the change before committing, or pass --overwrite to push and commit your copy")
 	}
 
-	var pushErrs []string
-	for _, variant := range variants {
-		if err := mgmntClient.PushTemplateVariant(workspace, slug, variant); err != nil {
-			pushErrs = append(pushErrs, err.Error())
-		}
+	pushed, pushErr := applyParts(mgmntClient, workspace, slug, plan, local, variantOrder)
+	if !opts.PushAll {
+		recordParts(mgmntClient, opts.State, workspace, slug, plan, pushed, local)
 	}
-	if len(pushErrs) > 0 {
-		return "", "", clierr.New(fmt.Sprintf("templates/%s: failed to push %d variant(s): %s", slug, len(pushErrs), strings.Join(pushErrs, "; ")), clierr.CodeAPIInternal)
+	if pushErr != nil {
+		return "", "", pushErr
 	}
 
-	// Push mock_data.json if it exists
-	mockDataFile := filepath.Join(templateDir, "mock_data.json")
-	if mockDataBytes, err := os.ReadFile(mockDataFile); err == nil {
-		var mockData map[string]any
-		if err := json.Unmarshal(mockDataBytes, &mockData); err != nil {
-			return "", "", clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse mock_data.json for template %s", slug))
-		}
-		stored, err := mgmntClient.PatchTemplateMockData(workspace, slug, mockData)
-		if err != nil {
-			return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push mock data for template %s", slug))
-		}
-		warnDroppedMockData(slug, mockData, stored)
+	status, detail := pushStatus(plan, pushed, skipped, exists, opts.PushAll)
+	if !opts.Commit {
+		return status, detail, nil
 	}
+	commitStatus, commitDetail, err := commitTemplate(mgmntClient, workspace, slug, opts.CommitMessage, opts.SkipInvalid)
+	if err != nil {
+		return "", "", err
+	}
+	var notes []string
+	if len(pushed) > 0 && !opts.PushAll {
+		notes = append(notes, "pushed "+describeParts(pushed))
+	}
+	if commitDetail != "" {
+		notes = append(notes, commitDetail)
+	}
+	return commitStatus, strings.Join(notes, "; "), nil
+}
 
-	// Push variant order if present in template.json
-	if variantOrderRaw, ok := templateData["variant_order"]; ok && variantOrderRaw != nil {
-		flatOrder, ok := variantOrderRaw.(map[string]any)
-		if !ok {
-			return "", "", clierr.New(fmt.Sprintf("invalid variant_order format for template %s", slug), clierr.CodeFileParseFailed)
+// readMockData reads mock_data.json, or returns nil when there is none.
+func readMockData(templateDir string) (map[string]any, error) {
+	data, err := os.ReadFile(filepath.Join(templateDir, "mock_data.json"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var mockData map[string]any
+	if err := json.Unmarshal(data, &mockData); err != nil {
+		return nil, err
+	}
+	return mockData, nil
+}
+
+// variantOrderFromFile turns template.json's variant_order ("<channel>" or
+// "<channel>/<tenant>" mapped to variant ids) into the API's form.
+func variantOrderFromFile(raw any) (*mgmnt.VariantOrderResponse, error) {
+	flatOrder, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("variant_order is not an object")
+	}
+	channelMap := map[string]*mgmnt.VariantOrderChannel{}
+	var channels []string
+	for _, key := range sortedKeys(flatOrder) {
+		parts := strings.SplitN(key, "/", 2)
+		channel := parts[0]
+		var tenantIDPtr *string
+		if len(parts) == 2 {
+			t := parts[1]
+			tenantIDPtr = &t
 		}
-		channelMap := map[string]*mgmnt.VariantOrderChannel{}
-		for key, variantsRaw := range flatOrder {
-			parts := strings.SplitN(key, "/", 2)
-			channel := parts[0]
-			var tenantIDPtr *string
-			if len(parts) == 2 {
-				t := parts[1]
-				tenantIDPtr = &t
-			}
-			variants := []string{} // the API rejects null
-			if variantsList, ok := variantsRaw.([]any); ok {
-				for _, v := range variantsList {
-					if s, ok := v.(string); ok {
-						variants = append(variants, s)
-					}
+		variants := []string{} // the API rejects null
+		if variantsList, ok := flatOrder[key].([]any); ok {
+			for _, v := range variantsList {
+				if s, ok := v.(string); ok {
+					variants = append(variants, s)
 				}
 			}
-			if _, exists := channelMap[channel]; !exists {
-				channelMap[channel] = &mgmnt.VariantOrderChannel{Channel: channel}
-			}
-			channelMap[channel].Tenants = append(channelMap[channel].Tenants, mgmnt.VariantOrderTenant{
-				TenantID: tenantIDPtr,
-				Variants: variants,
-			})
 		}
-		// The API rejects null channels, so send [] for a template with no variants.
-		variantOrder := mgmnt.VariantOrderResponse{Channels: []mgmnt.VariantOrderChannel{}}
-		for _, ch := range channelMap {
-			variantOrder.Channels = append(variantOrder.Channels, *ch)
+		if _, exists := channelMap[channel]; !exists {
+			channelMap[channel] = &mgmnt.VariantOrderChannel{Channel: channel}
+			channels = append(channels, channel)
 		}
-		if err := mgmntClient.PostVariantOrder(workspace, slug, "draft", &variantOrder); err != nil {
-			return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push variant order for template %s", slug))
-		}
+		channelMap[channel].Tenants = append(channelMap[channel].Tenants, mgmnt.VariantOrderTenant{
+			TenantID: tenantIDPtr,
+			Variants: variants,
+		})
 	}
-
-	if !commit {
-		return utils.StatusPushed, "", nil
+	// The API rejects null channels, so send [] for a template with no variants.
+	order := &mgmnt.VariantOrderResponse{Channels: []mgmnt.VariantOrderChannel{}}
+	for _, ch := range channels {
+		order.Channels = append(order.Channels, *channelMap[ch])
 	}
-	return commitTemplate(mgmntClient, workspace, slug, commitMessage, skipInvalid)
+	return order, nil
 }
 
 // commitTemplate commits a template's draft and returns its report status and
@@ -242,7 +300,8 @@ var templatePushCmd = &cobra.Command{
 		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads the local template directories and reports the variants and channels that would be pushed. Nothing is validated server-side.",
 		"skills:tip.c-invalid": "With `--commit`, all changed variants are committed together, and one invalid variant fails the commit. `--skip-invalid` runs a pre-commit validation and commits only the variants that pass; the skipped ones are listed in the result. If every changed variant fails, nothing is committed and push exits non-zero; if nothing changed, the template is reported as `unchanged`.",
 		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking; `-F/--force` skips it on a TTY too.",
-		"skills:tip.e-result":  "Each template is reported on stdout as `pushed`, `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.e-result":  "Each template is reported on stdout as `created`, `updated` (the detail names the parts sent, such as `email/default` or `mock data`), `unchanged` (nothing differed from the workspace's draft, so nothing was sent; with `--commit`, the draft already matched live), `skipped` (see the state tip), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.f-state":   "A template is pushed in parts: its fields (name, description, tags, enabled_channels), each variant, mock data and variant order, and only the parts that differ from the workspace's draft are sent. Pull and push keep `.suprsend-state.json` in the templates directory (commit it with the files): what each part looked like, per workspace, at the last pull or push. A part changed only in the workspace since then (say, a variant edited in the dashboard) is skipped rather than overwritten, and named in the detail; with `--commit` that is an error, so nobody else's draft goes live unseen. A part changed on both sides fails the template as a conflict (code `api-conflict`) before anything is sent. Pull again to get the workspace's version, or pass `--overwrite` to push your copy anyway. Without a record for that workspace, every part that differs is sent.",
 	},
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -254,6 +313,7 @@ var templatePushCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 		skipInvalid, _ := cmd.Flags().GetBool("skip-invalid")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		overwrite, _ := cmd.Flags().GetBool("overwrite")
 
 		if skipInvalid && !commit {
 			return clierr.New("--skip-invalid only applies with --commit", clierr.CodeInvalidUsage)
@@ -281,6 +341,14 @@ var templatePushCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
+		opts := PushOptions{CommitMessage: commitMessage, Commit: commit, SkipInvalid: skipInvalid, DryRun: dryRun, Overwrite: overwrite}
+		if !dryRun {
+			st, err := state.Load(path)
+			if err != nil {
+				return err
+			}
+			opts.State = st
+		}
 		report := utils.NewReport("template push", workspace, dryRun)
 
 		if slug != "" {
@@ -290,8 +358,9 @@ var templatePushCmd = &cobra.Command{
 			}
 
 			spinner := utils.NewSpinner(fmt.Sprintf("Pushing template %s...", slug))
-			status, detail, err := PushTemplate(mgmntClient, workspace, slug, templateDir, commitMessage, commit, skipInvalid, dryRun)
+			status, detail, err := PushTemplate(mgmntClient, workspace, slug, templateDir, opts)
 			spinner.Stop("")
+			saveState(opts.State)
 			if err != nil {
 				report.Fail("templates/"+slug, err)
 				return report.Finish(err)
@@ -300,12 +369,13 @@ var templatePushCmd = &cobra.Command{
 			return report.Finish(nil)
 		}
 
-		entries, err := os.ReadDir(path)
+		entries, err := utils.ReadDir(path)
 		if err != nil {
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
 		var failures []string
+		var failedErrs []error
 		for _, entry := range entries {
 			if !entry.IsDir() {
 				continue
@@ -315,21 +385,22 @@ var templatePushCmd = &cobra.Command{
 			templateDir := filepath.Join(path, templateSlug)
 
 			spinner := utils.NewSpinner(fmt.Sprintf("Pushing template %s...", templateSlug))
-			status, detail, err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, commitMessage, commit, skipInvalid, dryRun)
+			status, detail, err := PushTemplate(mgmntClient, workspace, templateSlug, templateDir, opts)
 			spinner.Stop("")
 			if err != nil {
 				report.Fail("templates/"+templateSlug, err)
 				failures = append(failures, clierr.ItemFailure("templates/"+templateSlug, "failed to push", err))
+				failedErrs = append(failedErrs, err)
 				continue
 			}
 			report.Add("templates/"+templateSlug, status, detail)
 		}
 
+		saveState(opts.State)
 		if len(failures) > 0 {
-			code := clierr.CodeAPIInternal
+			code := clierr.FailuresCode(failedErrs)
 			summary := fmt.Sprintf("%d template(s) failed to push", len(failures))
-			if dryRun {
-				code = clierr.CodeFileParseFailed
+			if code == clierr.CodeFileParseFailed {
 				summary = fmt.Sprintf("%d template(s) failed local checks", len(failures))
 			}
 			return report.Finish(clierr.Failures(summary, failures, code))
@@ -345,6 +416,12 @@ func readTemplateVariants(templateDir string) ([]map[string]any, error) {
 	err := filepath.WalkDir(templateDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if path != templateDir && utils.IsHidden(d.Name()) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if d.IsDir() || d.Name() != "variant.json" {
 			return nil
@@ -388,5 +465,6 @@ func init() {
 	templatePushCmd.PersistentFlags().BoolP("force", "F", false, "Skip the confirmation prompt for --commit")
 	templatePushCmd.PersistentFlags().Bool("skip-invalid", false, "With --commit: commit only the variants that pass pre-commit validation and list the ones skipped")
 	templatePushCmd.PersistentFlags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
+	templatePushCmd.PersistentFlags().Bool("overwrite", false, "Push your copy of each part even when the workspace's version changed since the last pull or push, replacing that change")
 	TemplateCmd.AddCommand(templatePushCmd)
 }

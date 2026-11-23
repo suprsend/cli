@@ -19,6 +19,8 @@ const (
 	ConfigSourceFlag    ConfigSource = "flag"
 	ConfigSourceProfile ConfigSource = "profile"
 	ConfigSourceDefault ConfigSource = "default"
+	// ConfigSourceActive is the config file's active_profile (set by `profile use`).
+	ConfigSourceActive ConfigSource = "active_profile"
 )
 
 type ConfigString struct {
@@ -66,7 +68,8 @@ type Config struct {
 	BaseUrl       ConfigString
 	MgmntUrl      ConfigString
 	ProxyURL      ConfigString
-	// Profile is the active profile's name, empty when no config file is used.
+	// Profile is the name of the profile in use (--profile, SUPRSEND_PROFILE
+	// or the config file's active profile), empty when no config file is used.
 	Profile ConfigString
 	// Workspace is set by ResolveWorkspace for commands that take --workspace.
 	Workspace ConfigString
@@ -96,9 +99,13 @@ type FlagValues struct {
 	Verbosity    string
 	VerbositySet bool // -v was passed explicitly
 	ServiceToken string
+	Profile      string
 	NoColor      bool
 	Quiet        bool
 }
+
+// ProfileFlagHelp is the help text for the root --profile flag.
+const ProfileFlagHelp = "Profile to use, by `name` (default: $SUPRSEND_PROFILE, else the config file's active profile)"
 
 func GetResolvedServiceToken(flagToken string, activeProfile Profile) (ConfigString, error) {
 	if flagToken != "" {
@@ -162,6 +169,7 @@ func GetResolvedNoColor(flagNoColor bool) ConfigBool {
 
 // Resolve populates c with all flag-derived and env-var / profile-resolved values.
 // Priority varies by field:
+//   - Profile: flag > env (SUPRSEND_PROFILE) > the config file's active profile
 //   - ServiceToken: flag > env > profile (no default — errors if unset)
 //   - Workspace: flag > env > profile > default, resolved per command by ResolveWorkspace
 //   - BaseUrl, MgmntUrl: env > profile > default
@@ -175,19 +183,33 @@ func (c *Config) Resolve(flags FlagValues) error {
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot read config file %s", flags.CfgFile))
 		}
 	}
+	requested := ConfigString{Value: flags.Profile, Source: ConfigSourceFlag}
+	if requested.Value == "" {
+		requested = ConfigString{Value: os.Getenv("SUPRSEND_PROFILE"), Source: ConfigSourceEnv}
+	}
+	c.Profile = ConfigString{}
 	var activeProfile Profile
 	if configPath := GetConfigFilePath(); configPath != "" {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
-			activeProfile = cfg.Profiles[cfg.ActiveProfile]
-			if cfg.ActiveProfile != "" {
-				c.Profile = ConfigString{Value: cfg.ActiveProfile, Source: ConfigSourceProfile}
+			c.Profile = ConfigString{Value: cfg.ActiveProfile, Source: ConfigSourceActive}
+			if requested.Value != "" {
+				if _, ok := cfg.Profiles[requested.Value]; !ok {
+					return profileNotFound(requested, configPath)
+				}
+				c.Profile = requested
 			}
+			activeProfile = cfg.Profiles[c.Profile.Value]
 			log.Debug("Using config file:", configPath)
 		} else if flags.CfgFile != "" {
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot parse config file %s", configPath))
+		} else if requested.Value != "" {
+			return profileNotFound(requested, configPath)
 		} else {
 			log.Debugf("failed to load config file %s: %v", configPath, err)
 		}
+	}
+	if c.Profile.Value == "" {
+		c.Profile = ConfigString{}
 	}
 
 	c.profileWorkspace = activeProfile.Workspace.Value
@@ -211,6 +233,25 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.ServiceToken = token
 
 	return nil
+}
+
+// profileNotFound is the error for a --profile or SUPRSEND_PROFILE that names
+// no profile in the config file.
+func profileNotFound(requested ConfigString, configPath string) error {
+	from := "--profile"
+	if requested.Source == ConfigSourceEnv {
+		from = "SUPRSEND_PROFILE"
+	}
+	return clierr.New(fmt.Sprintf("profile %q (from %s) not found in %s", requested.Value, from, configPath), clierr.CodeConfigInvalid).
+		WithHint("run `suprsend profile list` to see the profiles, or `suprsend profile add` to create one")
+}
+
+// RequireWorkspace reports whether SUPRSEND_REQUIRE_WORKSPACE is set to a
+// true value: then a write that would fall back to the default workspace
+// (and a sync without --from and --to) is an error instead of a warning.
+func RequireWorkspace() bool {
+	v, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("SUPRSEND_REQUIRE_WORKSPACE")))
+	return v
 }
 
 // WorkspaceFlagHelp is the help text for every --workspace flag.

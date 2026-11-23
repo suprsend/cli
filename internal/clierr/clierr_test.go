@@ -43,3 +43,23 @@ func TestItemFailureDoesNotRepeatResource(t *testing.T) {
 		}
 	}
 }
+
+// A run whose failures were all local checks exits 2, like --dry-run; one
+// API failure makes it exit 1.
+func TestFailuresCode(t *testing.T) {
+	local := New("bad json", CodeFileParseFailed)
+	missing := New("no file", CodeFileNotFound)
+	api := New("rejected", CodeAPIValidation)
+	if got := FailuresCode([]error{local, missing}); got != CodeFileParseFailed {
+		t.Errorf("local failures: code %s, want %s", got, CodeFileParseFailed)
+	}
+	if got := FailuresCode([]error{local, api}); got != CodeAPIInternal {
+		t.Errorf("mixed failures: code %s, want %s", got, CodeAPIInternal)
+	}
+	if got := FailuresCode([]error{errors.New("plain")}); got != CodeAPIInternal {
+		t.Errorf("unclassified failure: code %s, want %s", got, CodeAPIInternal)
+	}
+	if api.ExitCode() != ExitGeneralError {
+		t.Errorf("API validation exits %d, want %d", api.ExitCode(), ExitGeneralError)
+	}
+}

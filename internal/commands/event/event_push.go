@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 )
 
 var eventPushCmd = &cobra.Command{
@@ -28,8 +29,9 @@ var eventPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend event push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-results": "The API saves the valid events and reports each event separately. Each event is reported on stdout as `pushed` or `failed`; rejected events (for example a `payload_schema` that names a schema or `version_no` that does not exist or is not live in the workspace) are listed by name and the command exits 1; the other events are still saved. With `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.a-results": "Push first lists the workspace's events and sends only the ones that are new or differ (by name, description and payload_schema). The API saves the valid events and reports each event separately. Each event is reported on stdout as `created`, `updated`, `unchanged` (not sent) or `failed`; rejected events (for example a `payload_schema` that names a schema or `version_no` that does not exist or is not live in the workspace) are listed by name and the command exits 1; the other events are still saved. With `-o json` the result is one JSON object with `items` and `counts`.",
 		"skills:tip.b-names":   "The API stores event names in upper case: `Order_Placed` is saved, triggered and pulled as `ORDER_PLACED`.",
+		"skills:tip.c-rename":  "There is no rename: changing `name` in a pulled `event.json` and pushing creates a **new** event next to the old one, and workflows triggered by the old name keep using it. Push warns when a file's `name` no longer matches its directory.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -79,20 +81,35 @@ var eventPushCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner("Pushing events...")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		records, err := mgmntClient.PushEventsFromPayload(workspace, payload)
+		statuses, toSend, err := planEvents(mgmntClient, workspace, eventsArr)
+		if err != nil {
+			spinner.Stop("")
+			return report.Finish(err)
+		}
+		var records []mgmnt.EventPushRecord
+		if len(toSend) > 0 {
+			payload["events"] = toSend
+			records, err = mgmntClient.PushEventsFromPayload(workspace, payload)
+		}
 		spinner.Stop("")
 		if err != nil {
 			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
 		}
+		sent := 0 // index into toSend and records
 		for i := range eventsArr {
 			name := "events/" + EventName(eventsArr, i)
-			if i < len(records) && records[i].Failed() {
-				report.Fail(name, errors.New(RecordMessage(records[i])))
-			} else {
-				report.Add(name, utils.StatusPushed, "")
+			if statuses[i] == utils.StatusUnchanged {
+				report.Add(name, utils.StatusUnchanged, "")
+				continue
 			}
+			if sent < len(records) && records[sent].Failed() {
+				report.Fail(name, errors.New(RecordMessage(records[sent])))
+			} else {
+				report.Add(name, statuses[i], "")
+			}
+			sent++
 		}
-		return report.Finish(PushFailures(eventsArr, records))
+		return report.Finish(PushFailures(toSend, records))
 	},
 }
 

@@ -136,9 +136,9 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		result := resp.Result().(*CategoryPushResponse)
 		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
 			return NotCommitted, clierr.New(fmt.Sprintf("preference_categories: saved as draft but not committed: categories are invalid: %v", result.ValidationResult.Errors),
-				clierr.CodeSchemaValidation).WithResource("preference_categories")
+				clierr.CodeAPIValidation).WithResource("preference_categories")
 		}
-		return commitError("preference_categories", result.CommitResult, clierr.CodeAPIConflict)
+		return commitError("preference_categories", result.CommitResult, clierr.CodeAPIConflict, nil)
 	}
 	return NotCommitted, nil
 }

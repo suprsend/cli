@@ -13,7 +13,7 @@ import (
 var translationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List translations",
-	Long:  "List template translation files in a workspace. Returns translation file names and metadata. Use --mode to switch between draft and live versions.",
+	Long:  "List the template translation files in a workspace: all of them unless --limit is given. Returns translation file names and metadata. Use --mode to switch between draft and live versions.",
 	Example: `  # List all translations (live mode)
   suprsend translation list
 
@@ -48,13 +48,14 @@ var translationListCmd = &cobra.Command{
 			return nil
 		}
 		utils.OutputData(translations.Results, outputType)
+		utils.NoteMoreResults("translation files", len(translations.Results), offset, translations.Meta.Count)
 		return nil
 	},
 }
 
 func init() {
 	translationListCmd.Flags().String("include-content", "false", "Include translation file content in the response (true/false)")
-	translationListCmd.Flags().IntP("limit", "l", 20, "Maximum number of translations to return")
+	translationListCmd.Flags().IntP("limit", "l", 0, utils.LimitFlagHelp("translation files"))
 	translationListCmd.Flags().Int("offset", 0, "Number of translations to skip for pagination")
 	translationListCmd.Flags().StringP("mode", "m", "live", "Version mode: draft or live")
 	translationListCmd.Flags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")

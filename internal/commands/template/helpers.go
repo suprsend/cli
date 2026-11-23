@@ -146,17 +146,7 @@ func writeOneTemplate(tmpl TemplateResult, outputDir string, stats *TemplateWrit
 		"enabled_channels": tmpl.EnabledChannels,
 	}
 	if tmpl.VariantOrder != nil {
-		flatOrder := map[string][]string{}
-		for _, ch := range tmpl.VariantOrder.Channels {
-			for _, tenant := range ch.Tenants {
-				key := ch.Channel
-				if tenant.TenantID != nil {
-					key = ch.Channel + "/" + *tenant.TenantID
-				}
-				flatOrder[key] = tenant.Variants
-			}
-		}
-		templateData["variant_order"] = flatOrder
+		templateData["variant_order"] = flattenVariantOrder(tmpl.VariantOrder)
 	}
 	templateJSON, err := json.MarshalIndent(templateData, "", "  ")
 	if err != nil {
@@ -243,7 +233,23 @@ func selectValidVariants(resp *mgmnt.PreCommitValidateResponse, slug string) (va
 	}
 	if len(valid) == 0 {
 		return nil, skipped, clierr.New(fmt.Sprintf("templates/%s: all %d changed variant(s) failed pre-commit validation; nothing committed", slug, len(skipped)),
-			clierr.CodeSchemaValidation).WithResource("templates/" + slug)
+			clierr.CodeAPIValidation).WithResource("templates/" + slug)
 	}
 	return valid, skipped, nil
+}
+
+// flattenVariantOrder turns the API's variant order into template.json's
+// form: "<channel>" or "<channel>/<tenant>" mapped to variant ids.
+func flattenVariantOrder(order *mgmnt.VariantOrderResponse) map[string][]string {
+	flat := map[string][]string{}
+	for _, ch := range order.Channels {
+		for _, tenant := range ch.Tenants {
+			key := ch.Channel
+			if tenant.TenantID != nil {
+				key = ch.Channel + "/" + *tenant.TenantID
+			}
+			flat[key] = tenant.Variants
+		}
+	}
+	return flat
 }

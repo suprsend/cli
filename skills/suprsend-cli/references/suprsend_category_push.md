@@ -30,7 +30,7 @@ suprsend category push [flags]
 - Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.
 - `--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and reports counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.
 - The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.
-- The result lists each translation locale and then `preference_categories` as `pushed` (draft only), `committed`, `unchanged` (the draft already matched live) or `failed`, followed by a summary; with `-o json` it is one JSON object with `items` and `counts`.
+- The result lists each translation locale and then `preference_categories` as `updated` (saved as draft), `unchanged` (the draft already matches `categories.json`, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`; locales are `created`, `updated` or `unchanged` the same way, followed by a summary; with `-o json` it is one JSON object with `items` and `counts`.
 
 ### Options
 
@@ -50,7 +50,8 @@ suprsend category push [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
   -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)

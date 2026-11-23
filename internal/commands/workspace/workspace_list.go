@@ -20,7 +20,7 @@ type WorkspaceTableRow struct {
 var workspaceListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List workspaces",
-	Long:  "List all SuprSend workspaces accessible with the current service token. Returns workspace name, slug, mode, and description.",
+	Long:  "List the SuprSend workspaces the current service token can reach: all of them unless --limit is given. Returns workspace name, slug, mode, and description.",
 	Example: `  # List workspaces
   suprsend workspace list
 
@@ -65,11 +65,12 @@ var workspaceListCmd = &cobra.Command{
 		}
 
 		utils.OutputData(rows, outputType)
+		utils.NoteMoreResults("workspaces", len(rows), offset, workspaces.Meta.Count)
 		return nil
 	},
 }
 
 func init() {
-	workspaceListCmd.Flags().IntP("limit", "l", 20, "Maximum number of workspaces to return")
+	workspaceListCmd.Flags().IntP("limit", "l", 0, utils.LimitFlagHelp("workspaces"))
 	workspaceListCmd.Flags().Int("offset", 0, "Number of workspaces to skip for pagination")
 }

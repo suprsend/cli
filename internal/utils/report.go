@@ -15,8 +15,10 @@ import (
 // Item statuses used in a Report.
 const (
 	StatusPushed      = "pushed"       // saved as draft
+	StatusCreated     = "created"      // saved as draft; it didn't exist in the workspace
+	StatusUpdated     = "updated"      // saved as draft over a different one
 	StatusCommitted   = "committed"    // promoted to live
-	StatusUnchanged   = "unchanged"    // commit requested, but the draft already matched live
+	StatusUnchanged   = "unchanged"    // nothing to push, or nothing to commit (the draft already matched live)
 	StatusPulled      = "pulled"       // written to a local file
 	StatusWouldPush   = "would-push"   // --dry-run
 	StatusWouldCommit = "would-commit" // --dry-run
@@ -96,8 +98,10 @@ func hostOf(rawURL string) string {
 	return rawURL
 }
 
+// pretty reports whether results print line by line. -q doesn't change
+// that: it hides the header and warnings, never the results.
 func (r *Report) pretty() bool {
-	return config.Cfg.OutputType.Value != "json" && config.Cfg.OutputType.Value != "yaml" && !config.Cfg.Quiet.Value
+	return config.Cfg.OutputType.Value != "json" && config.Cfg.OutputType.Value != "yaml"
 }
 
 func (r *Report) println(s string) {
@@ -105,7 +109,7 @@ func (r *Report) println(s string) {
 }
 
 func (r *Report) printHeader(target string) {
-	if !r.pretty() {
+	if !r.pretty() || config.Cfg.Quiet.Value {
 		return
 	}
 	line := r.Command
@@ -158,7 +162,7 @@ func statusLabel(status string) string {
 	switch status {
 	case StatusFailed:
 		return color.RedString(label)
-	case StatusCommitted, StatusPushed, StatusPulled, StatusEnabled, StatusDisabled, StatusTriggered, StatusGenerated:
+	case StatusCommitted, StatusPushed, StatusCreated, StatusUpdated, StatusPulled, StatusEnabled, StatusDisabled, StatusTriggered, StatusGenerated:
 		return color.GreenString(label)
 	case StatusSkipped:
 		return color.YellowString(label)
@@ -183,11 +187,10 @@ func (r *Report) Finish(err error) error {
 		OutputData(r, config.Cfg.OutputType.Value)
 		return err
 	}
-	if config.Cfg.Quiet.Value {
-		return err
-	}
-	for _, w := range r.Warnings {
-		r.println("warning: " + w)
+	if !config.Cfg.Quiet.Value {
+		for _, w := range r.Warnings {
+			r.println("warning: " + w)
+		}
 	}
 	r.println(r.summary())
 	return err

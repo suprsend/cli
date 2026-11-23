@@ -57,30 +57,45 @@ const (
 )
 
 // commitError turns a failed commit_result into a CLI error. "No uncommitted
-// changes" means the draft already matches live, so it is not a failure.
-func commitError(resource string, cr *CommitResult, code string) (CommitStatus, error) {
+// changes" means the draft already matches live, so it is not a failure. def
+// is the definition that was pushed, used to say where a missing field is
+// (nil when not known).
+func commitError(resource string, cr *CommitResult, code string, def any) (CommitStatus, error) {
 	if cr == nil || cr.IsCommitted {
 		return Committed, nil
 	}
 	msgs := make([]string, 0, len(cr.Errors))
 	for _, e := range cr.Errors {
-		msgs = append(msgs, describeCommitError(fmt.Sprint(e)))
+		msgs = append(msgs, describeCommitError(fmt.Sprint(e), def))
 	}
 	msg := strings.Join(msgs, "; ")
 	if isNoChanges(msg) {
 		log.Debugf("%s: no changes to commit", resource)
 		return NoChanges, nil
 	}
-	return NotCommitted, clierr.New(fmt.Sprintf("%s: saved as draft but not committed: %s", resource, msg), code).
+	return NotCommitted, clierr.New(fmt.Sprintf("%s: %s: %s", resource, draftSavedMarker, msg), code).
 		WithResource(resource)
+}
+
+// draftSavedMarker is in the error of a push that saved the draft but whose
+// commit failed.
+const draftSavedMarker = "saved as draft but not committed"
+
+// DraftSaved reports whether err is from a push that saved the draft but
+// didn't commit it, so the draft now holds what was pushed.
+func DraftSaved(err error) bool {
+	return err != nil && strings.Contains(err.Error(), draftSavedMarker)
 }
 
 // bareFieldName matches a commit error that is only a quoted field name, such
 // as 'variable_ns': the API's way of saying a required field is missing.
 var bareFieldName = regexp.MustCompile(`^'([A-Za-z_][A-Za-z0-9_.]*)'$`)
 
-func describeCommitError(msg string) string {
+func describeCommitError(msg string, def any) string {
 	if m := bareFieldName.FindStringSubmatch(strings.TrimSpace(msg)); m != nil {
+		if paths := missingFieldPaths(def, m[1]); len(paths) > 0 {
+			return fmt.Sprintf("required field %q is missing at %s", m[1], describePaths(paths))
+		}
 		return fmt.Sprintf("required field %q is missing somewhere in the definition (the API doesn't say where)", m[1])
 	}
 	return msg

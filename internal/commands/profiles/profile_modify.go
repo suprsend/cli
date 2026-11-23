@@ -25,7 +25,7 @@ var profilesModifyCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
-		cfg, path, err := EnsureConfig(path)
+		cfg, path, err := EnsureConfig(path, false)
 		if err != nil {
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
 		}

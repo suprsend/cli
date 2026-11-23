@@ -36,38 +36,49 @@ type Event struct {
 	CreatedAt     string                 `json:"created_at"`
 }
 
+// ListEvents lists a workspace's events, starting at offset: limit of them,
+// or all of them when limit <= 0. Meta.Count is the total the API reports.
 func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListEventsResponse, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]Event, int, error) {
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
+		u.RawQuery = q.Encode()
+		log.Debugf("Getting events for workspace: %s, limit: %d, offset: %d", workspace, limit, offset)
+		res, err := client.R().
+			SetDebug(c.debug).
+			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+			SetResult(&ListEventsResponse{}).
+			Get(u.String())
+		if err != nil {
+			return nil, 0, fmt.Errorf("request failed: %w", err)
+		}
+		if res.IsError() {
+			return nil, 0, apiError(res)
+		}
+		page := res.Result().(*ListEventsResponse)
+		return page.Results, page.Meta.Count, nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing url: %w", err)
-	}
-	q := u.Query()
-	q.Add("limit", strconv.Itoa(limit))
-	q.Add("offset", strconv.Itoa(offset))
-	u.RawQuery = q.Encode()
-	urlStr = u.String()
-	log.Debugf("Getting Events for workspace: %s", workspace)
-	res, err := client.R().
-		SetDebug(c.debug).
-		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
-		SetResult(&ListEventsResponse{}).
-		Get(urlStr)
-	if err != nil {
-		log.Errorf("Error getting events: %s", err)
 		return nil, err
 	}
-	if res.IsError() {
-		return nil, apiError(res)
-	}
-	events := res.Result().(*ListEventsResponse)
-	return events, nil
+
+	resp := &ListEventsResponse{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {

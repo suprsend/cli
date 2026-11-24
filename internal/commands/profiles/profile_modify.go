@@ -76,7 +76,7 @@ var profilesModifyCmd = &cobra.Command{
 			if !utils.IsInputInteractive() {
 				return clierr.New("required flags missing (--name and a field to change), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
 			}
-			runModifyInteractive(cfg, path)
+			runModifyInteractive(cfg, path, workspaceSet)
 		}
 		return nil
 	},
@@ -91,7 +91,10 @@ func init() {
 	ProfileCmd.AddCommand(profilesModifyCmd)
 }
 
-func runModifyInteractive(cfg *config.ProfileConfig, path string) {
+// runModifyInteractive prompts for the fields that weren't given as flags.
+// workspaceSet says --workspace was passed: its value (already normalized,
+// "" to remove the workspace) is then used as is, without a prompt.
+func runModifyInteractive(cfg *config.ProfileConfig, path string, workspaceSet bool) {
 	var profileNames []string
 	for name := range cfg.Profiles {
 		profileNames = append(profileNames, name)
@@ -195,29 +198,31 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 		})
 	}
 
-	modifyWorkspace = selectedProfile.Workspace.Value
-	current := modifyWorkspace
-	if current == "" {
-		current = "none"
+	if !workspaceSet {
+		modifyWorkspace = selectedProfile.Workspace.Value
+		current := modifyWorkspace
+		if current == "" {
+			current = "none"
+		}
+		questions = append(questions, question{
+			Text: fmt.Sprintf("Default workspace [%s] (Enter keeps it, \"-\" removes it): ", current),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				switch s {
+				case "":
+					return nil
+				case "-":
+					modifyWorkspace = ""
+					return nil
+				}
+				ws, err := normalizeProfileWorkspace(s)
+				if err == nil {
+					modifyWorkspace = ws
+				}
+				return err
+			},
+		})
 	}
-	questions = append(questions, question{
-		Text: fmt.Sprintf("Default workspace [%s] (Enter keeps it, \"-\" removes it): ", current),
-		Handler: func(s string) error {
-			s = cleanInput(s)
-			switch s {
-			case "":
-				return nil
-			case "-":
-				modifyWorkspace = ""
-				return nil
-			}
-			ws, err := normalizeProfileWorkspace(s)
-			if err == nil {
-				modifyWorkspace = ws
-			}
-			return err
-		},
-	})
 
 	if err := ask(questions); err != nil {
 		log.Error(err)

@@ -26,7 +26,10 @@ type RootCategory struct {
 }
 
 type Section struct {
-	Name              string     `json:"name"`
+	Name string `json:"name"`
+	// Slug is the section identity. Empty is omitted.
+	// Push derives a missing slug from Name, so a rename must still send the stored slug.
+	Slug              string     `json:"slug,omitempty"`
 	Description       string     `json:"description"`
 	Tags              []string   `json:"tags"`
 	Categories        []Category `json:"categories"`
@@ -35,7 +38,9 @@ type Section struct {
 }
 
 type Category struct {
-	Category                 string   `json:"category"`
+	// Category is the category identity. Empty is omitted.
+	// Push derives a missing slug from Name, so a rename must still send the stored slug.
+	Category                 string   `json:"category,omitempty"`
 	Name                     string   `json:"name"`
 	Description              string   `json:"description"`
 	DefaultPreference        string   `json:"default_preference"`

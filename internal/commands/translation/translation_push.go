@@ -187,6 +187,12 @@ func draftFingerprints(client *mgmnt.SS_MgmntClient, workspace string) (map[stri
 		if !ok {
 			continue
 		}
+		// A file deleted in the draft is still listed, marked "deleted". It
+		// must count as missing: an equal local file would otherwise be
+		// "unchanged", and a commit would then delete it from live.
+		if action, _ := obj["action"].(string); action == "deleted" {
+			continue
+		}
 		if name, _ := obj["filename"].(string); name != "" {
 			fps[name] = state.Fingerprint(obj["content"])
 		}

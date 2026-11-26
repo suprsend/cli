@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
@@ -20,19 +21,88 @@ var workflowIgnore = []string{
 }
 
 func fingerprint(wf map[string]any) string {
-	return state.Fingerprint(wf, workflowIgnore...)
+	return state.Fingerprint(sortChannels(wf), workflowIgnore...)
 }
 
-// RecordPulled records a workflow just written by pull: the file and the
-// workspace hold the same definition.
-func RecordPulled(st *state.File, workspace string, wf map[string]any) {
+// setFields are the node properties the API keeps as sets (it stores
+// list(set(...)) and re-saves nodes on a draft read), so their order differs
+// between two reads of the same workflow and isn't a change. That includes
+// routing_channels_sequence, whose order the API does not preserve either.
+var setFields = []string{"channels", "mandatory_channels", "routing_channels_sequence", "user_selection"}
+
+// sortChannels returns v with those node properties, and the workflow's
+// trigger_events, sorted. v is not modified.
+func sortChannels(v any) any {
+	out := sortSets(v)
+	if wf, ok := out.(map[string]any); ok {
+		sortStrings(wf, "trigger_events")
+	}
+	return out
+}
+
+func sortSets(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, val := range t {
+			out[k] = sortSets(val)
+		}
+		if _, isNode := out["node_type"]; isNode {
+			if props, ok := out["properties"].(map[string]any); ok {
+				for _, f := range setFields {
+					sortStrings(props, f)
+				}
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, val := range t {
+			out[i] = sortSets(val)
+		}
+		return out
+	}
+	return v
+}
+
+// sortStrings replaces m[key] with a sorted copy when it is a list of strings.
+func sortStrings(m map[string]any, key string) {
+	list, ok := m[key].([]any)
+	if !ok {
+		return
+	}
+	for _, item := range list {
+		if _, ok := item.(string); !ok {
+			return
+		}
+	}
+	sorted := append([]any(nil), list...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].(string) < sorted[j].(string) })
+	m[key] = sorted
+}
+
+// RecordPulled records a workflow just written by pull. draft is the
+// workspace's draft of it, which is what push compares with; pass nil when
+// wf is the draft, or when the draft couldn't be fetched. A draft that
+// differs from the pulled live version is marked pending: it holds changes
+// the file doesn't have.
+func RecordPulled(st *state.File, workspace string, wf, draft map[string]any) {
 	slug, _ := wf["slug"].(string)
 	if slug == "" {
 		return
 	}
 	fp := fingerprint(wf)
-	st.Set(workspace, slug, state.Entry{Remote: fp, Local: fp})
+	entry := state.Entry{Remote: fp, Local: fp}
+	if draft != nil {
+		entry.Remote = fingerprint(draft)
+		entry.Pending = entry.Remote != fp
+	}
+	st.Set(workspace, slug, entry)
 }
+
+// pendingNote says why a workflow whose draft holds unpulled changes was
+// left alone.
+const pendingNote = "the workspace's draft has changes that aren't in the file (it was pulled from live); pull with --mode draft to see them, or pass --overwrite to replace them"
 
 // draftFingerprint fingerprints the workspace's draft of slug, or returns ""
 // when the workspace has no such workflow.
@@ -76,6 +146,11 @@ func pushOne(client *mgmnt.SS_MgmntClient, workspace, slug string, wf map[string
 
 	switch action := state.Decide(local, remote, base, hasBase, opts.overwrite); action {
 	case state.Conflict:
+		if hasBase && base.Pending && remote == base.Remote {
+			return "", "", clierr.New(fmt.Sprintf("%s: changed locally, and the draft in workspace %q has changes that aren't in the file (it was pulled from live)", resource, workspace), clierr.CodeAPIConflict).
+				WithResource(resource).
+				WithHint("copy your edit, pull with --mode draft to get the draft, and reapply it; or pass --overwrite to replace the draft with your copy")
+		}
 		return "", "", conflictError(resource, workspace, remote == "")
 	case state.Skip:
 		if opts.commit {
@@ -84,6 +159,13 @@ func pushOne(client *mgmnt.SS_MgmntClient, workspace, slug string, wf map[string
 				WithHint("pull it to see the change before committing, or pass --overwrite to push and commit your copy")
 		}
 		return utils.StatusSkipped, skipReason(workspace, remote == "") + "; pull to update the file, or pass --overwrite", nil
+	case state.Pending:
+		// Nothing changed since the pull. The draft is someone's pending
+		// work: don't replace it with the live version, and don't commit it.
+		if opts.commit {
+			return utils.StatusUnchanged, "not committed: " + pendingNote, nil
+		}
+		return utils.StatusUnchanged, pendingNote, nil
 	case state.Unchanged:
 		opts.state.Set(workspace, slug, state.Entry{Remote: remote, Local: local})
 		if !opts.commit {

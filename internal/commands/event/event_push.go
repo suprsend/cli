@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 
@@ -81,10 +82,15 @@ var eventPushCmd = &cobra.Command{
 
 		spinner := utils.NewSpinner("Pushing events...")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		statuses, toSend, err := planEvents(mgmntClient, workspace, eventsArr)
+		statuses, toSend, unlink, err := planEvents(mgmntClient, workspace, eventsArr)
 		if err != nil {
 			spinner.Stop("")
 			return report.Finish(err)
+		}
+		for _, name := range unlink {
+			if err := mgmntClient.DelinkEventSchema(workspace, name); err != nil {
+				log.Warnf("events/%s: couldn't remove its schema link: %v; the event may still be validated against the old schema", name, err)
+			}
 		}
 		var records []mgmnt.EventPushRecord
 		if len(toSend) > 0 {

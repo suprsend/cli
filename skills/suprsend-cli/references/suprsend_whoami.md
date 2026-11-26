@@ -7,7 +7,9 @@ Print where commands will go: the profile (and where it came from:
 the workspace a command would use (and where that value came from: -w,
 SUPRSEND_WORKSPACE, the profile, or the built-in default), and where the
 service token came from. The token itself is never printed. With --check, it
-also calls the API to confirm the token works and the workspace exists.
+also calls the API to confirm the token works and the workspace exists. When
+no workspace is set anywhere, --check confirms the token only: it does not
+check the built-in default, so pass -w to check the workspace you mean.
 
 ```
 suprsend whoami [flags]
@@ -28,12 +30,12 @@ suprsend whoami [flags]
 
 ### Tips
 
-- Run `suprsend whoami --check -o json` before writing to a workspace: it shows the host, profile and workspace commands will use without reading the config file (which holds tokens), and fails if the token is invalid or the workspace doesn't exist.
+- Run `suprsend whoami --check -w <workspace> -o json` before writing to a workspace: it shows the host, profile and workspace commands will use without reading the config file (which holds tokens), and fails if the token is invalid or the workspace doesn't exist. Always pass `-w` (or have `SUPRSEND_WORKSPACE` set): with no workspace set, only the token is checked (`workspace_checked` is false) and `workspace_source` is `default`.
 
 ### Options
 
 ```
-      --check              Also call the API to confirm the token works and the workspace exists
+      --check              Also call the API to confirm the token works and the workspace exists (the token only, when no workspace is set)
   -h, --help               help for whoami
   -w, --workspace string   Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```

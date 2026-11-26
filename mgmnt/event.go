@@ -220,3 +220,24 @@ func parseEventPushRecords(body []byte) []EventPushRecord {
 	}
 	return wrapped.Records
 }
+
+// DelinkEventSchema removes an event's schema link. The bulk push clears
+// payload_schema but can leave the link record behind (when no event in the
+// request has a schema), and that record is what validation uses.
+func (c *SS_MgmntClient) DelinkEventSchema(workspace, eventName string) error {
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr := fmt.Sprintf("%sv1/%s/event/%s/delink_schema/", c.mgmnt_base_URL, workspace, url.PathEscape(eventName))
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		Patch(urlStr)
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		return apiError(resp)
+	}
+	return nil
+}

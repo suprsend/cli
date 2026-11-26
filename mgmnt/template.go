@@ -215,11 +215,16 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 	return Committed, nil
 }
 
-func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string]any, error) {
+// GetTemplateMockData returns the mock data of the template's draft or live
+// version: each version has its own, and a commit copies draft to live.
+func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug, mode string) (map[string]any, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
+	if mode != "live" {
+		mode = "draft"
+	}
+	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
 
 	log.Debugf("Getting mock data for template: %s, workspace: %s", slug, workspace)
 	resp, err := client.R().
@@ -267,7 +272,7 @@ func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData 
 	if resp.IsError() {
 		return nil, apiError(resp)
 	}
-	stored, err := c.GetTemplateMockData(workspace, slug)
+	stored, err := c.GetTemplateMockData(workspace, slug, "draft")
 	if err != nil {
 		// The save worked; only the check of what was stored can't run.
 		log.Debugf("templates/%s: couldn't read back mock data: %v", slug, err)

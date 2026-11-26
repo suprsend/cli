@@ -30,7 +30,7 @@ var workflowPullCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-overwrite": "Pull overwrites `<dir>/<slug>/workflow.json` for every pulled slug without asking, so commit or stash local edits first. `--force` does not affect overwriting: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/workflows` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
-		"skills:tip.c-state":     "Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the workflows.",
+		"skills:tip.c-state":     "Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the workflows. The record is of the workspace's **draft** (one more request per workflow list, since push compares with the draft), so a draft that differs from the live version you pulled isn't mistaken for a later change.",
 	},
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -89,6 +89,7 @@ var workflowPullCmd = &cobra.Command{
 		if err != nil {
 			return report.Finish(clierr.Wrap(err, clierr.CodeFileParseFailed, ""))
 		}
+		drafts := draftsBySlug(mgmntClient, workspace, mode)
 		written := map[string]bool{}
 		for _, s := range stats.Written {
 			written[s] = true
@@ -96,7 +97,7 @@ var workflowPullCmd = &cobra.Command{
 		for _, wf := range workflows_resp.Results {
 			if obj, ok := wf.(map[string]any); ok {
 				if s, _ := obj["slug"].(string); written[s] {
-					RecordPulled(st, workspace, obj)
+					RecordPulled(st, workspace, obj, drafts[s])
 				}
 			}
 		}
@@ -131,8 +132,42 @@ func pullOneWorkflow(mgmntClient *mgmnt.SS_MgmntClient, workspace, mode, slug, o
 	if err := os.WriteFile(filepath.Join(slugDir, "workflow.json"), append(workflowJson, '\n'), 0o644); err != nil {
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
 	}
-	RecordPulled(st, workspace, *workflowResp)
+	var draft map[string]any
+	if mode != "draft" {
+		// Push compares with the draft, so record that. Without it, the
+		// record falls back to the pulled version.
+		if d, err := mgmntClient.GetWorkflowDetailBySlug(workspace, slug, "draft"); err == nil && d != nil {
+			draft = *d
+		} else {
+			log.Debugf("workflows/%s: couldn't fetch the draft to record: %v", slug, err)
+		}
+	}
+	RecordPulled(st, workspace, *workflowResp, draft)
 	return nil
+}
+
+// draftsBySlug returns the workspace's draft of every workflow, for the
+// state file: push compares with drafts, whatever mode was pulled. It is
+// empty when mode is already draft, or when the drafts can't be listed (the
+// record then falls back to the pulled versions).
+func draftsBySlug(mgmntClient *mgmnt.SS_MgmntClient, workspace, mode string) map[string]map[string]any {
+	drafts := map[string]map[string]any{}
+	if mode == "draft" {
+		return drafts
+	}
+	resp, err := mgmntClient.GetWorkflows(workspace, "draft")
+	if err != nil || resp == nil {
+		log.Debugf("couldn't list draft workflows to record: %v", err)
+		return drafts
+	}
+	for _, wf := range resp.Results {
+		if obj, ok := wf.(map[string]any); ok {
+			if s, _ := obj["slug"].(string); s != "" {
+				drafts[s] = obj
+			}
+		}
+	}
+	return drafts
 }
 
 func init() {

@@ -30,6 +30,14 @@ func TestDecide(t *testing.T) {
 		{"overwrite a skip", "l0", "r1", base, true, true, Update},
 		{"overwrite a deletion", "l0", "", base, true, true, Create},
 		{"overwrite, same", "l1", "l1", base, true, true, Unchanged},
+		// #34: pulled from live while the draft differed; nothing changed since.
+		{"pending draft, untouched", "l0", "r0", Entry{Remote: "r0", Local: "l0", Pending: true}, true, false, Pending},
+		{"pending draft, edited locally", "l1", "r0", Entry{Remote: "r0", Local: "l0", Pending: true}, true, false, Conflict},
+		{"pending draft, draft changed again", "l0", "r1", Entry{Remote: "r0", Local: "l0", Pending: true}, true, false, Skip},
+		{"pending draft, overwrite", "l0", "r0", Entry{Remote: "r0", Local: "l0", Pending: true}, true, true, Update},
+		{"pending deletion, untouched", "l0", "", Entry{Local: "l0", Pending: true}, true, false, Pending},
+		{"pending deletion, edited locally", "l1", "", Entry{Local: "l0", Pending: true}, true, false, Conflict},
+		{"pending draft, now equal", "l0", "l0", Entry{Remote: "r0", Local: "l0", Pending: true}, true, false, Unchanged},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

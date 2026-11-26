@@ -407,9 +407,17 @@ func syncCategories(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fro
 		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeFileParseFailed, "error reading categories from file")
 	}
+	// The push replaces the destination's whole tree, so categories that
+	// exist only there are deleted. Name them.
+	removedDetail := ""
+	if dest, err := mgmntClient.ListCategories(toWorkspace, "draft"); err == nil && dest != nil {
+		if removed := category.RemovedCategories(dest.RootCategories, categories.RootCategories); len(removed) > 0 {
+			removedDetail = fmt.Sprintf("removes categories that are only in %s: %s", toWorkspace, strings.Join(removed, ", "))
+		}
+	}
 	if dryRun {
 		spinner.Stop("")
-		report.Add("preference_categories", utils.StatusWouldCommit, "")
+		report.Add("preference_categories", utils.StatusWouldCommit, removedDetail)
 		return nil
 	}
 
@@ -421,6 +429,9 @@ func syncCategories(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fro
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing categories")
 	}
 	status, detail := utils.PushStatus(commitStatus)
+	if removedDetail != "" {
+		detail = strings.TrimPrefix(detail+"; "+removedDetail, "; ")
+	}
 	report.Add("preference_categories", status, detail)
 
 	// Sync category translations

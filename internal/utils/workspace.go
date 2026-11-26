@@ -25,6 +25,14 @@ func CheckWorkspace(slug string) error {
 	return err
 }
 
+// VerifyToken confirms the service token works, without naming a workspace.
+func VerifyToken() error {
+	if _, err := SDKInstance.ListWorkspaces(1, 0); err != nil {
+		return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+	}
+	return nil
+}
+
 // VerifyWorkspace is CheckWorkspace that also returns the error from listing
 // the workspaces (an invalid token, for example).
 func VerifyWorkspace(slug string) error {

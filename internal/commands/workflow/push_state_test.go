@@ -111,7 +111,7 @@ func TestPushOneUsesState(t *testing.T) {
 	// Pull: the local file is the workspace's draft, plus $schema.
 	local := copyMap(api.drafts["welcome"])
 	local["$schema"] = "https://schema.suprsend.com/workflow/v1/schema.json"
-	RecordPulled(st, "staging", local)
+	RecordPulled(st, "staging", local, nil)
 	opts := pushOptions{state: st}
 
 	push := func(wf map[string]any, o pushOptions) (string, error) {
@@ -181,4 +181,92 @@ func TestPushOneUsesState(t *testing.T) {
 	// production alone: no record there, so no conflict.
 	status, _, err = pushOne(client, "production", "welcome", local, opts)
 	wantStatus("another workspace", status, err, utils.StatusUnchanged)
+}
+
+func multiChannel(name string, channels ...any) map[string]any {
+	return map[string]any{"slug": "kyc", "name": name, "tree": map[string]any{"nodes": []any{
+		map[string]any{"node_type": "send_multi_channel", "properties": map[string]any{"channels": channels, "template": "kyc"}},
+	}}}
+}
+
+// #34: pull writes the live version, push compares with the draft.
+func TestPushAfterLivePull(t *testing.T) {
+	newClient := func(t *testing.T, draft map[string]any) (*fakeAPI, *mgmnt.SS_MgmntClient) {
+		api := &fakeAPI{drafts: map[string]map[string]any{}}
+		api.save("kyc", draft)
+		srv := httptest.NewServer(api.handler(t))
+		t.Cleanup(srv.Close)
+		return api, mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+	}
+	newState := func(t *testing.T) *state.File {
+		st, err := state.Load(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return st
+	}
+
+	t.Run("channel order is not a change", func(t *testing.T) {
+		live := multiChannel("KYC", "sms", "email")
+		api, client := newClient(t, multiChannel("KYC", "email", "sms"))
+		st := newState(t)
+		RecordPulled(st, "staging", live, copyMap(api.drafts["kyc"]))
+		if e, _ := st.Get("staging", "kyc"); e.Pending {
+			t.Fatal("a draft that differs only in channel order was recorded as pending")
+		}
+		status, _, err := pushOne(client, "staging", "kyc", live, pushOptions{state: st, commit: true})
+		if err != nil || status != utils.StatusUnchanged || api.pushCount() != 0 {
+			t.Fatalf("push --commit of an untouched workflow: %q, %v, %d pushes", status, err, api.pushCount())
+		}
+	})
+
+	t.Run("a pending draft is left alone", func(t *testing.T) {
+		live := multiChannel("KYC", "sms", "email")
+		api, client := newClient(t, multiChannel("KYC, reworded", "sms", "email"))
+		st := newState(t)
+		RecordPulled(st, "staging", live, copyMap(api.drafts["kyc"]))
+
+		for _, commit := range []bool{false, true} {
+			status, detail, err := pushOne(client, "staging", "kyc", live, pushOptions{state: st, commit: commit})
+			if err != nil || status != utils.StatusUnchanged || !strings.Contains(detail, "--mode draft") {
+				t.Fatalf("commit=%v: got %q (%s), %v; want unchanged with a note", commit, status, detail, err)
+			}
+		}
+		if api.pushCount() != 0 || api.drafts["kyc"]["name"] != "KYC, reworded" {
+			t.Fatal("the pending draft was replaced")
+		}
+
+		// An edit based on live would replace the draft nobody here has seen.
+		edited := multiChannel("KYC v2", "sms", "email")
+		_, _, err := pushOne(client, "staging", "kyc", edited, pushOptions{state: st})
+		if !clierr.HasCode(err, clierr.CodeAPIConflict) || api.pushCount() != 0 {
+			t.Fatalf("edit over a pending draft: got %v, want a conflict and no push", err)
+		}
+		status, _, err := pushOne(client, "staging", "kyc", edited, pushOptions{state: st, overwrite: true})
+		if err != nil || status != utils.StatusUpdated {
+			t.Fatalf("--overwrite: %q, %v", status, err)
+		}
+		if e, _ := st.Get("staging", "kyc"); e.Pending {
+			t.Fatal("the entry is still pending after the push")
+		}
+	})
+}
+
+// The API keeps these lists as sets and returns them in varying order.
+func TestFingerprintIgnoresSetOrder(t *testing.T) {
+	wf := func(events []any, mandatory []any) map[string]any {
+		return map[string]any{"slug": "s", "trigger_events": events, "tree": map[string]any{"nodes": []any{
+			map[string]any{"node_type": "send_smart_channel_routing", "properties": map[string]any{"mandatory_channels": mandatory, "template": "t"}},
+		}}}
+	}
+	a := wf([]any{"A", "B"}, []any{"email", "sms"})
+	if fingerprint(a) != fingerprint(wf([]any{"B", "A"}, []any{"sms", "email"})) {
+		t.Error("set order changed the fingerprint")
+	}
+	if fingerprint(a) == fingerprint(wf([]any{"A"}, []any{"email", "sms"})) {
+		t.Error("a removed trigger event should change the fingerprint")
+	}
+	if got := a["trigger_events"].([]any)[0]; got != "A" {
+		t.Error("the workflow was modified")
+	}
 }

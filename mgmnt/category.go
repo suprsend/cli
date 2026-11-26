@@ -26,7 +26,13 @@ type RootCategory struct {
 }
 
 type Section struct {
-	Name              string     `json:"name"`
+	Name string `json:"name"`
+	// Slug identifies the section (its translations are keyed by it) and
+	// stays the same when the name changes. Without it the API derives the
+	// slug from the name again, so it must round-trip through the file. A
+	// nameless section, the bucket for categories directly under a root,
+	// has none.
+	Slug              string     `json:"slug,omitempty"`
 	Description       string     `json:"description"`
 	Tags              []string   `json:"tags"`
 	Categories        []Category `json:"categories"`
@@ -35,7 +41,10 @@ type Section struct {
 }
 
 type Category struct {
-	Category                 string   `json:"category"`
+	// Category is the category's slug, its identity. Empty is omitted: the
+	// API then derives it from Name, so a rename must still send the stored
+	// slug.
+	Category                 string   `json:"category,omitempty"`
 	Name                     string   `json:"name"`
 	Description              string   `json:"description"`
 	DefaultPreference        string   `json:"default_preference"`

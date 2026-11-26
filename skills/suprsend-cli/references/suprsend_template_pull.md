@@ -35,7 +35,7 @@ suprsend template pull [<slug>] [flags]
 
 - Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.
 - Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.
-- Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the templates.
+- Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the templates. The record is of the workspace's **draft**, which push compares with (a live pull fetches it too, four more requests per template), so a draft that differs from the live version you pulled isn't mistaken for a later change.
 
 ### Options
 

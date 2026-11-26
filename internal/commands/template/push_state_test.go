@@ -320,3 +320,65 @@ func TestPushTemplateCommitUnseenVariant(t *testing.T) {
 		t.Fatalf("commit after the variant went live: %q, %v", status, err)
 	}
 }
+
+// #34: pull writes the live version, push compares with the draft. A draft
+// variant that differed at pull time is pending work, not a change since.
+func TestPushTemplateAfterLivePull(t *testing.T) {
+	api := &fakeTemplateAPI{
+		fields:   map[string]any{"slug": "t1", "name": "T1", "description": "", "tags": []any{}, "enabled_channels": []any{"sms", "email"}},
+		variants: map[string]map[string]any{},
+	}
+	api.store("sms/default", map[string]any{"id": "default", "channel": "sms", "content": map[string]any{"text": "hi"}})
+	api.store("email/default", map[string]any{"id": "default", "channel": "email", "content": map[string]any{"text": "hello"}})
+	api.live = map[string]map[string]any{"sms/default": api.variants["sms/default"], "email/default": api.variants["email/default"]}
+	api.dashboardEdit("sms/default", "hi, pending") // a draft edit made before the pull
+	srv := httptest.NewServer(api.handler(t))
+	defer srv.Close()
+	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+
+	// Pull live, as `template pull` does by default.
+	outDir := t.TempDir()
+	st, err := state.Load(outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := FetchTemplates(client, "staging", "live", "t1", FetchOptions{WithDraft: true})
+	if err != nil || len(results) != 1 || results[0].Draft == nil {
+		t.Fatalf("fetch: %v, %d result(s)", err, len(results))
+	}
+	stats := &TemplateWriteStats{}
+	if err := WriteOneTemplate(results[0], outDir, stats); err != nil || stats.Failed > 0 {
+		t.Fatalf("write: %v %v", err, stats.Errors)
+	}
+	RecordPulled(st, "staging", outDir, results[0])
+	dir := filepath.Join(outDir, "t1")
+
+	for _, commit := range []bool{false, true} {
+		status, detail, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: commit})
+		if err != nil || status != utils.StatusUnchanged || !strings.Contains(detail, "sms/default") {
+			t.Fatalf("commit=%v, untouched files: got %q (%s), %v; want unchanged, naming sms/default", commit, status, detail, err)
+		}
+	}
+	if len(api.takePushed()) != 0 || api.commits != 0 {
+		t.Fatal("the pending draft was replaced or committed")
+	}
+
+	// Editing another variant doesn't touch the pending one, but a commit
+	// would publish it.
+	editVariant(t, dir, "email/default", "hello again")
+	_, _, err = PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: true})
+	if !clierr.HasCode(err, clierr.CodeAPIConflict) || api.commits != 0 {
+		t.Fatalf("commit next to a pending draft variant: got %v, want a conflict", err)
+	}
+	status, _, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st})
+	if err != nil || status != utils.StatusUpdated || fmt.Sprint(api.takePushed()) != "[email/default]" {
+		t.Fatalf("draft push of the other variant: %q, %v", status, err)
+	}
+
+	// Editing the pending variant itself is a conflict.
+	editVariant(t, dir, "sms/default", "hi v2")
+	_, _, err = PushTemplate(client, "staging", "t1", dir, PushOptions{State: st})
+	if !clierr.HasCode(err, clierr.CodeAPIConflict) {
+		t.Fatalf("edit over a pending draft variant: got %v, want a conflict", err)
+	}
+}

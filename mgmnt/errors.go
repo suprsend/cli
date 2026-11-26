@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -149,9 +150,63 @@ func commitHTTPError(resp *resty.Response, resource string) (CommitStatus, error
 }
 
 func extractMessage(resp *resty.Response, fallback string) string {
-	var e ErrorResponse
-	if err := json.Unmarshal([]byte(resp.String()), &e); err == nil && e.Message != "" {
-		return e.Message
+	var e struct {
+		Message json.RawMessage `json:"message"`
+		Detail  json.RawMessage `json:"detail"`
+	}
+	if err := json.Unmarshal([]byte(resp.String()), &e); err != nil {
+		return fallback
+	}
+	for _, raw := range []json.RawMessage{e.Message, e.Detail} {
+		if msg := flattenMessage(raw); msg != "" {
+			return msg
+		}
 	}
 	return fallback
+}
+
+// flattenMessage turns an error body's message into one line. It is a
+// string for most errors, but for a validation error the API sends the
+// serializer's errors as they are: a list, or an object of field name to
+// messages, possibly nested.
+func flattenMessage(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return ""
+	}
+	return flattenValue(v)
+}
+
+func flattenValue(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return t
+	case []any:
+		parts := make([]string, 0, len(t))
+		for _, item := range t {
+			if s := flattenValue(item); s != "" {
+				parts = append(parts, s)
+			}
+		}
+		return strings.Join(parts, "; ")
+	case map[string]any:
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			if s := flattenValue(t[k]); s != "" {
+				parts = append(parts, k+": "+s)
+			}
+		}
+		return strings.Join(parts, "; ")
+	}
+	return fmt.Sprint(v)
 }

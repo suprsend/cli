@@ -33,6 +33,10 @@ type TemplateResult struct {
 	Variants        []map[string]any            `json:"variants"`
 	MockData        map[string]any              `json:"mock_data,omitempty"`
 	VariantOrder    *mgmnt.VariantOrderResponse `json:"variant_order,omitempty"`
+	// Draft is the workspace's draft of the template, fetched for the state
+	// file (FetchOptions.WithDraft) when another mode was pulled. Nil when
+	// it wasn't asked for or couldn't be fetched.
+	Draft *TemplateResult `json:"-"`
 }
 
 // FetchOptions configures optional callbacks for FetchTemplates. Both fields
@@ -53,6 +57,23 @@ type FetchOptions struct {
 	// OnFetchError is called for each template skipped because its variants
 	// couldn't be fetched. Like OnResult, it runs concurrently.
 	OnFetchError func(slug string, err error)
+	// WithDraft also fetches each template's draft when mode isn't draft
+	// (four more GETs per template), for RecordPulled: push
+	// compares with the draft, whatever mode was pulled.
+	WithDraft bool
+}
+
+// attachDraft sets r.Draft when opts ask for it.
+func attachDraft(client *mgmnt.SS_MgmntClient, workspace, mode string, r *TemplateResult, opts FetchOptions) {
+	if !opts.WithDraft || mode == "draft" {
+		return
+	}
+	draft, exists, err := fetchDraft(client, workspace, r.Slug)
+	if err != nil || !exists {
+		log.Debugf("templates/%s: couldn't fetch the draft to record: %v", r.Slug, err)
+		return
+	}
+	r.Draft = &draft
 }
 
 // FetchTemplates fetches either one template (when slug != "") or all templates
@@ -74,7 +95,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 		if err != nil {
 			return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variants for template %s", slug))
 		}
-		mockData, err := client.GetTemplateMockData(workspace, slug)
+		mockData, err := client.GetTemplateMockData(workspace, slug, mode)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}
@@ -92,6 +113,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 			MockData:        mockData,
 			VariantOrder:    variantOrder,
 		}
+		attachDraft(client, workspace, mode, &r, opts)
 		if opts.OnListed != nil {
 			opts.OnListed(1)
 		}
@@ -139,7 +161,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 				}
 				return nil
 			}
-			mockData, err := client.GetTemplateMockData(workspace, t.Slug)
+			mockData, err := client.GetTemplateMockData(workspace, t.Slug, mode)
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
 			}
@@ -157,6 +179,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 				MockData:        mockData,
 				VariantOrder:    variantOrder,
 			}
+			attachDraft(client, workspace, mode, &r, opts)
 			slots[i] = &r
 			if opts.OnResult != nil {
 				opts.OnResult(r)
@@ -189,7 +212,7 @@ var templatePullCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
-		"skills:tip.c-state":     "Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the templates.",
+		"skills:tip.c-state":     "Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the templates. The record is of the workspace's **draft**, which push compares with (a live pull fetches it too, four more requests per template), so a draft that differs from the live version you pulled isn't mistaken for a later change.",
 	},
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -243,6 +266,7 @@ var templatePullCmd = &cobra.Command{
 		var total atomic.Int32
 
 		_, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
+			WithDraft: true,
 			OnListed: func(n int) {
 				total.Store(int32(n))
 				stats.Total = n

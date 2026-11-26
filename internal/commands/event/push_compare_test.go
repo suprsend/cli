@@ -32,7 +32,7 @@ func TestPlanEvents(t *testing.T) {
 		map[string]any{"name": "order_shipped", "description": "shipped!", "payload_schema": map[string]any{"schema": "order", "version_no": float64(1)}},
 		map[string]any{"name": "ORDER_RETURNED", "description": "returned"},
 	}
-	statuses, toSend, err := planEvents(client, "staging", events)
+	statuses, toSend, _, err := planEvents(client, "staging", events)
 	if err != nil {
 		t.Fatal(err)
 	}

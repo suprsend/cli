@@ -24,12 +24,14 @@ const (
 	variantPrefix    = "variants/" // + "<channel>/<id>"
 )
 
-// variantIgnore are the variant fields the API manages. Fingerprints leave
+// variantIgnore are the variant fields the API manages. seq_no is the
+// variant's position, renumbered whenever a sibling is added, removed or
+// reordered and again on commit; the variant_order part covers order. Fingerprints leave
 // them out, so a draft and its live version (and files pulled in either
 // mode) compare equal when their content does.
 var variantIgnore = []string{
 	"$schema", "action", "approval_at", "approval_status", "created_at", "discard_comment",
-	"errors", "has_error", "hash", "needs_vendor_approval", "sysgen_template_name",
+	"errors", "has_error", "hash", "needs_vendor_approval", "seq_no", "sysgen_template_name",
 	"updated_at", "vendor_approvals",
 }
 
@@ -156,7 +158,7 @@ func fetchDraft(client *mgmnt.SS_MgmntClient, workspace, slug string) (TemplateR
 	if err != nil {
 		return TemplateResult{}, false, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variants for template %s", slug))
 	}
-	mockData, err := client.GetTemplateMockData(workspace, slug)
+	mockData, err := client.GetTemplateMockData(workspace, slug, "draft")
 	if err != nil {
 		return TemplateResult{}, false, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch mock data for template %s", slug))
 	}
@@ -347,25 +349,35 @@ func pushStatus(p plan, pushed, skipped []string, exists, pushAll bool) (string,
 	if pushAll {
 		return utils.StatusPushed, ""
 	}
-	skipNote := ""
-	if len(skipped) > 0 {
-		skipNote = "skipped, changed in the workspace since the last pull or push and not locally: " + describeParts(skipped) + " (pull to update the files, or pass --overwrite)"
-	}
 	join := func(a, b string) string {
 		if a == "" || b == "" {
 			return a + b
 		}
 		return a + "; " + b
 	}
+	note := ""
+	if len(skipped) > 0 {
+		note = "skipped, changed in the workspace since the last pull or push and not locally: " + describeParts(skipped) + " (pull to update the files, or pass --overwrite)"
+	}
+	note = join(note, pendingNote(p.keys(state.Pending)))
 	switch {
 	case len(pushed) > 0 && !exists:
 		return utils.StatusCreated, fmt.Sprintf("%d variant(s)", countVariants(p))
 	case len(pushed) > 0:
-		return utils.StatusUpdated, join(describeParts(pushed), skipNote)
+		return utils.StatusUpdated, join(describeParts(pushed), note)
 	case len(skipped) > 0:
-		return utils.StatusSkipped, skipNote
+		return utils.StatusSkipped, note
 	}
-	return utils.StatusUnchanged, ""
+	return utils.StatusUnchanged, note
+}
+
+// pendingNote says which parts were left alone because the workspace's
+// draft holds changes a live pull didn't bring; "" when there are none.
+func pendingNote(pending []string) string {
+	if len(pending) == 0 {
+		return ""
+	}
+	return "the workspace's draft has changes that aren't in the files (they were pulled from live), in: " + describeParts(pending) + " (pull with --mode draft to see them, or pass --overwrite to replace them)"
 }
 
 func countVariants(p plan) int {
@@ -414,15 +426,26 @@ func RecordPulled(st *state.File, workspace, outputDir string, t TemplateResult)
 		return
 	}
 	remote := remoteParts(t)
+	var draft templateParts
+	if t.Draft != nil {
+		draft = remoteParts(*t.Draft)
+	}
 	for _, key := range local.partKeys() {
 		v, ok := remote[key]
 		if !ok {
 			continue
 		}
-		st.Set(workspace, t.Slug+"/"+key, state.Entry{
-			Remote: partFingerprint(key, v),
-			Local:  partFingerprint(key, local[key]),
-		})
+		entry := state.Entry{Remote: partFingerprint(key, v), Local: partFingerprint(key, local[key])}
+		// Push compares with the draft. A draft part that differs from the
+		// pulled one holds changes the files don't have.
+		if dv, ok := draft[key]; ok {
+			pulled := entry.Remote
+			entry.Remote = partFingerprint(key, dv)
+			entry.Pending = entry.Remote != pulled
+		} else if draft != nil {
+			entry.Remote, entry.Pending = "", true // removed in the draft
+		}
+		st.Set(workspace, t.Slug+"/"+key, entry)
 	}
 }
 

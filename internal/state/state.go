@@ -33,8 +33,12 @@ const version = 1
 
 // Entry holds an item's fingerprints from the last pull or push.
 type Entry struct {
-	Remote string `json:"remote"` // the item as the workspace had it
+	Remote string `json:"remote"` // the workspace's draft of the item
 	Local  string `json:"local"`  // the local copy
+	// Pending is set by a pull of the live version when the workspace's
+	// draft differed from it: the draft holds changes the local copy never
+	// had. Push leaves such a draft alone until the local copy changes.
+	Pending bool `json:"pending,omitempty"`
 }
 
 // File is a loaded state file. Its methods are safe for concurrent use.
@@ -181,6 +185,10 @@ const (
 	// Conflict: changed both locally and in the workspace since the last
 	// pull or push.
 	Conflict Action = "conflict"
+	// Pending: not changed on either side since a live pull that left the
+	// draft's changes out (Entry.Pending). There is nothing to push, and a
+	// commit would publish changes that aren't in the local copy.
+	Pending Action = "pending"
 )
 
 // Decide picks what to do with one item from its current local and remote
@@ -205,6 +213,9 @@ func Decide(local, remote string, base Entry, hasBase, overwrite bool) Action {
 			return Create
 		}
 		if local == base.Local {
+			if base.Pending && base.Remote == "" {
+				return Pending // already missing from the draft at the pull
+			}
 			return Skip // deleted in the workspace, untouched locally
 		}
 		return Conflict
@@ -220,10 +231,14 @@ func Decide(local, remote string, base Entry, hasBase, overwrite bool) Action {
 	switch {
 	case localChanged && remoteChanged:
 		return Conflict
+	case localChanged && base.Pending:
+		return Conflict // the push would replace draft changes the pull left out
 	case localChanged:
 		return Update
 	case remoteChanged:
 		return Skip
+	case base.Pending:
+		return Pending
 	}
 	// Neither side changed since the last pull or push; they differ only in
 	// how the API stores the item.

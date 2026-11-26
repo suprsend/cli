@@ -22,3 +22,18 @@ func TestSchemaFingerprint(t *testing.T) {
 		t.Error("a changed JSON Schema should differ")
 	}
 }
+
+// The API adds additionalProperties:false and keeps a name the request
+// leaves out; neither is a change.
+func TestSchemaSameAs(t *testing.T) {
+	remote := map[string]any{"name": "Order", "description": "d", "json_schema": map[string]any{
+		"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}, "additionalProperties": false}}
+	jsonOnly := map[string]any{"json_schema": map[string]any{
+		"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}}}
+	if !sameAs(jsonOnly, remote) {
+		t.Error("a payload without name or additionalProperties should match the stored schema")
+	}
+	if sameAs(map[string]any{"name": "Orders", "json_schema": jsonOnly["json_schema"]}, remote) {
+		t.Error("a renamed schema should differ")
+	}
+}

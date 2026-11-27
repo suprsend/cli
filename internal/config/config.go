@@ -3,7 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
@@ -17,11 +19,15 @@ const (
 	ConfigSourceFlag    ConfigSource = "flag"
 	ConfigSourceProfile ConfigSource = "profile"
 	ConfigSourceDefault ConfigSource = "default"
+	// ConfigSourceActive is the config file's active_profile (set by `profile use`).
+	ConfigSourceActive ConfigSource = "active_profile"
 )
 
 type ConfigString struct {
 	Value  string
 	Source ConfigSource
+	// Set reports whether a flag value was passed explicitly rather than defaulted.
+	Set bool `yaml:"-"`
 }
 
 func (p ConfigString) MarshalYAML() (interface{}, error) {
@@ -62,18 +68,25 @@ type Config struct {
 	BaseUrl       ConfigString
 	MgmntUrl      ConfigString
 	ProxyURL      ConfigString
+	// Profile is the name of the profile in use (--profile, SUPRSEND_PROFILE
+	// or the config file's active profile), empty when no config file is used.
+	Profile ConfigString
+	// Workspace is set by ResolveWorkspace for commands that take --workspace.
+	Workspace ConfigString
 	// flag only configs (not resolved from env/profile)
 	CfgFile    ConfigString
-	Workspace  ConfigString
 	OutputType ConfigString
 	Verbosity  ConfigString
 	Quiet      ConfigBool
 	Debug      ConfigBool
+
+	profileWorkspace string
 }
 
 const (
-	DefaultBaseUrl  = "https://hub.suprsend.com/"
-	DefaultMgmntUrl = "https://management-api.suprsend.com/"
+	DefaultBaseUrl   = "https://hub.suprsend.com/"
+	DefaultMgmntUrl  = "https://management-api.suprsend.com/"
+	DefaultWorkspace = "staging"
 )
 
 // Cfg is the global configuration instance.
@@ -81,29 +94,37 @@ var Cfg = &Config{}
 
 // FlagValues holds the raw values parsed from CLI flags before any resolution.
 type FlagValues struct {
-	Workspace    string
 	CfgFile      string
 	OutputType   string
 	Verbosity    string
+	VerbositySet bool // -v was passed explicitly
 	ServiceToken string
+	Profile      string
 	NoColor      bool
 	Quiet        bool
 }
 
+// ProfileFlagHelp is the help text for the root --profile flag.
+const ProfileFlagHelp = "Profile to use, by `name` (default: $SUPRSEND_PROFILE, else the config file's active profile)"
+
 func GetResolvedServiceToken(flagToken string, activeProfile Profile) (ConfigString, error) {
+	if flagToken != "" {
+		if os.Getenv("SUPRSEND_SERVICE_TOKEN") != "" {
+			log.Debug("Using service token from command line flag (overrides SUPRSEND_SERVICE_TOKEN)")
+		} else {
+			log.Debug("Using service token from command line flag")
+		}
+		return ConfigString{Value: flagToken, Source: ConfigSourceFlag}, nil
+	}
 	if envToken := os.Getenv("SUPRSEND_SERVICE_TOKEN"); envToken != "" {
 		log.Debug("Using service token from environment variable")
 		return ConfigString{Value: envToken, Source: ConfigSourceEnv}, nil
-	}
-	if flagToken != "" {
-		log.Debug("Using service token from command line flag")
-		return ConfigString{Value: flagToken, Source: ConfigSourceFlag}, nil
 	}
 	if activeProfile.ServiceToken.Value != "" {
 		log.Debug("Using service token from config file profile")
 		return ConfigString{Value: activeProfile.ServiceToken.Value, Source: ConfigSourceProfile}, nil
 	}
-	return ConfigString{}, clierr.New("no service token found in environment, command line, or config file", clierr.CodeAuthMissingToken).
+	return ConfigString{}, clierr.New("no service token found in command line, environment, or config file", clierr.CodeAuthMissingToken).
 		WithHint("set SUPRSEND_SERVICE_TOKEN or run `suprsend profile add`")
 }
 
@@ -148,11 +169,13 @@ func GetResolvedNoColor(flagNoColor bool) ConfigBool {
 
 // Resolve populates c with all flag-derived and env-var / profile-resolved values.
 // Priority varies by field:
-//   - ServiceToken: env > flag > profile (no default — errors if unset)
+//   - Profile: flag > env (SUPRSEND_PROFILE) > the config file's active profile
+//   - ServiceToken: flag > env > profile (no default — errors if unset)
+//   - Workspace: flag > env > profile > default, resolved per command by ResolveWorkspace
 //   - BaseUrl, MgmntUrl: env > profile > default
 //   - NoColorOutput: env > flag > default
 //   - Debug, ProxyURL: env only
-//   - Workspace, OutputType, Verbosity, Quiet, CfgFile: flag only
+//   - OutputType, Verbosity, Quiet, CfgFile: flag only
 func (c *Config) Resolve(flags FlagValues) error {
 	c.CfgFile = ConfigString{Value: flags.CfgFile, Source: ConfigSourceFlag}
 	if flags.CfgFile != "" {
@@ -160,21 +183,38 @@ func (c *Config) Resolve(flags FlagValues) error {
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot read config file %s", flags.CfgFile))
 		}
 	}
+	requested := ConfigString{Value: flags.Profile, Source: ConfigSourceFlag}
+	if requested.Value == "" {
+		requested = ConfigString{Value: os.Getenv("SUPRSEND_PROFILE"), Source: ConfigSourceEnv}
+	}
+	c.Profile = ConfigString{}
 	var activeProfile Profile
 	if configPath := GetConfigFilePath(); configPath != "" {
 		if cfg, err := LoadProfileConfig(configPath); err == nil {
-			activeProfile = cfg.Profiles[cfg.ActiveProfile]
+			c.Profile = ConfigString{Value: cfg.ActiveProfile, Source: ConfigSourceActive}
+			if requested.Value != "" {
+				if _, ok := cfg.Profiles[requested.Value]; !ok {
+					return profileNotFound(requested, configPath)
+				}
+				c.Profile = requested
+			}
+			activeProfile = cfg.Profiles[c.Profile.Value]
 			log.Debug("Using config file:", configPath)
 		} else if flags.CfgFile != "" {
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, fmt.Sprintf("cannot parse config file %s", configPath))
+		} else if requested.Value != "" {
+			return profileNotFound(requested, configPath)
 		} else {
 			log.Debugf("failed to load config file %s: %v", configPath, err)
 		}
 	}
+	if c.Profile.Value == "" {
+		c.Profile = ConfigString{}
+	}
 
-	c.Workspace = ConfigString{Value: flags.Workspace, Source: ConfigSourceFlag}
+	c.profileWorkspace = activeProfile.Workspace.Value
 	c.OutputType = ConfigString{Value: flags.OutputType, Source: ConfigSourceFlag}
-	c.Verbosity = ConfigString{Value: flags.Verbosity, Source: ConfigSourceFlag}
+	c.Verbosity = ConfigString{Value: flags.Verbosity, Source: ConfigSourceFlag, Set: flags.VerbositySet}
 	c.Quiet = ConfigBool{Value: flags.Quiet, Source: ConfigSourceFlag}
 	c.Debug = GetResolvedDebug()
 
@@ -193,4 +233,68 @@ func (c *Config) Resolve(flags FlagValues) error {
 	c.ServiceToken = token
 
 	return nil
+}
+
+// profileNotFound is the error for a --profile or SUPRSEND_PROFILE that names
+// no profile in the config file.
+func profileNotFound(requested ConfigString, configPath string) error {
+	from := "--profile"
+	if requested.Source == ConfigSourceEnv {
+		from = "SUPRSEND_PROFILE"
+	}
+	return clierr.New(fmt.Sprintf("profile %q (from %s) not found in %s", requested.Value, from, configPath), clierr.CodeConfigInvalid).
+		WithHint("run `suprsend profile list` to see the profiles, or `suprsend profile add` to create one")
+}
+
+// RequireWorkspace reports whether SUPRSEND_REQUIRE_WORKSPACE is set to a
+// true value: then a write that would fall back to the default workspace
+// (and a sync without --from and --to) is an error instead of a warning.
+func RequireWorkspace() bool {
+	v, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("SUPRSEND_REQUIRE_WORKSPACE")))
+	return v
+}
+
+// WorkspaceFlagHelp is the help text for every --workspace flag.
+const WorkspaceFlagHelp = "Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)"
+
+var workspacePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// ResolveWorkspace picks the workspace for a command: the --workspace flag
+// when it was passed, else SUPRSEND_WORKSPACE, else the active profile's
+// workspace, else DefaultWorkspace. Surrounding whitespace is trimmed (a
+// shell quoting slip like "-w staging" as one argument would otherwise send
+// " staging" to the API, which answers only "resource not found"), and a
+// value that can't be a workspace slug is an error. The result is stored in
+// Cfg.Workspace.
+func (c *Config) ResolveWorkspace(flagValue string, flagSet bool) (ConfigString, error) {
+	ws := ConfigString{Value: DefaultWorkspace, Source: ConfigSourceDefault}
+	switch {
+	case flagSet:
+		ws = ConfigString{Value: flagValue, Source: ConfigSourceFlag}
+	case os.Getenv("SUPRSEND_WORKSPACE") != "":
+		ws = ConfigString{Value: os.Getenv("SUPRSEND_WORKSPACE"), Source: ConfigSourceEnv}
+	case c.profileWorkspace != "":
+		ws = ConfigString{Value: c.profileWorkspace, Source: ConfigSourceProfile}
+	}
+	value, err := NormalizeWorkspace(ws.Value, "from "+string(ws.Source))
+	if err != nil {
+		return ConfigString{}, err
+	}
+	ws.Value = value
+	c.Workspace = ws
+	return ws, nil
+}
+
+// NormalizeWorkspace trims value and checks that it looks like a workspace
+// slug. from says where the value came from, for the error message.
+func NormalizeWorkspace(value, from string) (string, error) {
+	if trimmed := strings.TrimSpace(value); trimmed != value {
+		log.Warnf("workspace %q has surrounding whitespace; using %q", value, trimmed)
+		value = trimmed
+	}
+	if !workspacePattern.MatchString(value) {
+		return "", clierr.New(fmt.Sprintf("invalid workspace %q (%s): expected a workspace slug such as staging or production", value, from), clierr.CodeInvalidUsage).
+			WithHint("run `suprsend workspace list` to see the workspace slugs")
+	}
+	return value, nil
 }

@@ -6,13 +6,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
 var eventListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List events",
-	Long:  "List all events in a workspace with pagination. Returns event names and their linked schema information.",
+	Long:  "List the events in a workspace: all of them unless --limit is given. Returns event names and their linked schema information.",
 	Annotations: map[string]string{
 		"skills:tip:output": "Use `-o json` for machine-readable JSON output, `-o yaml` for YAML. Default `-o pretty` outputs a human-friendly table.",
 	},
@@ -34,14 +35,15 @@ var eventListCmd = &cobra.Command{
 			return err
 		}
 		utils.OutputData(events.Results, outputType)
+		utils.NoteMoreResults("events", len(events.Results), offset, events.Meta.Count)
 		return nil
 	},
 }
 
 func init() {
-	eventListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of events to return")
+	eventListCmd.PersistentFlags().IntP("limit", "l", 0, utils.LimitFlagHelp("events"))
 	eventListCmd.PersistentFlags().Int("offset", 0, "Number of events to skip for pagination")
 	eventListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
-	EventCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	EventCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	EventCmd.AddCommand(eventListCmd)
 }

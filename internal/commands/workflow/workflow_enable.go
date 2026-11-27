@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
@@ -19,7 +18,7 @@ var worklowEnableCmd = &cobra.Command{
 
   # Dry run: see what would change without making changes
   suprsend workflow enable welcome --dry-run`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := utils.ResolveSlug(cmd, args)
@@ -28,25 +27,27 @@ var worklowEnableCmd = &cobra.Command{
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		report := utils.NewReport("workflow enable", workspace, dryRun)
 		if dryRun {
-			log.Infof("DRY RUN: would enable workflow '%s' in %s", slug, workspace)
-			return nil
+			report.Add("workflows/"+slug, "would-enable", "")
+			return report.Finish(nil)
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		err := mgmntClient.ChangeStatusWorkflow(workspace, slug, true)
 		if err != nil {
-			log.Error(err.Error())
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			err = clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			report.Fail("workflows/"+slug, err)
+			return report.Finish(err)
 		}
 
-		log.Infof("Enabled workflow: %s", slug)
-		return nil
+		report.Add("workflows/"+slug, utils.StatusEnabled, "")
+		return report.Finish(nil)
 	},
 }
 
 func init() {
 	worklowEnableCmd.Flags().StringP("slug", "g", "", "Workflow slug")
-	worklowEnableCmd.Flags().BoolP("dry-run", "n", false, "Print what would be changed without making any changes")
+	worklowEnableCmd.Flags().BoolP("dry-run", "n", false, "Report what would be changed without making any changes")
 	WorkflowCmd.AddCommand(worklowEnableCmd)
 }

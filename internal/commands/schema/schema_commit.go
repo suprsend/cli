@@ -25,7 +25,7 @@ var schemaCommitCmd = &cobra.Command{
 		"skills:tip.a-irreversible": "Commit is irreversible: it promotes the draft to **live**, and new workflow triggers immediately validate against the new schema.",
 		"skills:tip.b-regen":        "After commit, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync with the live schema.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug := utils.ResolveSlug(cmd, args)
 		if slug == "" {
@@ -35,9 +35,10 @@ var schemaCommitCmd = &cobra.Command{
 		workspace, _ := cmd.Flags().GetString("workspace")
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		report := utils.NewReport("schema commit", workspace, dryRun)
 		if dryRun {
-			log.Infof("DRY RUN: would commit schema '%s' to live", slug)
-			return nil
+			report.Add("schemas/"+slug, utils.StatusWouldCommit, "")
+			return report.Finish(nil)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
@@ -52,22 +53,23 @@ var schemaCommitCmd = &cobra.Command{
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		spinner := utils.NewSpinner("Committing schema...")
-
-		err := mgmntClient.FinalizeSchema(workspace, slug, commitMessage)
+		commitStatus, err := mgmntClient.FinalizeSchema(workspace, slug, commitMessage)
+		spinner.Stop("")
 		if err != nil {
-			log.Error(err.Error())
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			err = clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			report.Fail("schemas/"+slug, err)
+			return report.Finish(err)
 		}
-
-		spinner.Stop(fmt.Sprintf("Schema '%s' is up to date in live", slug))
-		return nil
+		status, detail := utils.PushStatus(commitStatus)
+		report.Add("schemas/"+slug, status, detail)
+		return report.Finish(nil)
 	},
 }
 
 func init() {
 	schemaCommitCmd.Flags().StringP("slug", "g", "", "Schema slug")
 	schemaCommitCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
-	schemaCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	schemaCommitCmd.Flags().BoolP("dry-run", "n", false, "Report what would be committed without making any changes")
 	schemaCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	SchemaCmd.AddCommand(schemaCommitCmd)
 }

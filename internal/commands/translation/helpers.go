@@ -18,13 +18,7 @@ type TranslationWriteStats struct {
 	Success int
 	Failed  int
 	Errors  []string
-}
-
-type TranslationPushStats struct {
-	Total   int
-	Success int
-	Failed  int
-	Errors  []string
+	Written []string // file names written
 }
 
 func promptForOutputDirectory() (string, bool) {
@@ -100,8 +94,9 @@ func WriteTranslationToFiles(resp mgmnt.TranslationResponse, outputDir string) (
 			stats.Errors = append(stats.Errors, fmt.Sprintf("Failed to write file '%s': %v", filename, err))
 			continue
 		}
-		log.Infof("Wrote translation to %s", filename)
+		log.Debugf("Wrote translation to %s", filename)
 		stats.Success++
+		stats.Written = append(stats.Written, filepath.Base(filename))
 	}
 	return stats, nil
 }

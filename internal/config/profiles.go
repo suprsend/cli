@@ -12,6 +12,8 @@ type Profile struct {
 	BaseUrl      ConfigString `yaml:"base_url"`
 	MgmntUrl     ConfigString `yaml:"mgmnt_url"`
 	ServiceToken ConfigString `yaml:"service_token"`
+	// Workspace is the default workspace for this profile's commands.
+	Workspace ConfigString `yaml:"workspace,omitempty"`
 }
 
 type ProfileConfig struct {
@@ -55,6 +57,5 @@ func SaveProfileConfig(cfg *ProfileConfig, path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600) // it holds service tokens
 }
-

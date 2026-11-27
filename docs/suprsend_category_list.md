@@ -4,7 +4,7 @@ List categories
 
 ### Synopsis
 
-List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, mandatory channels, and is_commercial. Use --mode to switch between draft and live.
+List notification preference categories in a workspace. Returns a flattened table with root_category, section, category (the slug that workflows, preferences and translation files use), category_name, default_preference, mandatory channels, and is_commercial. Use --mode to switch between draft and live.
 
 ```
 suprsend category list [flags]
@@ -36,10 +36,11 @@ suprsend category list [flags]
 ```
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 
 ### SEE ALSO

@@ -58,7 +58,7 @@ var templateGetCmd = &cobra.Command{
 			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
 		}
 
-		mockData, err := mgmntClient.GetTemplateMockData(workspace, slug)
+		mockData, err := mgmntClient.GetTemplateMockData(workspace, slug, mode)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}

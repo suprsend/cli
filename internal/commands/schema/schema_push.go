@@ -27,14 +27,15 @@ var schemaPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend schema push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
-		"skills:tip.b-dryrun": "`--dry-run` makes no API calls. It reads the local files, compiles each payload schema (`payload_schema.json`, or the `--json` value) locally as JSON Schema (draft 2020-12; root `type` must be `object`), and logs what would be pushed. Nothing is validated server-side.",
-		"skills:tip.c-regen":  "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
-		"skills:tip.d-commit": "With `--commit`, a schema that is saved as a draft but not committed (for example an empty JSON Schema) is an error: the command exits non-zero with the API's reason. A schema whose draft already matches live counts as success (nothing to commit).",
-		"skills:tip.f-enabled": "Enabled/disabled is a property of the schema, not a version: it applies on push, without `--commit`. If `schema.json` has no `is_enabled` key, the API currently **enables** the schema on every push, re-enabling a disabled one (this includes `sync`). To keep a schema disabled, set `\"is_enabled\": false` in its `schema.json`. `--json` pushes never send `is_enabled`.",
-		"skills:tip.e-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
+		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend schema commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls. It reads the local files, compiles each payload schema (`payload_schema.json`, or the `--json` value) locally as JSON Schema (draft 2020-12; root `type` must be `object`), and reports what would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-regen":   "After committing a schema change, regenerate types with `suprsend generate-types <language>` so consuming code stays in sync.",
+		"skills:tip.d-commit":  "With `--commit`, a schema that is saved as a draft but not committed (for example an empty JSON Schema) is an error: the command exits non-zero with the API's reason. A schema whose draft already matches live counts as success (nothing to commit).",
+		"skills:tip.f-enabled": "Enabled/disabled is a property of the schema, not a version: it applies on push, without `--commit`. `schema pull` writes `is_enabled` to `schema.json`, and a push sends it back. If the key is missing (or with `--json`, which never sends it), a push leaves the schema's enabled state as it is; a new schema starts enabled. `sync` copies the source workspace's value.",
+		"skills:tip.g-result":  "Each schema is compared with the workspace's draft (name, description, JSON Schema and `is_enabled`) and reported on stdout as `created` or `updated` (saved as draft), `unchanged` (the draft already matches, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`. A file that matches the live version while the draft differs is reported `unchanged` with a note, and the draft is left alone: it is pending work that a pull without `--mode draft` didn't bring, and pushing would replace it with what is already live.",
+		"skills:tip.e-force":   "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		slug := utils.ResolveSlug(cmd, args)
@@ -44,7 +45,6 @@ var schemaPushCmd = &cobra.Command{
 		jsonPayload, _ := cmd.Flags().GetString("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		force, _ := cmd.Flags().GetBool("force")
-		var dryRunSlugs []string
 
 		if jsonPayload != "" && slug == "" {
 			return clierr.New("--json requires --slug to be specified", clierr.CodeInvalidUsage)
@@ -64,9 +64,10 @@ var schemaPushCmd = &cobra.Command{
 		}
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
-
-		hasError := false
-		var spinner *utils.Spinner
+		dryRunStatus := utils.StatusWouldPush
+		if commit {
+			dryRunStatus = utils.StatusWouldCommit
+		}
 
 		if slug != "" {
 			var schema map[string]any
@@ -94,27 +95,22 @@ var schemaPushCmd = &cobra.Command{
 				schema = merged
 			}
 
+			report := utils.NewReport("schema push", workspace, dryRun)
 			if dryRun {
-				action := "push"
-				if commit {
-					action = "push and commit"
-				}
-				log.Infof("DRY RUN: would %s schema '%s' to %s", action, slug, workspace)
-				return nil
+				report.Add("schemas/"+slug, dryRunStatus, "")
+				return report.Finish(nil)
 			}
 
-			spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			err := mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			status, detail, err := pushSchema(mgmntClient, workspace, slug, schema, commit, commitMessage)
+			spinner.Stop("")
 			if err != nil {
-				spinner.Stop("")
-				return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
+				err = clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push schema %s", slug))
+				report.Fail("schemas/"+slug, err)
+				return report.Finish(err)
 			}
-			spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-			return nil
-		}
-
-		stats := &SchemaPushStats{
-			Errors: []string{},
+			report.Add("schemas/"+slug, status, detail)
+			return report.Finish(nil)
 		}
 
 		if path == "" {
@@ -122,97 +118,62 @@ var schemaPushCmd = &cobra.Command{
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Errorf("Directory %s does not exist", path)
-			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+			return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("directory %s does not exist", path))
 		}
 
 		if err := validateInputDirectory(path); err != nil {
-			log.Errorf("Error with input directory: %v\n", err)
-			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+			return clierr.Wrap(err, clierr.CodeFileNotFound, "error with input directory")
 		}
 
-		entries, err := os.ReadDir(path)
+		entries, err := utils.ReadDir(path)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to read local schema directory")
 			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
 		}
 
-		for _, entry := range entries {
-			if entry.IsDir() {
-				stats.Total++
-			}
-		}
-
+		report := utils.NewReport("schema push", workspace, dryRun)
+		var failures []string
+		var failedErrs []error
 		for _, entry := range entries {
 			if !entry.IsDir() {
 				continue
 			}
 			slug := entry.Name()
-			if !hasError {
-				spinner = utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
-			}
 
 			schema, err := ReadAndMergeSchemaFiles(filepath.Join(path, slug), slug)
 			if err != nil {
-				spinner.Stop("")
-				hasError = true
-				log.WithError(err).Errorf("Failed to read schema files for %s", slug)
-				stats.Failed++
-				stats.Errors = append(stats.Errors, err.Error())
+				err = clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+				report.Fail("schemas/"+slug, err)
+				failures = append(failures, err.Error())
+				failedErrs = append(failedErrs, err)
 				continue
 			}
 
 			if dryRun {
-				dryRunSlugs = append(dryRunSlugs, slug)
-				stats.Success++
-				spinner.Stop(fmt.Sprintf("(dry run) %s", slug))
-				hasError = false
+				report.Add("schemas/"+slug, dryRunStatus, "")
 				continue
 			}
 
-			err = mgmntClient.PushSchema(workspace, slug, schema, commit, commitMessage)
+			spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", slug))
+			status, detail, err := pushSchema(mgmntClient, workspace, slug, schema, commit, commitMessage)
+			spinner.Stop("")
 			if err != nil {
-				spinner.Stop("")
-				hasError = true
-				log.WithError(err).Errorf("schemas/%s: failed to push", slug)
-				stats.Failed++
-				stats.Errors = append(stats.Errors, clierr.ItemFailure("schemas/"+slug, "failed to push", err))
+				report.Fail("schemas/"+slug, err)
+				failures = append(failures, clierr.ItemFailure("schemas/"+slug, "failed to push", err))
+				failedErrs = append(failedErrs, err)
 				continue
 			}
-
-			stats.Success++
-			spinner.Stop(fmt.Sprintf("Pushed schema: %s", slug))
-			hasError = false
+			report.Add("schemas/"+slug, status, detail)
 		}
 
-		if dryRun {
-			action := "push"
-			if commit {
-				action = "push and commit"
+		if len(failures) > 0 {
+			code := clierr.FailuresCode(failedErrs)
+			summary := fmt.Sprintf("%d schema(s) failed to push", len(failures))
+			if code == clierr.CodeFileParseFailed {
+				summary = fmt.Sprintf("%d schema(s) failed local checks", len(failures))
 			}
-			log.Infof("DRY RUN: would %s %d schema(s) to %s", action, len(dryRunSlugs), workspace)
-			for _, s := range dryRunSlugs {
-				log.Infof("  - %s", s)
-			}
-			if stats.Failed > 0 {
-				return clierr.Failures(fmt.Sprintf("%d schema(s) failed local checks", stats.Failed), stats.Errors, clierr.CodeFileParseFailed)
-			}
-			return nil
+			return report.Finish(clierr.Failures(summary, failures, code))
 		}
-
-		log.Info("=== Schema Push Summary ===")
-		log.Infof("Total schemas processed: %d", stats.Total)
-		log.Infof("Successfully pushed: %d", stats.Success)
-		log.Infof("Failed to push: %d", stats.Failed)
-
-		if stats.Failed > 0 {
-			log.Info("Failed schemas:")
-			for _, errorMsg := range stats.Errors {
-				log.Infof("  - %s", errorMsg)
-			}
-			return clierr.Failures(fmt.Sprintf("%d schema(s) failed to push", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
-		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 
@@ -222,7 +183,7 @@ func init() {
 	schemaPushCmd.Flags().String("commit-message", "", "Message describing the changes being committed")
 	schemaPushCmd.PersistentFlags().StringP("slug", "g", "", "Schema slug to push (omit to push all)")
 	schemaPushCmd.PersistentFlags().StringP("json", "j", "", `Payload JSON Schema as a JSON object, used instead of payload_schema.json (requires --slug). Must be a valid JSON Schema with root type "object", e.g. '{"type":"object","properties":{"key":{"type":"string"}}}'`)
-	schemaPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	schemaPushCmd.Flags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	schemaPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	SchemaCmd.AddCommand(schemaPushCmd)
 }

@@ -34,3 +34,17 @@ func TestPushFailuresNamesRejectedEvents(t *testing.T) {
 		t.Errorf("expected no error when every record succeeded, got %v", err)
 	}
 }
+
+// A pull that writes fewer events than the API reports must fail, so an
+// agent never reads a broken pull as an empty workspace.
+func TestCheckPulledAll(t *testing.T) {
+	if err := checkPulledAll(12, 0); err == nil {
+		t.Error("12 reported, 0 written: expected an error")
+	}
+	if err := checkPulledAll(12, 12); err != nil {
+		t.Errorf("12 reported, 12 written: unexpected error %v", err)
+	}
+	if err := checkPulledAll(0, 0); err != nil {
+		t.Errorf("empty workspace: unexpected error %v", err)
+	}
+}

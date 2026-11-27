@@ -29,11 +29,14 @@ var translationPullCmd = &cobra.Command{
 		outputDir, _ := cmd.Flags().GetString("dir")
 		force, _ := cmd.Flags().GetBool("force")
 
-		return PullTranslations(workspace, outputDir, force)
+		report := utils.NewReport("category translation pull", workspace, false)
+		return report.Finish(PullTranslations(report, workspace, outputDir, force))
 	},
 }
 
-func PullTranslations(workspace, outputDir string, force bool) error {
+// PullTranslations writes one <locale>.json per translation locale to
+// outputDir and adds one report item per locale.
+func PullTranslations(report *utils.Report, workspace, outputDir string, force bool) error {
 	if workspace == "" {
 		return clierr.New("workspace flag is required", clierr.CodeInvalidUsage)
 	}
@@ -61,68 +64,54 @@ func PullTranslations(workspace, outputDir string, force bool) error {
 	}
 
 	spinner := utils.NewSpinner("Loading...")
+	defer spinner.Stop("")
 
 	mgmntClient := utils.GetSuprSendMgmntClient()
 	locales, err := mgmntClient.ListPreferenceTranslations(workspace)
 	if err != nil {
-		spinner.Stop("")
 		return clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch translation locales from workspace '%s'", workspace))
 	}
 
 	successCount := 0
 	failedCount := 0
 	var errors []string
+	fail := func(locale, msg string) {
+		failedCount++
+		errors = append(errors, msg)
+		report.Fail("preference_categories/translations/"+locale+".json", fmt.Errorf("%s", msg))
+	}
 
 	for _, localeResult := range locales.Results {
 		locale := localeResult.Locale
 		translations, err := mgmntClient.GetPreferenceTranslationsForLocale(workspace, locale)
 		if err != nil {
-			log.WithError(err).Errorf("Couldn't fetch translations for locale '%s' from workspace '%s'", locale, workspace)
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Locale '%s': Failed to fetch translations from workspace '%s' - %v", locale, workspace, err))
+			fail(locale, fmt.Sprintf("Locale '%s': Failed to fetch translations from workspace '%s' - %v", locale, workspace, err))
 			continue
 		}
 
 		// The locale comes from the API; only accept a plain name so the file
 		// can't land outside outputDir.
 		if locale == "" || locale != filepath.Base(locale) {
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Invalid locale %q", locale))
+			fail(locale, fmt.Sprintf("Invalid locale %q", locale))
 			continue
 		}
 		filename := filepath.Join(outputDir, fmt.Sprintf("%s.json", locale))
 		fileData, err := json.MarshalIndent(translations, "", "  ")
 		if err != nil {
-			log.WithError(err).Errorf("Failed to serialize translations to JSON for locale '%s'", locale)
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Failed to serialize translations to JSON for locale '%s': %v", locale, err))
+			fail(locale, fmt.Sprintf("Failed to serialize translations to JSON for locale '%s': %v", locale, err))
 			continue
 		}
 
 		if err := os.WriteFile(filename, fileData, 0644); err != nil {
-			log.WithError(err).Errorf("Couldn't write file '%s' for locale '%s'", filename, locale)
-			failedCount++
-			errors = append(errors, fmt.Sprintf("Locale '%s': Failed to write file '%s' - %v", locale, filename, err))
+			fail(locale, fmt.Sprintf("Locale '%s': Failed to write file '%s' - %v", locale, filename, err))
 			continue
 		}
 		successCount++
-		// Per-file write line, matching schema/workflow pull's "Wrote ... to ..."
-		// shape so users can see what landed on disk and can grep / diff
-		// against expectations.
-		log.Infof("Wrote translation to %s", filename)
+		log.Debugf("Wrote translation to %s", filename)
+		report.Add("preference_categories/translations/"+locale+".json", utils.StatusPulled, "")
 	}
 
-	spinner.Stop(fmt.Sprintf("Pulled %d translation(s) from %s", successCount, workspace))
-
-	log.Info("=== Translation Pull Summary ===")
-	log.Infof("Total locales processed: %d", len(locales.Results))
-	log.Infof("Successfully written: %d", successCount)
 	if failedCount > 0 {
-		log.Infof("Failed to write: %d", failedCount)
-		log.Info("Failed translations:")
-		for _, errMsg := range errors {
-			log.Infof("  - %s", errMsg)
-		}
 		return clierr.Failures(fmt.Sprintf("%d translation locale(s) failed to pull", failedCount), errors, clierr.CodeAPIInternal)
 	}
 	return nil

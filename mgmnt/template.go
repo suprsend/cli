@@ -78,7 +78,13 @@ func (c *SS_MgmntClient) GetTemplateVariants(workspace, slug, mode string) ([]ma
 	return allVariants, nil
 }
 
-func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels []string) error {
+// TemplateFields are the template-level fields that template.json sets and
+// the upsert endpoint accepts.
+var TemplateFields = []string{"name", "description", "tags", "enabled_channels"}
+
+// CreateTemplate creates or updates the template's own fields (see
+// TemplateFields). Fields left out of fields keep their current value.
+func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, fields map[string]any) error {
 	if slug == "" {
 		return fmt.Errorf("slug cannot be empty")
 	}
@@ -94,9 +100,7 @@ func (c *SS_MgmntClient) CreateTemplate(workspace, slug string, enabledChannels 
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]any{
-			"enabled_channels": enabledChannels,
-		}).
+		SetBody(fields).
 		Post(urlStr)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -140,10 +144,10 @@ func (c *SS_MgmntClient) PushTemplateVariant(workspace, slug string, variant map
 }
 
 type PreCommitVariant struct {
-	Channel string                `json:"channel"`
-	ID      string                `json:"id"`
-	HasDiff bool                  `json:"has_diff"`
-	Errors  map[string][]string   `json:"errors"`
+	Channel string              `json:"channel"`
+	ID      string              `json:"id"`
+	HasDiff bool                `json:"has_diff"`
+	Errors  map[string][]string `json:"errors"`
 }
 
 type PreCommitValidateResponse struct {
@@ -178,9 +182,9 @@ func (c *SS_MgmntClient) PreCommitValidate(workspace, slug string) (*PreCommitVa
 	return resp.Result().(*PreCommitValidateResponse), nil
 }
 
-func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, variants []map[string]any) error {
+func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, variants []map[string]any) (CommitStatus, error) {
 	if slug == "" {
-		return fmt.Errorf("slug cannot be empty")
+		return NotCommitted, fmt.Errorf("slug cannot be empty")
 	}
 
 	client := client.NewHTTPClient()
@@ -203,19 +207,24 @@ func (c *SS_MgmntClient) CommitTemplate(workspace, slug, commitMessage string, v
 
 	resp, err := req.Patch(urlStr)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return NotCommitted, requestError("templates/"+slug, true, err)
 	}
 	if resp.IsError() {
 		return commitHTTPError(resp, "templates/"+slug)
 	}
-	return nil
+	return Committed, nil
 }
 
-func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string]any, error) {
+// GetTemplateMockData returns the mock data of the template's draft or live
+// version: each version has its own, and a commit copies draft to live.
+func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug, mode string) (map[string]any, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/", c.mgmnt_base_URL, workspace, slug)
+	if mode != "live" {
+		mode = "draft"
+	}
+	url := fmt.Sprintf("%sv2/%s/template/%s/mock_data/?mode=%s", c.mgmnt_base_URL, workspace, slug, mode)
 
 	log.Debugf("Getting mock data for template: %s, workspace: %s", slug, workspace)
 	resp, err := client.R().
@@ -240,7 +249,11 @@ func (c *SS_MgmntClient) GetTemplateMockData(workspace, slug string) (map[string
 	return data, nil
 }
 
-func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) error {
+// PatchTemplateMockData saves mock data and returns it as the API stored it,
+// which can differ from what was sent: the API drops some fields silently.
+// The stored value is read back with a GET rather than taken from the PATCH
+// response, which for a new template can echo the request.
+func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData map[string]any) (map[string]any, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
@@ -254,12 +267,18 @@ func (c *SS_MgmntClient) PatchTemplateMockData(workspace, slug string, mockData 
 		SetBody(map[string]any{"data": mockData}).
 		Patch(url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.IsError() {
-		return apiError(resp)
+		return nil, apiError(resp)
 	}
-	return nil
+	stored, err := c.GetTemplateMockData(workspace, slug, "draft")
+	if err != nil {
+		// The save worked; only the check of what was stored can't run.
+		log.Debugf("templates/%s: couldn't read back mock data: %v", slug, err)
+		return nil, nil
+	}
+	return stored, nil
 }
 
 func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, error) {
@@ -287,6 +306,8 @@ func (c *SS_MgmntClient) GetTemplate(workspace, slug, mode string) (*Template, e
 	return resp.Result().(*Template), nil
 }
 
+// ListTemplates lists a workspace's templates, starting at offset: limit of
+// them, or all of them when limit <= 0. Meta.Count is the total the API reports.
 func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, mode string) (*TemplateAPIResponse, error) {
 	if mode != "live" && mode != "draft" {
 		return nil, fmt.Errorf("invalid mode: %s. Available modes are: live, draft", mode)
@@ -295,55 +316,31 @@ func (c *SS_MgmntClient) ListTemplates(workspace string, limit int, offset int, 
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	apiLimit := 50
-	allTemplates := []Template{}
-	currentOffset := offset
-	remainingLimit := limit
-	for remainingLimit > 0 {
-		currentLimit := apiLimit
-		if remainingLimit < apiLimit {
-			currentLimit = remainingLimit
-		}
-
-		log.Debugf("Getting templates for workspace: %s, limit: %d, offset: %d", workspace, currentLimit, currentOffset)
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]Template, int, error) {
+		log.Debugf("Getting templates for workspace: %s, limit: %d, offset: %d", workspace, limit, offset)
 		res, err := client.R().
 			SetDebug(c.debug).
 			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 			SetResult(&TemplateAPIResponse{}).
-			Get(c.mgmnt_base_URL + "v2/" + workspace + "/template/?limit=" + strconv.Itoa(currentLimit) + "&offset=" + strconv.Itoa(currentOffset) + "&mode=" + mode)
+			Get(c.mgmnt_base_URL + "v2/" + workspace + "/template/?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset) + "&mode=" + mode)
 		if err != nil {
-			log.Errorf("Error getting templates: %s", err)
-			return nil, err
+			return nil, 0, fmt.Errorf("request failed: %w", err)
 		}
 		if res.IsError() {
-			return nil, apiError(res)
+			return nil, 0, apiError(res)
 		}
-
-		templates := res.Result().(*TemplateAPIResponse)
-		if len(templates.Results) == 0 {
-			break
-		}
-
-		allTemplates = append(allTemplates, templates.Results...)
-		remainingLimit -= len(templates.Results)
-		currentOffset += len(templates.Results)
-		if len(templates.Results) < currentLimit {
-			break
-		}
+		page := res.Result().(*TemplateAPIResponse)
+		return page.Results, page.Meta.Count, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return &TemplateAPIResponse{
-		Results: allTemplates,
-		Meta: struct {
-			Count  int `json:"count"`
-			Limit  int `json:"limit"`
-			Offset int `json:"offset"`
-		}{
-			Count:  len(allTemplates),
-			Limit:  limit,
-			Offset: currentOffset,
-		},
-	}, nil
+	resp := &TemplateAPIResponse{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 type VariantOrderTenant struct {

@@ -38,8 +38,9 @@ var categoryPushCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-draft":   "Categories are written to the **draft** state. Run `suprsend category commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
 		"skills:tip.b-live":    "Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.",
-		"skills:tip.c-dryrun":  "`--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and logs counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.",
+		"skills:tip.c-dryrun":  "`--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and reports counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.",
 		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
+		"skills:tip.e-result":  "The result lists each translation locale and then `preference_categories` as `updated` (saved as draft), `unchanged` (the draft already matches `categories.json`, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`. With `--commit` the push and the commit are one step on the server: if the commit is refused (a removed category is still used by an active workflow), exit code 1 and the draft is left as it was. If the draft changes in the workspace while the push runs, it fails with `api-conflict` and nothing is saved; run it again. Locales are `created`, `updated` or `unchanged` the same way, followed by a summary; with `-o json` it is one JSON object with `items` and `counts`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -59,14 +60,11 @@ var categoryPushCmd = &cobra.Command{
 			}
 		}
 
-		// Aggregate stats across translations + categories so the run finishes
-		// with a single "=== Category Push Summary ===" block matching the
-		// shape used by schema push. Translations contribute one item per
-		// locale; the categories tree contributes exactly one item.
+		report := utils.NewReport("category push", workspace, dryRun)
+		mgmntClient := utils.GetSuprSendMgmntClient()
 		translationStats := &translation.PushTranslationStats{}
-		categorySuccess := false
-		categoryFailErr := ""
 
+		var categories *CategoriesOnDisk
 		if jsonPayload != "" {
 			var input jsonCategoryInput
 			if err := json.Unmarshal([]byte(jsonPayload), &input); err != nil {
@@ -75,194 +73,124 @@ var categoryPushCmd = &cobra.Command{
 			if input.Categories == nil {
 				return clierr.New("--json payload missing required \"categories\" field", clierr.CodeInvalidUsage)
 			}
-
-			mgmntClient := utils.GetSuprSendMgmntClient()
-
-			pushableLocales := 0
-			for locale := range input.Translations {
-				if locale != "en" {
-					pushableLocales++
-				}
-			}
-
-			if dryRun {
-				sectionCount, categoryCount := 0, 0
-				for _, rc := range input.Categories.RootCategories {
-					sectionCount += len(rc.Sections)
-					for _, s := range rc.Sections {
-						categoryCount += len(s.Categories)
-					}
-				}
-				log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
-					sectionCount, pluralS(sectionCount),
-					categoryCount, pluralIes(categoryCount),
-					pushableLocales, workspace,
-				)
-				return nil
-			}
+			categories = input.Categories
 
 			// Translations don't have a draft/live distinction — push them
 			// regardless of --commit so they always reflect the local state.
-			translationStats.Total = pushableLocales
 			for locale, t := range input.Translations {
-				if locale == "en" {
+				resource := "preference_categories/translations/" + locale + ".json"
+				switch {
+				case locale == "en":
 					translationStats.SkippedEnglish++
+					report.Add(resource, utils.StatusSkipped, "English is the source of truth and can't be pushed")
+					continue
+				case dryRun:
+					translationStats.Total++
+					report.Add(resource, utils.StatusWouldPush, "")
 					continue
 				}
+				translationStats.Total++
 				spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s.json...", locale))
-				if err := mgmntClient.PushPreferenceTranslation(workspace, locale, t); err != nil {
-					spinner.Stop("")
-					log.WithError(err).Errorf("preference_categories/translations/%s.json: failed to push", locale)
+				status, detail, err := translation.PushLocale(mgmntClient, workspace, locale, t)
+				spinner.Stop("")
+				if err != nil {
 					translationStats.Failed++
-					translationStats.Errors = append(translationStats.Errors, fmt.Sprintf("preference_categories/translations/%s.json: failed to push: %v", locale, err))
+					translationStats.Errors = append(translationStats.Errors, fmt.Sprintf("%s: failed to push: %v", resource, err))
+					report.Fail(resource, err)
 					continue
 				}
 				translationStats.Success++
-				spinner.Stop(fmt.Sprintf("Pushed translation: %s.json", locale))
+				report.Add(resource, status, detail)
 			}
-
-			catSpinner := utils.NewSpinner("Pushing categories...")
-			if err := mgmntClient.PushCategories(workspace, input.Categories, commit, commitMessage); err != nil {
-				catSpinner.Stop("")
-				log.WithError(err).Error("preference_categories/categories.json: failed to push")
-				categoryFailErr = err.Error()
-			} else {
-				categorySuccess = true
-				catSpinner.Stop("Pushed categories")
-			}
-
-			sectionCount, categoryCount := countSectionsAndCategories(input.Categories)
-			emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
-			if !categorySuccess || translationStats.Failed > 0 {
-				return categoryPushError(translationStats, categorySuccess, categoryFailErr)
-			}
-			return nil
-		}
-
-		translationDir := path
-		if translationDir == "" {
-			translationDir = filepath.Join(".", defaultCategoryDir)
-		}
-		translationDir = filepath.Join(translationDir, "translations")
-
-		if path == "" {
-			path = filepath.Join(".", defaultCategoryDir, "categories.json")
 		} else {
-			path = filepath.Join(path, "categories.json")
-		}
+			translationDir := path
+			if translationDir == "" {
+				translationDir = filepath.Join(".", defaultCategoryDir)
+			}
+			translationDir = filepath.Join(translationDir, "translations")
 
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Errorf("Directory %s does not exist", path)
-			return clierr.Wrap(err, clierr.CodeFileNotFound, "")
-		}
-
-		categories, err := ReadFromFile(path)
-		if err != nil {
-			log.WithError(err).Error("Couldn't read categories from file")
-			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
-		}
-
-		// Push translations first, regardless of --commit. They don't have a
-		// draft/live model, so any local change should land immediately.
-		// English-only / no-files cases get demoted from error to debug log so
-		// they don't fail the broader category push.
-		ts, terr := translation.PushTranslations(workspace, "", translationDir, dryRun)
-		if ts != nil {
-			translationStats = ts
-		}
-		if terr != nil {
-			var ce *clierr.CLIError
-			if errors.As(terr, &ce) && ce.Code == clierr.CodeInvalidUsage {
-				log.Debugf("No translations to push: %v", terr)
-			} else if errors.As(terr, &ce) && ce.Code == clierr.CodeFileNotFound {
-				log.Debugf("No translation files found: %v", terr)
+			if path == "" {
+				path = filepath.Join(".", defaultCategoryDir, "categories.json")
 			} else {
-				log.WithError(terr).Warn("Translation push had errors; continuing with categories")
+				path = filepath.Join(path, "categories.json")
+			}
+
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				return clierr.Wrap(err, clierr.CodeFileNotFound, "")
+			}
+
+			var err error
+			categories, err = ReadFromFile(path)
+			if err != nil {
+				return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+			}
+
+			// Push translations first, regardless of --commit. They don't have a
+			// draft/live model, so any local change should land immediately.
+			// English-only / no-files cases get demoted from error to debug log so
+			// they don't fail the broader category push.
+			ts, terr := translation.PushTranslations(report, workspace, "", translationDir, dryRun)
+			if ts != nil {
+				translationStats = ts
+			}
+			if terr != nil {
+				var ce *clierr.CLIError
+				if errors.As(terr, &ce) && ce.Code == clierr.CodeInvalidUsage {
+					log.Debugf("No translations to push: %v", terr)
+				} else if errors.As(terr, &ce) && ce.Code == clierr.CodeFileNotFound {
+					log.Debugf("No translation files found: %v", terr)
+				}
 			}
 		}
 
+		sectionCount, categoryCount := countSectionsAndCategories(categories)
+		counts := fmt.Sprintf("%d section%s, %d categor%s", sectionCount, pluralS(sectionCount), categoryCount, pluralIes(categoryCount))
 		if dryRun {
-			sectionCount, categoryCount := countSectionsAndCategories(categories)
-			log.Infof("DRY RUN: would push %d section%s, %d categor%s and %d translation(s) to %s",
-				sectionCount, pluralS(sectionCount),
-				categoryCount, pluralIes(categoryCount),
-				translationStats.Total, workspace,
-			)
-			return nil
-		}
-
-		spinner2 := utils.NewSpinner("Pushing categories...")
-		mgmnt_client := utils.GetSuprSendMgmntClient()
-		err = mgmnt_client.PushCategories(workspace, categories, commit, commitMessage)
-		if err != nil {
-			spinner2.Stop("")
-			log.WithError(err).Error("preference_categories/categories.json: failed to push")
-			categoryFailErr = err.Error()
-		} else {
-			categorySuccess = true
-			spinner2.Stop("Pushed categories")
-		}
-
-		sectionCount, categoryCount := 0, 0
-		for _, rc := range categories.RootCategories {
-			sectionCount += len(rc.Sections)
-			for _, s := range rc.Sections {
-				categoryCount += len(s.Categories)
+			status := utils.StatusWouldPush
+			if commit {
+				status = utils.StatusWouldCommit
 			}
+			report.Add("preference_categories", status, counts)
+			return report.Finish(nil)
 		}
-		emitCategoryPushSummary(translationStats, categorySuccess, categoryFailErr, sectionCount, categoryCount)
-		if !categorySuccess || translationStats.Failed > 0 {
-			return categoryPushError(translationStats, categorySuccess, categoryFailErr)
+
+		spinner := utils.NewSpinner("Pushing categories...")
+		status, detail, err := pushCategories(mgmntClient, workspace, categories, commit, commitMessage)
+		spinner.Stop("")
+		if err != nil {
+			report.Fail("preference_categories", err)
+		} else {
+			if detail != "" {
+				counts += "; " + detail
+			}
+			report.Add("preference_categories", status, counts)
 		}
-		return nil
+
+		if err != nil || translationStats.Failed > 0 {
+			return report.Finish(categoryPushError(translationStats, err))
+		}
+		return report.Finish(nil)
 	},
 }
 
 // categoryPushError lists everything that failed in a category push: the
 // categories themselves and each translation locale.
-func categoryPushError(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) error {
+//
+// The categories' own error code is kept (api-conflict for a draft that
+// changed, api-validation-failed for a refused commit) unless a locale
+// failed too.
+func categoryPushError(t *translation.PushTranslationStats, categoryErr error) error {
 	var failures []string
-	if !categorySuccess {
-		failures = append(failures, clierr.ItemFailure("preference_categories", "failed to push", errors.New(categoryFailErr)))
+	code := clierr.CodeAPIInternal
+	if categoryErr != nil {
+		failures = append(failures, clierr.ItemFailure("preference_categories", "failed to push", categoryErr))
+		var ce *clierr.CLIError
+		if errors.As(categoryErr, &ce) && len(t.Errors) == 0 {
+			code = ce.Code
+		}
 	}
 	failures = append(failures, t.Errors...)
-	return clierr.Failures("category push had errors", failures, clierr.CodeAPIInternal)
-}
-
-// emitCategoryPushSummary prints the end-of-run summary for `category push`.
-// The "Category Push Summary" block is always printed and reports the
-// section/category counts plus push outcome. The "Translation Push Summary"
-// block follows only when translations were attempted or English files were
-// skipped (i.e. t.Total or t.SkippedEnglish is non-zero).
-func emitCategoryPushSummary(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string, sectionCount, categoryCount int) {
-	if t == nil {
-		t = &translation.PushTranslationStats{}
-	}
-
-	log.Info("=== Category Push Summary ===")
-	log.Infof("Sections: %d", sectionCount)
-	log.Infof("Categories: %d", categoryCount)
-	if categorySuccess {
-		log.Info("Successfully pushed")
-	} else {
-		log.Infof("Failed to push: %s", categoryFailErr)
-	}
-
-	if t.Total > 0 || t.SkippedEnglish > 0 {
-		log.Info("=== Translation Push Summary ===")
-		log.Infof("Total locales processed: %d", t.Total)
-		log.Infof("Successfully pushed: %d", t.Success)
-		log.Infof("Failed to push: %d", t.Failed)
-		if t.SkippedEnglish > 0 {
-			log.Infof("Skipped (English source of truth): %d", t.SkippedEnglish)
-		}
-		if len(t.Errors) > 0 {
-			log.Info("Errors:")
-			for _, e := range t.Errors {
-				log.Infof("  - %s", e)
-			}
-		}
-	}
+	return clierr.Failures("category push had errors", failures, code)
 }
 
 func countSectionsAndCategories(cats *CategoriesOnDisk) (int, int) {
@@ -298,7 +226,7 @@ func init() {
 	categoryPushCmd.PersistentFlags().BoolP("commit", "c", false, "Promote changes from draft to live after pushing")
 	categoryPushCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
 	categoryPushCmd.Flags().StringP("json", "j", "", `Categories (and optional translations) as a JSON object. Required "categories" key holds the preference category structure. Optional "translations" key maps locale codes to objects with "sections" and "categories" keys, e.g. '{"categories":{"root_categories":[...]},"translations":{"es":{"sections":{"key":{"name":"...","description":"..."}},"categories":{"key":{"name":"...","description":"..."}}}}}'`)
-	categoryPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	categoryPushCmd.Flags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	categoryPushCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt when --commit is set")
 	CategoryCmd.AddCommand(categoryPushCmd)
 }

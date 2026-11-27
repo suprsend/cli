@@ -6,13 +6,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
 var schemaListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List schemas",
-	Long:  `List trigger payload schemas in a workspace with pagination. Returns schema slug, name, and version info. Use --mode to switch between draft and live versions.`,
+	Long:  `List the trigger payload schemas in a workspace: all of them unless --limit is given. Returns schema slug, name, and version info. Use --mode to switch between draft and live versions.`,
 	Example: `  # List all schemas (live mode)
   suprsend schema list
 
@@ -50,16 +51,17 @@ var schemaListCmd = &cobra.Command{
 		}
 		filteredSchemas := filterSchemaData(schemas.Results)
 		utils.OutputData(filteredSchemas, outputType)
+		utils.NoteMoreResults("schemas", len(schemas.Results), offset, schemas.Meta.Count)
 		return nil
 	},
 }
 
 func init() {
-	schemaListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of schemas to return")
+	schemaListCmd.PersistentFlags().IntP("limit", "l", 0, utils.LimitFlagHelp("schemas"))
 	schemaListCmd.PersistentFlags().Int("offset", 0, "Number of schemas to skip for pagination")
 	schemaListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	schemaListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 
-	SchemaCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	SchemaCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	SchemaCmd.AddCommand(schemaListCmd)
 }

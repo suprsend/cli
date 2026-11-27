@@ -1,0 +1,516 @@
+package template
+
+import (
+	"errors"
+	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/state"
+	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
+)
+
+// A template is pushed in parts, each compared and recorded on its own, so a
+// variant edited in the dashboard isn't overwritten by a push that only
+// changed another variant. State file keys are "<slug>/<part>".
+const (
+	partFields       = "fields" // name, description, tags, enabled_channels
+	partMockData     = "mock_data"
+	partVariantOrder = "variant_order"
+	variantPrefix    = "variants/" // + "<channel>/<id>"
+)
+
+// variantIgnore are the variant fields the API manages. seq_no is the
+// variant's position, renumbered whenever a sibling is added, removed or
+// reordered and again on commit; the variant_order part covers order. Fingerprints leave
+// them out, so a draft and its live version (and files pulled in either
+// mode) compare equal when their content does.
+var variantIgnore = []string{
+	"$schema", "action", "approval_at", "approval_status", "created_at", "discard_comment",
+	"errors", "has_error", "hash", "needs_vendor_approval", "seq_no", "sysgen_template_name",
+	"updated_at", "vendor_approvals",
+}
+
+// templateParts maps part keys to their values.
+type templateParts map[string]any
+
+func variantKey(v map[string]any) string {
+	ch, _ := v["channel"].(string)
+	id, _ := v["id"].(string)
+	return variantPrefix + ch + "/" + id
+}
+
+// localParts are the parts push would send from a template directory.
+func localParts(templateData map[string]any, variants []map[string]any, mockData map[string]any) templateParts {
+	p := templateParts{partFields: templateFields(templateData)}
+	for _, v := range variants {
+		p[variantKey(v)] = v
+	}
+	if mockData != nil {
+		p[partMockData] = mockData
+	}
+	if vo, ok := templateData["variant_order"]; ok && vo != nil {
+		p[partVariantOrder] = vo
+	}
+	return p
+}
+
+// remoteParts are the parts of a template as the API returned it.
+func remoteParts(t TemplateResult) templateParts {
+	tags := t.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	p := templateParts{partFields: map[string]any{
+		"name": t.Name, "description": t.Description, "tags": tags, "enabled_channels": t.EnabledChannels,
+	}}
+	for _, v := range t.Variants {
+		p[variantKey(v)] = v
+	}
+	if t.MockData != nil {
+		p[partMockData] = t.MockData
+	}
+	if t.VariantOrder != nil {
+		p[partVariantOrder] = flattenVariantOrder(t.VariantOrder)
+	}
+	return p
+}
+
+// partFingerprint fingerprints one part. The fields part always covers all
+// of mgmnt.TemplateFields, with a field the file leaves out (or sets to
+// null, or an empty name) counting as null on both sides: fingerprints then
+// stay comparable when template.json gains or loses a field.
+func partFingerprint(key string, v any) string {
+	switch {
+	case key == partFields:
+		m, _ := v.(map[string]any)
+		m = templateFields(m)
+		picked := map[string]any{}
+		for _, k := range mgmnt.TemplateFields {
+			picked[k] = m[k]
+		}
+		return state.Fingerprint(picked)
+	case strings.HasPrefix(key, variantPrefix):
+		m, _ := v.(map[string]any)
+		return state.Fingerprint(m, variantIgnore...)
+	}
+	return state.Fingerprint(v)
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// partKeys lists p's keys with the fields part first, as they are pushed.
+func (p templateParts) partKeys() []string {
+	keys := []string{}
+	if _, ok := p[partFields]; ok {
+		keys = append(keys, partFields)
+	}
+	for _, k := range sortedKeys(p) {
+		if k != partFields {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+type partPlan struct {
+	key           string
+	action        state.Action
+	local, remote string // fingerprints; remote is "" when the workspace lacks the part
+}
+
+type plan []partPlan
+
+func (p plan) keys(a state.Action) []string {
+	var keys []string
+	for _, pp := range p {
+		if pp.action == a {
+			keys = append(keys, pp.key)
+		}
+	}
+	return keys
+}
+
+// fetchDraft fetches the workspace's draft of slug; exists is false when the
+// workspace has no such template. Unlike a pull, any failed request is an
+// error: a part that couldn't be read would look deleted in the workspace.
+// A 404 for mock data or variant order means the template has none.
+func fetchDraft(client *mgmnt.SS_MgmntClient, workspace, slug string) (TemplateResult, bool, error) {
+	tmpl, err := client.GetTemplate(workspace, slug, "draft")
+	if isNotFound(err) {
+		return TemplateResult{}, false, nil
+	}
+	if err != nil {
+		return TemplateResult{}, false, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch template %s", slug))
+	}
+	variants, err := client.GetTemplateVariants(workspace, slug, "draft")
+	if err != nil {
+		return TemplateResult{}, false, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variants for template %s", slug))
+	}
+	mockData, err := client.GetTemplateMockData(workspace, slug, "draft")
+	if err != nil {
+		return TemplateResult{}, false, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch mock data for template %s", slug))
+	}
+	variantOrder, err := client.GetVariantOrder(workspace, slug, "draft")
+	if isNotFound(err) {
+		variantOrder, err = nil, nil
+	}
+	if err != nil {
+		return TemplateResult{}, false, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variant order for template %s", slug))
+	}
+	return TemplateResult{
+		Slug:            slug,
+		Name:            tmpl.Name,
+		Description:     tmpl.Description,
+		Tags:            tmpl.Tags,
+		EnabledChannels: tmpl.EnabledChannels,
+		Variants:        variants,
+		MockData:        mockData,
+		VariantOrder:    variantOrder,
+	}, true, nil
+}
+
+func isNotFound(err error) bool {
+	var ce *clierr.CLIError
+	return errors.As(err, &ce) && ce.Code == clierr.CodeAPINotFound
+}
+
+// planParts decides what to do with each local part. It also returns the
+// workspace draft's parts (nil for PushAll, which doesn't fetch them).
+func planParts(client *mgmnt.SS_MgmntClient, workspace, slug string, local templateParts, opts PushOptions) (plan, templateParts, bool, error) {
+	var p plan
+	if opts.PushAll {
+		for _, key := range local.partKeys() {
+			p = append(p, partPlan{key: key, action: state.Update})
+		}
+		return p, nil, true, nil
+	}
+	draft, exists, err := fetchDraft(client, workspace, slug)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	remote := templateParts{}
+	if exists {
+		remote = remoteParts(draft)
+	}
+	for _, key := range local.partKeys() {
+		pp := partPlan{key: key, local: partFingerprint(key, local[key])}
+		if v, ok := remote[key]; ok {
+			pp.remote = partFingerprint(key, v)
+		}
+		base, hasBase := opts.State.Get(workspace, slug+"/"+key)
+		pp.action = state.Decide(pp.local, pp.remote, base, hasBase, opts.Overwrite)
+		p = append(p, pp)
+	}
+	return p, remote, exists, nil
+}
+
+// unseenDraftParts lists the parts of the workspace's draft that the local
+// files don't have and that aren't live as they stand: variants, and the
+// mock data or variant order of a template whose directory has no
+// mock_data.json or variant_order. A commit publishes the whole draft, so
+// these would go live without anyone here having seen them. Mock data and
+// variant order are only checked for a template that has a live version:
+// before that the API's defaults are all there is.
+func unseenDraftParts(client *mgmnt.SS_MgmntClient, workspace, slug string, local, remote templateParts) ([]string, error) {
+	var missing []string
+	for _, key := range sortedKeys(remote) {
+		if _, ok := local[key]; ok {
+			continue
+		}
+		if strings.HasPrefix(key, variantPrefix) || key == partMockData || key == partVariantOrder {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) == 0 {
+		return nil, nil
+	}
+	liveVariants, err := client.GetTemplateVariants(workspace, slug, "live")
+	hasLive := !isNotFound(err) // not found: nothing is live yet
+	if err != nil && hasLive {
+		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live variants of template %s", slug))
+	}
+	live := map[string]string{}
+	for _, v := range liveVariants {
+		live[variantKey(v)] = partFingerprint(variantKey(v), v)
+	}
+	var unseen []string
+	for _, key := range missing {
+		switch key {
+		case partMockData:
+			if !hasLive {
+				continue
+			}
+			mockData, err := client.GetTemplateMockData(workspace, slug, "live")
+			if err != nil {
+				return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live mock data of template %s", slug))
+			}
+			if mockData == nil { // the live version has none to compare with
+				continue
+			}
+			if partFingerprint(key, mockData) != partFingerprint(key, remote[key]) {
+				unseen = append(unseen, key)
+			}
+		case partVariantOrder:
+			if !hasLive {
+				continue
+			}
+			order, err := client.GetVariantOrder(workspace, slug, "live")
+			if isNotFound(err) || (err == nil && order == nil) {
+				continue
+			}
+			if err != nil {
+				return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live variant order of template %s", slug))
+			}
+			if partFingerprint(key, flattenVariantOrder(order)) != partFingerprint(key, remote[key]) {
+				unseen = append(unseen, key)
+			}
+		default:
+			if fp, ok := live[key]; !ok || fp != partFingerprint(key, remote[key]) {
+				unseen = append(unseen, key)
+			}
+		}
+	}
+	return unseen, nil
+}
+
+func toPush(a state.Action) bool { return a == state.Create || a == state.Update }
+
+// applyParts sends the parts the plan says to push and returns the keys it
+// sent. Variants are all attempted; a failed one fails the template before
+// mock data and variant order are sent.
+func applyParts(client *mgmnt.SS_MgmntClient, workspace, slug string, p plan, local templateParts, variantOrder *mgmnt.VariantOrderResponse) ([]string, error) {
+	var pushed []string
+	var variantErrs []string
+	for _, pp := range p {
+		if !toPush(pp.action) {
+			continue
+		}
+		switch {
+		case pp.key == partFields:
+			fields, _ := local[partFields].(map[string]any)
+			if err := client.CreateTemplate(workspace, slug, fields); err != nil {
+				return pushed, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to create template %s", slug))
+			}
+		case strings.HasPrefix(pp.key, variantPrefix):
+			variant, _ := local[pp.key].(map[string]any)
+			if err := client.PushTemplateVariant(workspace, slug, variant); err != nil {
+				variantErrs = append(variantErrs, err.Error())
+				continue
+			}
+		}
+		if pp.key == partMockData || pp.key == partVariantOrder {
+			continue // after the variants
+		}
+		pushed = append(pushed, pp.key)
+	}
+	if len(variantErrs) > 0 {
+		return pushed, clierr.New(fmt.Sprintf("templates/%s: failed to push %d variant(s): %s", slug, len(variantErrs), strings.Join(variantErrs, "; ")), clierr.CodeAPIInternal)
+	}
+	for _, pp := range p {
+		if !toPush(pp.action) {
+			continue
+		}
+		switch pp.key {
+		case partMockData:
+			mockData, _ := local[partMockData].(map[string]any)
+			stored, err := client.PatchTemplateMockData(workspace, slug, mockData)
+			if err != nil {
+				return pushed, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push mock data for template %s", slug))
+			}
+			warnDroppedMockData(slug, mockData, stored)
+		case partVariantOrder:
+			if err := client.PostVariantOrder(workspace, slug, "draft", variantOrder); err != nil {
+				return pushed, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("failed to push variant order for template %s", slug))
+			}
+		default:
+			continue
+		}
+		pushed = append(pushed, pp.key)
+	}
+	return pushed, nil
+}
+
+// recordParts records the parts that were pushed or found unchanged, with
+// the workspace's version read back after the push. Skipped and conflicting
+// parts keep their old entry, so the next push still sees that the
+// workspace changed them. When the template can't be read back, the pushed
+// parts' entries are dropped.
+func recordParts(client *mgmnt.SS_MgmntClient, st *state.File, workspace, slug string, p plan, pushed []string, local templateParts) {
+	if st == nil {
+		return
+	}
+	wasPushed := map[string]bool{}
+	for _, k := range pushed {
+		wasPushed[k] = true
+	}
+	var after templateParts
+	if len(pushed) > 0 {
+		if draft, exists, err := fetchDraft(client, workspace, slug); err == nil && exists {
+			after = remoteParts(draft)
+		} else {
+			log.Debugf("templates/%s: couldn't read the template back after pushing: %v", slug, err)
+		}
+	}
+	for _, pp := range p {
+		key := slug + "/" + pp.key
+		switch {
+		case wasPushed[pp.key]:
+			if v, ok := after[pp.key]; ok {
+				st.Set(workspace, key, state.Entry{Remote: partFingerprint(pp.key, v), Local: pp.local})
+			} else {
+				st.Delete(workspace, key, false)
+			}
+		case pp.action == state.Unchanged:
+			remote := pp.remote
+			if v, ok := after[pp.key]; ok {
+				remote = partFingerprint(pp.key, v)
+			}
+			st.Set(workspace, key, state.Entry{Remote: remote, Local: pp.local})
+		}
+	}
+}
+
+// pushStatus is the report status and detail for a push without commit.
+func pushStatus(p plan, pushed, skipped []string, exists, pushAll bool) (string, string) {
+	if pushAll {
+		return utils.StatusPushed, ""
+	}
+	join := func(a, b string) string {
+		if a == "" || b == "" {
+			return a + b
+		}
+		return a + "; " + b
+	}
+	note := ""
+	if len(skipped) > 0 {
+		note = "skipped, changed in the workspace since the last pull or push and not locally: " + describeParts(skipped) + " (pull to update the files, or pass --overwrite)"
+	}
+	note = join(note, pendingNote(p.keys(state.Pending)))
+	switch {
+	case len(pushed) > 0 && !exists:
+		return utils.StatusCreated, fmt.Sprintf("%d variant(s)", countVariants(p))
+	case len(pushed) > 0:
+		return utils.StatusUpdated, join(describeParts(pushed), note)
+	case len(skipped) > 0:
+		return utils.StatusSkipped, note
+	}
+	return utils.StatusUnchanged, note
+}
+
+// pendingNote says which parts were left alone because the workspace's
+// draft holds changes a live pull didn't bring; "" when there are none.
+func pendingNote(pending []string) string {
+	if len(pending) == 0 {
+		return ""
+	}
+	return "the workspace's draft has changes that aren't in the files (they were pulled from live), in: " + describeParts(pending) + " (pull with --mode draft to see them, or pass --overwrite to replace them)"
+}
+
+func countVariants(p plan) int {
+	n := 0
+	for _, pp := range p {
+		if strings.HasPrefix(pp.key, variantPrefix) {
+			n++
+		}
+	}
+	return n
+}
+
+// describeParts names parts for a message: email/default, mock data, ...
+func describeParts(keys []string) string {
+	names := make([]string, 0, len(keys))
+	for _, k := range keys {
+		switch {
+		case k == partFields:
+			names = append(names, "template fields")
+		case k == partMockData:
+			names = append(names, "mock data")
+		case k == partVariantOrder:
+			names = append(names, "variant order")
+		default:
+			names = append(names, strings.TrimPrefix(k, variantPrefix))
+		}
+	}
+	const max = 6
+	if len(names) > max {
+		return fmt.Sprintf("%s and %d more", strings.Join(names[:max], ", "), len(names)-max)
+	}
+	return strings.Join(names, ", ")
+}
+
+// RecordPulled records a template just written by pull to outputDir. The
+// local fingerprints come from reading the files back the way push does, so
+// a push right after the pull finds nothing changed locally.
+func RecordPulled(st *state.File, workspace, outputDir string, t TemplateResult) {
+	if st == nil {
+		return
+	}
+	st.Delete(workspace, t.Slug+"/", true)
+	local, err := readLocalParts(templateDirOf(outputDir, t.Slug))
+	if err != nil {
+		log.Debugf("templates/%s: couldn't read back the pulled files: %v", t.Slug, err)
+		return
+	}
+	remote := remoteParts(t)
+	var draft templateParts
+	if t.Draft != nil {
+		draft = remoteParts(*t.Draft)
+	}
+	for _, key := range local.partKeys() {
+		v, ok := remote[key]
+		if !ok {
+			continue
+		}
+		entry := state.Entry{Remote: partFingerprint(key, v), Local: partFingerprint(key, local[key])}
+		// Push compares with the draft. A draft part that differs from the
+		// pulled one holds changes the files don't have.
+		if dv, ok := draft[key]; ok {
+			pulled := entry.Remote
+			entry.Remote = partFingerprint(key, dv)
+			entry.Pending = entry.Remote != pulled
+		} else if draft != nil {
+			entry.Remote, entry.Pending = "", true // removed in the draft
+		}
+		st.Set(workspace, t.Slug+"/"+key, entry)
+	}
+}
+
+// saveState writes st, warning (not failing the command) when it can't.
+func saveState(st *state.File) {
+	if err := st.Save(); err != nil {
+		log.Warnf("couldn't save %s: %v; the next push can't tell what changed since this run", state.FileName, err)
+	}
+}
+
+// readLocalParts reads a template directory the way push does.
+func readLocalParts(templateDir string) (templateParts, error) {
+	templateData, err := readTemplateJSON(templateDir)
+	if err != nil {
+		return nil, err
+	}
+	variants, err := readTemplateVariants(templateDir)
+	if err != nil {
+		return nil, err
+	}
+	mockData, err := readMockData(templateDir)
+	if err != nil {
+		return nil, err
+	}
+	return localParts(templateData, variants, mockData), nil
+}
+
+func templateDirOf(outputDir, slug string) string {
+	return filepath.Join(outputDir, slug)
+}

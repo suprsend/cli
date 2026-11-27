@@ -3,7 +3,6 @@ package profiles
 import (
 	"fmt"
 
-	"github.com/sabouaram/cobra_ui"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
@@ -16,6 +15,7 @@ var (
 	modifyBaseUrl      string
 	modifyMgmntUrl     string
 	modifyServiceToken string
+	modifyWorkspace    string
 )
 
 var profilesModifyCmd = &cobra.Command{
@@ -25,10 +25,13 @@ var profilesModifyCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 
-		cfg, path, err := EnsureConfig(path)
+		cfg, path, err := EnsureConfig(path, false)
 		if err != nil {
-			log.WithError(err).Error("Failed to load or create config")
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
+		}
+		workspaceSet := cmd.Flags().Changed("workspace")
+		if modifyWorkspace, err = normalizeProfileWorkspace(modifyWorkspace); err != nil {
+			return err
 		}
 		if modifyName != "" {
 			if _, exists := cfg.Profiles[modifyName]; !exists {
@@ -36,7 +39,7 @@ var profilesModifyCmd = &cobra.Command{
 			}
 		}
 
-		if modifyName != "" && modifyServiceToken != "" {
+		if modifyName != "" && (modifyServiceToken != "" || modifyBaseUrl != "" || modifyMgmntUrl != "" || workspaceSet) {
 			selectedProfile := cfg.Profiles[modifyName]
 
 			if modifyBaseUrl != "" {
@@ -53,7 +56,12 @@ var profilesModifyCmd = &cobra.Command{
 				}
 				selectedProfile.MgmntUrl.Value = normalized
 			}
-			selectedProfile.ServiceToken.Value = modifyServiceToken
+			if modifyServiceToken != "" {
+				selectedProfile.ServiceToken.Value = modifyServiceToken
+			}
+			if workspaceSet {
+				selectedProfile.Workspace.Value = modifyWorkspace
+			}
 
 			cfg.Profiles[modifyName] = selectedProfile
 
@@ -66,9 +74,9 @@ var profilesModifyCmd = &cobra.Command{
 			log.Infof("Profile %s modified successfully", modifyName)
 		} else {
 			if !utils.IsInputInteractive() {
-				return clierr.New("required flags missing (--name, --service-token), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
+				return clierr.New("required flags missing (--name and a field to change), cannot prompt in non-interactive mode", clierr.CodeInvalidUsage)
 			}
-			runModifyInteractive(cfg, path)
+			runModifyInteractive(cfg, path, workspaceSet)
 		}
 		return nil
 	},
@@ -79,12 +87,14 @@ func init() {
 	profilesModifyCmd.Flags().StringVar(&modifyBaseUrl, "base-url", "", "Base URL (default: "+config.DefaultBaseUrl+")")
 	profilesModifyCmd.Flags().StringVar(&modifyMgmntUrl, "mgmnt-url", "", "Management URL (default: "+config.DefaultMgmntUrl+")")
 	profilesModifyCmd.Flags().StringVar(&modifyServiceToken, "service-token", "", "Service Token")
+	profilesModifyCmd.Flags().StringVar(&modifyWorkspace, "workspace", "", `Default workspace for commands run with this profile; "" removes it`)
 	ProfileCmd.AddCommand(profilesModifyCmd)
 }
 
-func runModifyInteractive(cfg *config.ProfileConfig, path string) {
-	ui := cobra_ui.New()
-
+// runModifyInteractive prompts for the fields that weren't given as flags.
+// workspaceSet says --workspace was passed: its value (already normalized,
+// "" to remove the workspace) is then used as is, without a prompt.
+func runModifyInteractive(cfg *config.ProfileConfig, path string, workspaceSet bool) {
 	var profileNames []string
 	for name := range cfg.Profiles {
 		profileNames = append(profileNames, name)
@@ -96,7 +106,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 	}
 
 	if modifyName == "" {
-		ui.SetQuestions([]cobra_ui.Question{
+		err := ask([]question{
 			{
 				Text: "Select a profile to modify: ",
 				Handler: func(s string) error {
@@ -107,8 +117,10 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 				Options: profileNames,
 			},
 		})
-
-		ui.RunInteractiveUI()
+		if err != nil {
+			log.Error(err)
+			return
+		}
 	}
 
 	selectedProfile, exists := cfg.Profiles[modifyName]
@@ -117,13 +129,12 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 		return
 	}
 
-	ui2 := cobra_ui.New()
-	var questions []cobra_ui.Question
+	var questions []question
 
 	if modifyServiceToken == "" {
 		currentToken := selectedProfile.ServiceToken.Value
 		maskedToken := MaskServiceToken(currentToken)
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: fmt.Sprintf("Service Token (current: %s, press Enter to keep): ", maskedToken),
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -148,7 +159,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 			current = config.DefaultBaseUrl
 		}
 		modifyBaseUrl = current
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: fmt.Sprintf("Base URL [%s]: ", current),
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -170,7 +181,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 			current = config.DefaultMgmntUrl
 		}
 		modifyMgmntUrl = current
-		questions = append(questions, cobra_ui.Question{
+		questions = append(questions, question{
 			Text: fmt.Sprintf("Management URL [%s]: ", current),
 			Handler: func(s string) error {
 				s = cleanInput(s)
@@ -187,9 +198,35 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 		})
 	}
 
-	if len(questions) > 0 {
-		ui2.SetQuestions(questions)
-		ui2.RunInteractiveUI()
+	if !workspaceSet {
+		modifyWorkspace = selectedProfile.Workspace.Value
+		current := modifyWorkspace
+		if current == "" {
+			current = "none"
+		}
+		questions = append(questions, question{
+			Text: fmt.Sprintf("Default workspace [%s] (Enter keeps it, \"-\" removes it): ", current),
+			Handler: func(s string) error {
+				s = cleanInput(s)
+				switch s {
+				case "":
+					return nil
+				case "-":
+					modifyWorkspace = ""
+					return nil
+				}
+				ws, err := normalizeProfileWorkspace(s)
+				if err == nil {
+					modifyWorkspace = ws
+				}
+				return err
+			},
+		})
+	}
+
+	if err := ask(questions); err != nil {
+		log.Error(err)
+		return
 	}
 
 	if modifyName == "" {
@@ -205,6 +242,7 @@ func runModifyInteractive(cfg *config.ProfileConfig, path string) {
 		BaseUrl:      config.ConfigString{Value: modifyBaseUrl},
 		MgmntUrl:     config.ConfigString{Value: modifyMgmntUrl},
 		ServiceToken: config.ConfigString{Value: modifyServiceToken},
+		Workspace:    config.ConfigString{Value: modifyWorkspace},
 	}
 
 	cfg.Profiles[modifyName] = updatedProfile

@@ -22,21 +22,16 @@ type SchemaWriteStats struct {
 	Success int
 	Failed  int
 	Errors  []string
-}
-
-type SchemaPushStats struct {
-	Total   int
-	Success int
-	Failed  int
-	Errors  []string
+	Written []string // slugs of the schemas written
 }
 
 type FilteredSchema struct {
 	Slug        string `json:"slug"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	// IsEnabled is left out when the API doesn't return it (older versions).
+	IsEnabled *bool `json:"is_enabled,omitempty"`
 }
-
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
@@ -104,6 +99,7 @@ func filterSchemaData(schemas []mgmnt.SchemaResponse) []FilteredSchema {
 			Slug:        schema.Slug,
 			Name:        schema.Name,
 			Description: schema.Description,
+			IsEnabled:   schema.IsEnabled,
 		}
 	}
 	return filtered
@@ -151,8 +147,9 @@ func WriteSchemasToFiles(schemasResp *mgmnt.SchemasResponse, dirPath string) (*S
 			continue
 		}
 
-		log.Infof("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
+		log.Debugf("Wrote schema to %s", filepath.Join(slugDir, "schema.json"))
 		stats.Success++
+		stats.Written = append(stats.Written, slug)
 	}
 
 	return stats, nil
@@ -167,8 +164,8 @@ func writeSchemaFiles(slugDir, slug string, obj map[string]any) error {
 		"name":        obj["name"],
 		"description": obj["description"],
 	}
-	// is_enabled belongs to the schema, not a version, and push sends it back
-	// so a disabled schema stays disabled. Only written when the API returns it.
+	// is_enabled belongs to the schema, not a version. Push sends it back; a
+	// file without it leaves the workspace's value alone.
 	if v, ok := obj["is_enabled"].(bool); ok {
 		schemaMeta["is_enabled"] = v
 	}

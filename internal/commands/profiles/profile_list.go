@@ -22,7 +22,7 @@ var listProfilesCmd = &cobra.Command{
 			log.WithError(err).Error("Couldn't find the path")
 			return clierr.Wrap(err, clierr.CodeUnknown, "")
 		}
-		cfg, _, err := EnsureConfig(path)
+		cfg, _, err := EnsureConfig(path, false)
 		if err != nil {
 			log.WithError(err).Error("Failed to load config")
 			return clierr.Wrap(err, clierr.CodeConfigInvalid, "")
@@ -81,6 +81,7 @@ var listProfilesCmd = &cobra.Command{
 					Active:       isActive,
 					BaseUrl:      profile.BaseUrl.Value,
 					MgmntUrl:     profile.MgmntUrl.Value,
+					Workspace:    profile.Workspace.Value,
 					ServiceToken: profile.ServiceToken.Value,
 				})
 			}

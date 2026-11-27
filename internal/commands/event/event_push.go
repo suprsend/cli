@@ -2,14 +2,16 @@ package event
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
 	"github.com/suprsend/cli/internal/utils"
+	"github.com/suprsend/cli/mgmnt"
 )
 
 var eventPushCmd = &cobra.Command{
@@ -28,7 +30,9 @@ var eventPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend event push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-results": "The API saves the valid events and reports each event separately. Rejected events (for example a `payload_schema` that names a schema or `version_no` that does not exist or is not live in the workspace) are listed by name and the command exits 1; the other events are still saved.",
+		"skills:tip.a-results": "Push first lists the workspace's events and sends only the ones that are new or differ (by name, description and payload_schema). The API saves the valid events and reports each event separately. Each event is reported on stdout as `created`, `updated`, `unchanged` (not sent) or `failed`; rejected events (for example a `payload_schema` that names a schema or `version_no` that does not exist or is not live in the workspace) are listed by name and the command exits 1; the other events are still saved. With `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.b-names":   "The API stores event names in upper case: `Order_Placed` is saved, triggered and pulled as `ORDER_PLACED`.",
+		"skills:tip.c-rename":  "There is no rename: changing `name` in a pulled `event.json` and pushing creates a **new** event next to the old one, and workflows triggered by the old name keep using it. Push warns when a file's `name` no longer matches its directory.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -64,49 +68,60 @@ var eventPushCmd = &cobra.Command{
 		}
 
 		eventsArr, _ := payload["events"].([]any)
+		report := utils.NewReport("event push", workspace, dryRun)
 		if len(eventsArr) == 0 {
-			log.Info("No events to push")
-			return nil
+			return report.Finish(nil)
 		}
 
 		if dryRun {
-			log.Infof("DRY RUN: would push %d event(s) to %s", len(eventsArr), workspace)
-			for _, ev := range eventsArr {
-				if obj, ok := ev.(map[string]any); ok {
-					name, _ := obj["name"].(string)
-					if name != "" {
-						log.Infof("  - %s", name)
-					}
-				}
+			for i := range eventsArr {
+				report.Add("events/"+EventName(eventsArr, i), utils.StatusWouldPush, "")
 			}
-			return nil
+			return report.Finish(nil)
 		}
 
-		// Single bulk POST: the management endpoint accepts an "events"
-		// array and the entire batch is one transaction. The earlier
-		// per-event loop (commit f844a95) was reverted because it
-		// scaled latency linearly with workspace size — large workspaces
-		// (hundreds of events) hit an unacceptable cliff.
 		spinner := utils.NewSpinner("Pushing events...")
 		mgmntClient := utils.GetSuprSendMgmntClient()
-		records, err := mgmntClient.PushEventsFromPayload(workspace, payload)
+		statuses, toSend, unlink, err := planEvents(mgmntClient, workspace, eventsArr)
 		if err != nil {
 			spinner.Stop("")
-			log.WithError(err).Error("Failed to push events")
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			return report.Finish(err)
 		}
-		if err := PushFailures(eventsArr, records); err != nil {
-			spinner.Stop("")
-			return err
+		for _, name := range unlink {
+			if err := mgmntClient.DelinkEventSchema(workspace, name); err != nil {
+				log.Warnf("events/%s: couldn't remove its schema link: %v; the event may still be validated against the old schema", name, err)
+			}
 		}
-		spinner.Stop(fmt.Sprintf("Pushed %d event(s) to %s", len(eventsArr), workspace))
-		return nil
+		var records []mgmnt.EventPushRecord
+		if len(toSend) > 0 {
+			payload["events"] = toSend
+			records, err = mgmntClient.PushEventsFromPayload(workspace, payload)
+		}
+		spinner.Stop("")
+		if err != nil {
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
+		}
+		sent := 0 // index into toSend and records
+		for i := range eventsArr {
+			name := "events/" + EventName(eventsArr, i)
+			if statuses[i] == utils.StatusUnchanged {
+				report.Add(name, utils.StatusUnchanged, "")
+				continue
+			}
+			if sent < len(records) && records[sent].Failed() {
+				report.Fail(name, errors.New(RecordMessage(records[sent])))
+			} else {
+				report.Add(name, statuses[i], "")
+			}
+			sent++
+		}
+		return report.Finish(PushFailures(toSend, records))
 	},
 }
 
 func init() {
 	eventPushCmd.Flags().StringP("dir", "d", "", "Directory containing per-event subdirectories (default: ./suprsend/events)")
 	eventPushCmd.Flags().StringP("json", "j", "", `Events payload as a JSON object with an "events" array, e.g. '{"events":[{"name":"user_signed_up","description":"Signup completed","payload_schema":{"schema":"user-signup","version_no":1}}]}'. payload_schema links the event to an existing schema by slug (version_no is optional); it is not an inline JSON Schema`)
-	eventPushCmd.Flags().BoolP("dry-run", "n", false, "Print what would be pushed without making any changes")
+	eventPushCmd.Flags().BoolP("dry-run", "n", false, "Report what would be pushed without making any changes")
 	EventCmd.AddCommand(eventPushCmd)
 }

@@ -7,12 +7,16 @@ import (
 )
 
 const (
-	CodeAuthMissingToken  = "auth-missing-token"
-	CodeAuthInvalidToken  = "auth-invalid-token"
-	CodeAuthForbidden     = "auth-forbidden"
-	CodeConfigMissing     = "config-missing"
-	CodeConfigInvalid     = "config-invalid"
-	CodeSchemaValidation  = "schema-validation-failed"
+	CodeAuthMissingToken = "auth-missing-token"
+	CodeAuthInvalidToken = "auth-invalid-token"
+	CodeAuthForbidden    = "auth-forbidden"
+	CodeConfigMissing    = "config-missing"
+	CodeConfigInvalid    = "config-invalid"
+	CodeSchemaValidation = "schema-validation-failed"
+	// CodeAPIValidation is a definition the API rejected as invalid (a
+	// commit that failed validation). It exits 1 like other API errors:
+	// exit 2 is only for checks the CLI runs before calling the API.
+	CodeAPIValidation     = "api-validation-failed"
 	CodeFileNotFound      = "file-not-found"
 	CodeFileParseFailed   = "file-parse-failed"
 	CodeAPIConflict       = "api-conflict"
@@ -43,6 +47,7 @@ var exitCodeMap = map[string]int{
 	CodeAPINotFound:       ExitNotFound,
 	CodeAPIRateLimited:    ExitRateLimited,
 	CodeSchemaValidation:  ExitValidation,
+	CodeAPIValidation:     ExitGeneralError,
 	CodeFileNotFound:      ExitValidation,
 	CodeFileParseFailed:   ExitValidation,
 	CodeInvalidUsage:      ExitInvalidUsage,
@@ -133,4 +138,30 @@ func Failures(summary string, failures []string, code string) *CLIError {
 		msg += ":\n" + strings.Join(failures, "\n")
 	}
 	return New(msg, code).WithDetails(map[string]any{"failures": failures})
+}
+
+// IsLocal reports whether err failed a check the CLI runs before calling the
+// API (a missing or malformed file, a payload that fails validation): its
+// exit code is ExitValidation.
+func IsLocal(err error) bool {
+	var ce *CLIError
+	return errors.As(err, &ce) && ce.ExitCode() == ExitValidation
+}
+
+// FailuresCode is the code for a run whose items failed with errs: a local
+// check code (exit 2, as for --dry-run) when every failure was local, else
+// api-internal (exit 1).
+func FailuresCode(errs []error) string {
+	for _, err := range errs {
+		if !IsLocal(err) {
+			return CodeAPIInternal
+		}
+	}
+	return CodeFileParseFailed
+}
+
+// HasCode reports whether err is a CLIError with the given code.
+func HasCode(err error, code string) bool {
+	var ce *CLIError
+	return errors.As(err, &ce) && ce.Code == code
 }

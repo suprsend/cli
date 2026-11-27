@@ -26,13 +26,15 @@ suprsend event push [flags]
 
 ### Tips
 
-- The API saves the valid events and reports each event separately. Rejected events (for example a `payload_schema` that names a schema or `version_no` that does not exist or is not live in the workspace) are listed by name and the command exits 1; the other events are still saved.
+- Push first lists the workspace's events and sends only the ones that are new or differ (by name, description and payload_schema). The API saves the valid events and reports each event separately. Each event is reported on stdout as `created`, `updated`, `unchanged` (not sent) or `failed`; rejected events (for example a `payload_schema` that names a schema or `version_no` that does not exist or is not live in the workspace) are listed by name and the command exits 1; the other events are still saved. With `-o json` the result is one JSON object with `items` and `counts`.
+- The API stores event names in upper case: `Order_Placed` is saved, triggered and pulled as `ORDER_PLACED`.
+- There is no rename: changing `name` in a pulled `event.json` and pushing creates a **new** event next to the old one, and workflows triggered by the old name keep using it. Push warns when a file's `name` no longer matches its directory.
 
 ### Options
 
 ```
   -d, --dir string    Directory containing per-event subdirectories (default: ./suprsend/events)
-  -n, --dry-run       Print what would be pushed without making any changes
+  -n, --dry-run       Report what would be pushed without making any changes
   -h, --help          help for push
   -j, --json string   Events payload as a JSON object with an "events" array, e.g. '{"events":[{"name":"user_signed_up","description":"Signup completed","payload_schema":{"schema":"user-signup","version_no":1}}]}'. payload_schema links the event to an existing schema by slug (version_no is optional); it is not an inline JSON Schema
 ```
@@ -43,9 +45,10 @@ suprsend event push [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 

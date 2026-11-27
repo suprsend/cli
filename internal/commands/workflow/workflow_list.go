@@ -9,13 +9,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 )
 
 var workflowListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List workflows for a workspace",
-	Long:  `List workflows in a workspace with pagination. Returns workflow slug, name, status, and version info. Use --mode to switch between draft and live versions.`,
+	Long:  `List the workflows in a workspace: all of them unless --limit is given. Returns workflow slug, name, status, and version info. Use --mode to switch between draft and live versions.`,
 	Example: `  # List all workflows (live mode)
   suprsend workflow list
 
@@ -53,18 +54,19 @@ var workflowListCmd = &cobra.Command{
 			return nil
 		}
 		utils.OutputData(workflows.Results, outputType)
+		utils.NoteMoreResults("workflows", len(workflows.Results), offset, workflows.Meta.Count)
 		return nil
 	},
 }
 
 func init() {
-	workflowListCmd.PersistentFlags().IntP("limit", "l", 20, "Maximum number of workflows to return")
+	workflowListCmd.PersistentFlags().IntP("limit", "l", 0, utils.LimitFlagHelp("workflows"))
 	workflowListCmd.PersistentFlags().Int("offset", 0, "Number of workflows to skip for pagination")
 	workflowListCmd.PersistentFlags().StringP("mode", "m", "live", "Version mode: draft or live")
 	workflowListCmd.PersistentFlags().StringP("output", "o", "pretty", "Output format: pretty, json, or yaml")
 	workflowListCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		cmd.Parent().HelpFunc()(cmd, args)
 	})
-	WorkflowCmd.PersistentFlags().StringP("workspace", "w", "staging", "Workspace name (e.g., staging, production)")
+	WorkflowCmd.PersistentFlags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 	WorkflowCmd.AddCommand(workflowListCmd)
 }

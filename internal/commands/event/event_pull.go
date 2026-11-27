@@ -1,6 +1,7 @@
 package event
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,26 +50,42 @@ var eventPullCmd = &cobra.Command{
 				return nil
 			}
 		}
+		report := utils.NewReport("event pull", workspace, false)
 		spinner := utils.NewSpinner("Loading...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		eventsResp, err := mgmntClient.GetEvents(workspace)
+		spinner.Stop("")
 		if err != nil {
-			log.Errorf("Failed to get events: %v", err)
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, ""))
 		}
-		spinner.Stop(fmt.Sprintf("Pulled %d events", len(eventsResp.Results)))
 
 		stats, err := WriteEventsToFiles(eventsResp, dirPath)
 		if err != nil {
-			log.Errorf("Failed to save events: %v", err)
-			return clierr.Wrap(err, clierr.CodeFileParseFailed, "")
+			return report.Finish(clierr.Wrap(err, clierr.CodeFileParseFailed, ""))
+		}
+		for _, name := range stats.Written {
+			report.Add("events/"+name, utils.StatusPulled, "")
+		}
+		for _, e := range stats.Errors {
+			report.Fail("events", errors.New(e))
 		}
 		if stats.Failed > 0 {
-			return clierr.Failures(fmt.Sprintf("%d event(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
+			return report.Finish(clierr.Failures(fmt.Sprintf("%d event(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal))
 		}
-		return nil
+		return report.Finish(checkPulledAll(eventsResp.Meta.Count, stats.Success))
 	},
+}
+
+// checkPulledAll fails a pull that wrote fewer events than the API says the
+// workspace has, so an agent never mistakes a broken pull for an empty
+// workspace.
+func checkPulledAll(apiCount, written int) error {
+	if apiCount > written {
+		return clierr.New(fmt.Sprintf("the API reports %d event(s) but only %d were written", apiCount, written), clierr.CodeAPIInternal).
+			WithHint("re-run with -v debug and report the output")
+	}
+	return nil
 }
 
 func init() {

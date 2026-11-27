@@ -18,15 +18,8 @@ type WorkflowWriteStats struct {
 	Success int
 	Failed  int
 	Errors  []string
+	Written []string // slugs of the workflows written
 }
-
-type WorkflowPushStats struct {
-	Total   int
-	Success int
-	Failed  int
-	Errors  []string
-}
-
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
@@ -80,7 +73,6 @@ func validateInputDirectory(dirPath string) error {
 	return nil
 }
 
-
 func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*WorkflowWriteStats, error) {
 	stats := &WorkflowWriteStats{
 		Total:  len(resp.Results),
@@ -132,8 +124,9 @@ func WriteWorkflowsToFiles(resp mgmnt.WorkflowsResponse, outputDir string) (*Wor
 			continue
 		}
 
-		log.Infof("Wrote workflow to %s", filename)
+		log.Debugf("Wrote workflow to %s", filename)
 		stats.Success++
+		stats.Written = append(stats.Written, slug)
 	}
 
 	return stats, nil

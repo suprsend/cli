@@ -36,38 +36,49 @@ type Event struct {
 	CreatedAt     string                 `json:"created_at"`
 }
 
+// ListEvents lists a workspace's events, starting at offset: limit of them,
+// or all of them when limit <= 0. Meta.Count is the total the API reports.
 func (c *SS_MgmntClient) ListEvents(workspace string, limit, offset int) (*ListEventsResponse, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]Event, int, error) {
+		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed constructing url: %w", err)
+		}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed parsing url: %w", err)
+		}
+		q := u.Query()
+		q.Add("limit", strconv.Itoa(limit))
+		q.Add("offset", strconv.Itoa(offset))
+		u.RawQuery = q.Encode()
+		log.Debugf("Getting events for workspace: %s, limit: %d, offset: %d", workspace, limit, offset)
+		res, err := client.R().
+			SetDebug(c.debug).
+			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+			SetResult(&ListEventsResponse{}).
+			Get(u.String())
+		if err != nil {
+			return nil, 0, fmt.Errorf("request failed: %w", err)
+		}
+		if res.IsError() {
+			return nil, 0, apiError(res)
+		}
+		page := res.Result().(*ListEventsResponse)
+		return page.Results, page.Meta.Count, nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing url: %w", err)
-	}
-	q := u.Query()
-	q.Add("limit", strconv.Itoa(limit))
-	q.Add("offset", strconv.Itoa(offset))
-	u.RawQuery = q.Encode()
-	urlStr = u.String()
-	log.Debugf("Getting Events for workspace: %s", workspace)
-	res, err := client.R().
-		SetDebug(c.debug).
-		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
-		SetResult(&ListEventsResponse{}).
-		Get(urlStr)
-	if err != nil {
-		log.Errorf("Error getting events: %s", err)
 		return nil, err
 	}
-	if res.IsError() {
-		return nil, apiError(res)
-	}
-	events := res.Result().(*ListEventsResponse)
-	return events, nil
+
+	resp := &ListEventsResponse{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
@@ -77,7 +88,7 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 	limit := 50
 	offset := 0
 	allEvents := []any{}
-	totalCount := 0
+	totalCount := -1
 
 	for {
 		urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "event", "/")
@@ -91,7 +102,6 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 		q := u.Query()
 		q.Add("limit", strconv.Itoa(limit))
 		q.Add("offset", strconv.Itoa(offset))
-		q.Add("has_linked_schema", "true")
 		u.RawQuery = q.Encode()
 		urlStr = u.String()
 		res, err := client.R().
@@ -107,14 +117,18 @@ func (c *SS_MgmntClient) GetEvents(workspace string) (*EventsResponse, error) {
 			return nil, apiError(res)
 		}
 		events := res.Result().(*EventsResponse)
+		if totalCount < 0 {
+			totalCount = events.Meta.Count
+		}
 		if len(events.Results) == 0 {
 			break
 		}
 		allEvents = append(allEvents, events.Results...)
-		totalCount += len(events.Results)
 		offset += limit
 	}
-	return &EventsResponse{Results: allEvents}, nil
+	resp := &EventsResponse{Results: allEvents}
+	resp.Meta.Count = max(totalCount, 0)
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetEventDetail(workspace, eventName string) (*Event, error) {
@@ -205,4 +219,25 @@ func parseEventPushRecords(body []byte) []EventPushRecord {
 		}
 	}
 	return wrapped.Records
+}
+
+// DelinkEventSchema removes an event's schema link. The bulk push clears
+// payload_schema but can leave the link record behind (when no event in the
+// request has a schema), and that record is what validation uses.
+func (c *SS_MgmntClient) DelinkEventSchema(workspace, eventName string) error {
+	client := client.NewHTTPClient()
+	defer client.Close()
+
+	urlStr := fmt.Sprintf("%sv1/%s/event/%s/delink_schema/", c.mgmnt_base_URL, workspace, url.PathEscape(eventName))
+	resp, err := client.R().
+		SetDebug(c.debug).
+		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+		Patch(urlStr)
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		return apiError(resp)
+	}
+	return nil
 }

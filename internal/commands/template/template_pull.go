@@ -5,7 +5,6 @@ package template
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -27,10 +26,16 @@ const templateFetchConcurrency = 20
 type TemplateResult struct {
 	Slug            string                      `json:"slug"`
 	Name            string                      `json:"name"`
+	Description     string                      `json:"description"`
+	Tags            []string                    `json:"tags"`
 	EnabledChannels []string                    `json:"enabled_channels"`
 	Variants        []map[string]any            `json:"variants"`
 	MockData        map[string]any              `json:"mock_data,omitempty"`
 	VariantOrder    *mgmnt.VariantOrderResponse `json:"variant_order,omitempty"`
+	// Draft is the workspace's draft of the template, fetched for the state
+	// file (FetchOptions.WithDraft) when another mode was pulled. Nil when
+	// it wasn't asked for or couldn't be fetched.
+	Draft *TemplateResult `json:"-"`
 }
 
 // FetchOptions configures optional callbacks for FetchTemplates. Both fields
@@ -51,6 +56,23 @@ type FetchOptions struct {
 	// OnFetchError is called for each template skipped because its variants
 	// couldn't be fetched. Like OnResult, it runs concurrently.
 	OnFetchError func(slug string, err error)
+	// WithDraft also fetches each template's draft when mode isn't draft
+	// (four more GETs per template), for RecordPulled: push
+	// compares with the draft, whatever mode was pulled.
+	WithDraft bool
+}
+
+// attachDraft sets r.Draft when opts ask for it.
+func attachDraft(client *mgmnt.SS_MgmntClient, workspace, mode string, r *TemplateResult, opts FetchOptions) {
+	if !opts.WithDraft || mode == "draft" {
+		return
+	}
+	draft, exists, err := fetchDraft(client, workspace, r.Slug)
+	if err != nil || !exists {
+		log.Debugf("templates/%s: couldn't fetch the draft to record: %v", r.Slug, err)
+		return
+	}
+	r.Draft = &draft
 }
 
 // FetchTemplates fetches either one template (when slug != "") or all templates
@@ -72,7 +94,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 		if err != nil {
 			return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch variants for template %s", slug))
 		}
-		mockData, err := client.GetTemplateMockData(workspace, slug)
+		mockData, err := client.GetTemplateMockData(workspace, slug, mode)
 		if err != nil {
 			log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", slug)
 		}
@@ -83,11 +105,14 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 		r := TemplateResult{
 			Slug:            slug,
 			Name:            tmpl.Name,
+			Description:     tmpl.Description,
+			Tags:            tmpl.Tags,
 			EnabledChannels: tmpl.EnabledChannels,
 			Variants:        variants,
 			MockData:        mockData,
 			VariantOrder:    variantOrder,
 		}
+		attachDraft(client, workspace, mode, &r, opts)
 		if opts.OnListed != nil {
 			opts.OnListed(1)
 		}
@@ -98,7 +123,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 		return results, nil
 	}
 
-	templates, err := client.ListTemplates(workspace, math.MaxInt32, 0, mode)
+	templates, err := client.ListTemplates(workspace, 0, 0, mode)
 	if err != nil {
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch templates")
 	}
@@ -135,7 +160,7 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 				}
 				return nil
 			}
-			mockData, err := client.GetTemplateMockData(workspace, t.Slug)
+			mockData, err := client.GetTemplateMockData(workspace, t.Slug, mode)
 			if err != nil {
 				log.WithError(err).Warnf("Couldn't fetch mock data for template: %s", t.Slug)
 			}
@@ -146,11 +171,14 @@ func FetchTemplates(client *mgmnt.SS_MgmntClient, workspace, mode, slug string, 
 			r := TemplateResult{
 				Slug:            t.Slug,
 				Name:            t.Name,
+				Description:     t.Description,
+				Tags:            t.Tags,
 				EnabledChannels: t.EnabledChannels,
 				Variants:        variants,
 				MockData:        mockData,
 				VariantOrder:    variantOrder,
 			}
+			attachDraft(client, workspace, mode, &r, opts)
 			slots[i] = &r
 			if opts.OnResult != nil {
 				opts.OnResult(r)
@@ -183,8 +211,9 @@ var templatePullCmd = &cobra.Command{
 	Annotations: map[string]string{
 		"skills:tip.a-overwrite": "Pull **deletes and recreates** the whole `<dir>/<slug>/` directory of every pulled template without asking, so local edits and local-only files inside it (e.g. a new variant) are lost. Commit or stash them first. `--force` does not affect this: it only skips the output-directory prompt shown when `--dir` is omitted and `./suprsend/templates` doesn't exist. In non-interactive shells pass `--dir` or `--force`; otherwise the command exits 64 (invalid usage) without pulling anything.",
 		"skills:tip.b-mode":      "Defaults to the **live** mode. Use `--mode draft` to mirror the pending state instead.",
+		"skills:tip.c-state":     "Pull also records what it pulled in `<dir>/.suprsend-state.json`, per workspace, so the next push can tell what changed locally and what changed in the workspace since. Commit that file with the templates. The record is of the workspace's **draft**, which push compares with (a live pull fetches it too, four more requests per template), so a draft that differs from the live version you pulled isn't mistaken for a later change.",
 	},
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -218,6 +247,11 @@ var templatePullCmd = &cobra.Command{
 			return err
 		}
 
+		st, err := utils.LoadState(outputDir)
+		if err != nil {
+			return err
+		}
+		report := utils.NewReport("template pull", workspace, false)
 		spinner := utils.NewSpinner("Listing templates...")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
@@ -229,9 +263,9 @@ var templatePullCmd = &cobra.Command{
 		var statsMu sync.Mutex
 		var done atomic.Int32
 		var total atomic.Int32
-		var totalVariants atomic.Int32
 
-		results, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
+		_, fetchErr := FetchTemplates(mgmntClient, workspace, mode, slug, FetchOptions{
+			WithDraft: true,
 			OnListed: func(n int) {
 				total.Store(int32(n))
 				stats.Total = n
@@ -239,9 +273,14 @@ var templatePullCmd = &cobra.Command{
 			},
 			OnResult: func(t TemplateResult) {
 				statsMu.Lock()
-				_ = WriteOneTemplate(t, outputDir, stats)
+				failedBefore := stats.Failed
+				if err := WriteOneTemplate(t, outputDir, stats); err != nil || stats.Failed > failedBefore {
+					report.Fail("templates/"+t.Slug, err)
+				} else {
+					RecordPulled(st, workspace, outputDir, t)
+					report.Add("templates/"+t.Slug, utils.StatusPulled, fmt.Sprintf("%d variant(s)", len(t.Variants)))
+				}
 				statsMu.Unlock()
-				totalVariants.Add(int32(len(t.Variants)))
 				n := done.Add(1)
 				spinner.UpdateMessage(fmt.Sprintf("Pulled %d/%d templates", n, total.Load()))
 			},
@@ -249,27 +288,19 @@ var templatePullCmd = &cobra.Command{
 				statsMu.Lock()
 				stats.Failed++
 				stats.Errors = append(stats.Errors, clierr.ItemFailure("templates/"+slug, "couldn't fetch variants", err))
+				report.Fail("templates/"+slug, err)
 				statsMu.Unlock()
 			},
 		})
+		spinner.Stop("")
+		saveState(st)
 		if fetchErr != nil {
-			spinner.Stop("Failed")
-			return fetchErr
-		}
-
-		spinner.Stop(fmt.Sprintf("Pulled %d templates with %d variants from %s", len(results), totalVariants.Load(), workspace))
-
-		log.Infof("Pull Summary: %d total, %d success, %d failed", stats.Total, stats.Success, stats.Failed)
-		if len(stats.Errors) > 0 {
-			log.Info("Errors:")
-			for _, e := range stats.Errors {
-				log.Infof("  - %s", e)
-			}
+			return report.Finish(fetchErr)
 		}
 		if stats.Failed > 0 {
-			return clierr.Failures(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal)
+			return report.Finish(clierr.Failures(fmt.Sprintf("%d template(s) failed to pull", stats.Failed), stats.Errors, clierr.CodeAPIInternal))
 		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 

@@ -43,28 +43,38 @@ type TranslationResponse struct {
 	} `json:"meta"`
 }
 
+// ListTranslations lists a workspace's translation files, starting at
+// offset: limit of them, or all of them when limit <= 0. Meta.Count is the
+// total the API reports.
 func (c *SS_MgmntClient) ListTranslations(workspace, mode, includeContent string, limit, offset int) (*ListTranslation, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 
-	url := fmt.Sprintf("%sv1/%s/translation/?mode=%s&limit=%d&offset=%d&include_content=%s&include_version_info=true", c.mgmnt_base_URL, workspace, mode, limit, offset, includeContent)
-	res, err := client.R().
-		SetDebug(c.debug).
-		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
-		SetResult(&ListTranslation{}).
-		Get(url)
-
+	all, total, err := listPages(limit, offset, func(limit, offset int) ([]TranslationItem, int, error) {
+		url := fmt.Sprintf("%sv1/%s/translation/?mode=%s&limit=%d&offset=%d&include_content=%s&include_version_info=true", c.mgmnt_base_URL, workspace, mode, limit, offset, includeContent)
+		res, err := client.R().
+			SetDebug(c.debug).
+			SetHeader("Authorization", "ServiceToken "+c.serviceToken).
+			SetResult(&ListTranslation{}).
+			Get(url)
+		if err != nil {
+			return nil, 0, fmt.Errorf("request failed: %w", err)
+		}
+		if res.IsError() {
+			return nil, 0, apiError(res)
+		}
+		page := res.Result().(*ListTranslation)
+		return page.Results, page.Meta.Count, nil
+	})
 	if err != nil {
-		log.Errorf("Error getting translations: %s", err)
 		return nil, err
 	}
-	if res.IsError() {
-		return nil, apiError(res)
-	}
 
-	translations := res.Result().(*ListTranslation)
-
-	return translations, nil
+	resp := &ListTranslation{Results: all}
+	resp.Meta.Count = listTotal(total, offset, len(all))
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	return resp, nil
 }
 
 func (c *SS_MgmntClient) GetTranslations(workspace, mode string) (*TranslationResponse, error) {
@@ -138,7 +148,7 @@ func (c *SS_MgmntClient) PushTranslation(workspace, filename string, translation
 	return nil
 }
 
-func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) error {
+func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) (CommitStatus, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	encodedCommitMessage := url.QueryEscape(commitMessage)
@@ -149,10 +159,10 @@ func (c *SS_MgmntClient) FinalizeTranslation(workspace, commitMessage string) er
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		Patch(url)
 	if err != nil {
-		return err
+		return NotCommitted, requestError("translations", true, err)
 	}
 	if res.IsError() {
 		return commitHTTPError(res, "translations")
 	}
-	return nil
+	return Committed, nil
 }

@@ -13,6 +13,7 @@ import (
 type CategoryTableRow struct {
 	RootCategory             string `json:"root_category"`
 	Section                  string `json:"section"`
+	Category                 string `json:"category"`
 	CategoryName             string `json:"category_name"`
 	DefaultPreference        string `json:"default_preference"`
 	DefaultMandatoryChannels string `json:"default_mandatory_channels"`
@@ -22,7 +23,7 @@ type CategoryTableRow struct {
 var categoryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List categories",
-	Long:  "List notification preference categories in a workspace. Returns a flattened table with root_category, section, category_name, default_preference, mandatory channels, and is_commercial. Use --mode to switch between draft and live.",
+	Long:  "List notification preference categories in a workspace. Returns a flattened table with root_category, section, category (the slug that workflows, preferences and translation files use), category_name, default_preference, mandatory channels, and is_commercial. Use --mode to switch between draft and live.",
 	Example: `  # List all categories (live mode)
   suprsend category list
 
@@ -59,6 +60,7 @@ var categoryListCmd = &cobra.Command{
 					tableRows = append(tableRows, CategoryTableRow{
 						RootCategory:             rootCategory.RootCategory,
 						Section:                  section.Name,
+						Category:                 category.Category,
 						CategoryName:             category.Name,
 						DefaultPreference:        category.DefaultPreference,
 						DefaultMandatoryChannels: strings.Join(category.DefaultMandatoryChannels, ", "),

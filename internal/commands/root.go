@@ -11,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/suprsend/cli/internal/clierr"
@@ -24,6 +25,7 @@ import (
 	"github.com/suprsend/cli/internal/commands/workspace"
 	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
+	"go.szostok.io/version"
 	"go.szostok.io/version/extension"
 )
 
@@ -60,9 +62,84 @@ func Execute() error {
 		if isCobraUsageError(err) {
 			err = clierr.Wrap(err, clierr.CodeInvalidUsage, "")
 		}
+		err = explainNotFound(err)
+		err = explainAuth(err)
 		utils.WriteError(err, early.OutputType)
 	}
 	return err
+}
+
+// explainNotFound turns a bare "not found" from the API into "unknown
+// workspace" when the workspace itself is what doesn't exist, which the API
+// reports the same way as a missing template or workflow.
+func explainNotFound(err error) error {
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAPINotFound || config.Cfg.Workspace.Value == "" {
+		return err
+	}
+	if wsErr := utils.CheckWorkspace(config.Cfg.Workspace.Value); wsErr != nil {
+		return wsErr
+	}
+	return err
+}
+
+// explainAuth adds the host and where it and the token came from to an
+// invalid-token error: a token only works on the host it was issued for, so
+// a valid token sent to the wrong host reads as "invalid service token".
+func explainAuth(err error) error {
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAuthInvalidToken || config.Cfg.MgmntUrl.Value == "" {
+		return err
+	}
+	cfg := config.Cfg
+	ce.Message = strings.TrimRight(ce.Message, ".") + fmt.Sprintf(" (host %s from %s, token from %s", hostname(cfg.MgmntUrl.Value), cfg.MgmntUrl.Source, cfg.ServiceToken.Source)
+	if cfg.Profile.Value != "" {
+		ce.Message += fmt.Sprintf(", profile %q", cfg.Profile.Value)
+	}
+	ce.Message += ")"
+	ce.Hint = "a token works only on the host it was issued for: check the host (the profile's mgmnt_url, or SUPRSEND_MGMNT_URL) as well as the token; `suprsend whoami` shows both"
+	return err
+}
+
+// writeVerbs are the subcommand names that change a workspace. Before they
+// run, the workspace is checked to exist, and a warning is logged when it
+// came from the built-in default rather than -w, SUPRSEND_WORKSPACE or the
+// profile.
+var writeVerbs = map[string]bool{"push": true, "commit": true, "enable": true, "disable": true, "trigger": true}
+
+// resolveWorkspace applies ResolveWorkspace to commands with a --workspace
+// flag and writes the result back to the flag, so every command reads the
+// resolved value with cmd.Flags().GetString("workspace").
+func resolveWorkspace(cmd *cobra.Command) error {
+	f := cmd.Flags().Lookup("workspace")
+	if f == nil {
+		return nil
+	}
+	ws, err := config.Cfg.ResolveWorkspace(f.Value.String(), f.Changed)
+	if err != nil {
+		return err
+	}
+	if err := f.Value.Set(ws.Value); err != nil {
+		return clierr.Wrap(err, clierr.CodeInvalidUsage, "")
+	}
+	if !writeVerbs[cmd.Name()] {
+		return nil
+	}
+	if ws.Source == config.ConfigSourceDefault {
+		if config.RequireWorkspace() {
+			return clierr.New("no workspace given, and SUPRSEND_REQUIRE_WORKSPACE is set", clierr.CodeInvalidUsage).
+				WithHint("pass -w, set SUPRSEND_WORKSPACE, or set workspace in the profile")
+		}
+		log.Warnf("no workspace given; using the default workspace %q (pass -w, set SUPRSEND_WORKSPACE, or set workspace in the profile)", ws.Value)
+	}
+	if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
+		return nil
+	}
+	return utils.CheckWorkspace(ws.Value)
+}
+
+func isProfileCmd(cmd *cobra.Command) bool {
+	return cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile")
 }
 
 func isCobraUsageError(err error) bool {
@@ -127,8 +204,9 @@ func earlySetup() earlyConfig {
 			ec.OutputType = "json"
 		}
 	}
+	// Execute prints errors itself (with hints, or as JSON), so cobra mustn't.
+	rootCmd.SilenceErrors = true
 	if config.ShouldJSONErrors(ec.OutputType) {
-		rootCmd.SilenceErrors = true
 		rootCmd.SilenceUsage = true
 	}
 	return ec
@@ -137,13 +215,13 @@ func earlySetup() earlyConfig {
 func init() {
 	var flags config.FlagValues
 
-	rootCmd.Flags().StringVarP(&flags.Workspace, "workspace", "w", "staging", "Workspace name (e.g., staging, production)")
 	rootCmd.PersistentFlags().StringVar(&flags.CfgFile, "config", "", "config file (default: $HOME/.suprsend.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&flags.OutputType, "output", "o", "pretty", "Output format: pretty, json, or yaml")
 	rootCmd.PersistentFlags().StringVarP(&flags.Verbosity, "verbosity", "v", "info", "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.PersistentFlags().StringVarP(&flags.ServiceToken, "service-token", "s", "", "Service token (default: $SUPRSEND_SERVICE_TOKEN)")
+	rootCmd.PersistentFlags().StringVar(&flags.Profile, "profile", "", config.ProfileFlagHelp)
 	rootCmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable color output (default: $NO_COLOR)")
-	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info/warn output (errors are still shown)")
+	rootCmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress info and warning output (results and errors are still shown)")
 
 	// Register the 'version' command with the upgrade notice enabled.
 	versionCmd := extension.NewVersionCobraCmd(
@@ -158,6 +236,8 @@ func init() {
   suprsend version -o yaml
   suprsend version -o short`
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.Version = version.Get().Version
+	rootCmd.SetVersionTemplate("suprsend version {{.Version}}\n")
 	rootCmd.DisableAutoGenTag = true
 
 	rootCmd.AddCommand(profiles.ProfileCmd)
@@ -179,6 +259,7 @@ func init() {
 			)
 		}
 
+		flags.VerbositySet = cmd.Flags().Changed("verbosity")
 		resolveErr := config.Cfg.Resolve(flags)
 
 		if err := config.SetUpLogs(); err != nil {
@@ -192,7 +273,7 @@ func init() {
 		if resolveErr != nil {
 			// env runs without a token so users can verify setup, but other Resolve failures leave Cfg half-populated and would render a misleading table.
 			var ce *clierr.CLIError
-			if cmd.Name() == "env" && errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
+			if (cmd.Name() == "env" || cmd.Name() == "whoami") && errors.As(resolveErr, &ce) && ce.Code == clierr.CodeAuthMissingToken {
 				return nil
 			}
 			if cmd.Name() == "gendocs" || cmd.Name() == "genskills" {
@@ -204,10 +285,7 @@ func init() {
 			if cmd.Name() == "completion" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
 				return nil
 			}
-			if cmd.Name() == "list-tools" && (cmd.Parent() != nil && cmd.Parent().Name() == "start-mcp-server") {
-				return nil
-			}
-			if cmd.Name() == "profile" || (cmd.Parent() != nil && cmd.Parent().Name() == "profile") {
+			if isProfileCmd(cmd) {
 				return nil
 			}
 
@@ -221,6 +299,12 @@ func init() {
 			config.Cfg.Debug.Value,
 		)
 
-		return nil
+		// profile add/modify's --workspace is the default to store in the
+		// profile, not a workspace to act on: resolving it would fill it in
+		// from the active profile and reject "" (which removes it).
+		if isProfileCmd(cmd) {
+			return nil
+		}
+		return resolveWorkspace(cmd)
 	}
 }

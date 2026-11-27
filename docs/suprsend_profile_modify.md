@@ -18,6 +18,7 @@ suprsend profile modify [flags]
       --mgmnt-url string       Management URL (default: https://management-api.suprsend.com/)
       --name string            Name of the profile to modify
       --service-token string   Service Token
+      --workspace string       Default workspace for commands run with this profile; "" removes it
 ```
 
 ### Options inherited from parent commands
@@ -26,7 +27,8 @@ suprsend profile modify [flags]
       --config string      config file (default: $HOME/.suprsend.yaml)
       --no-color           Disable color output (default: $NO_COLOR)
   -o, --output string      Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet              Suppress info/warn output (errors are still shown)
+      --profile name       Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet              Suppress info and warning output (results and errors are still shown)
   -v, --verbosity string   Log level (debug, info, warn, error, fatal, panic) (default "info")
 ```
 

@@ -43,9 +43,10 @@ var categoryCommitCmd = &cobra.Command{
 		translationDir := filepath.Join(categoryDir, "translations")
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		report := utils.NewReport("category commit", workspace, dryRun)
 		if dryRun {
-			log.Infof("DRY RUN: would commit categories to %s", workspace)
-			return nil
+			report.Add("preference_categories", utils.StatusWouldCommit, "")
+			return report.Finish(nil)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
@@ -58,35 +59,36 @@ var categoryCommitCmd = &cobra.Command{
 			}
 		}
 
-		spinner := utils.NewSpinner("Loading...")
-
 		// Translations are not part of the commit (they have no draft state),
 		// so a failed locale doesn't block it, but it does fail the command.
-		_, terr := translation.PushTranslations(workspace, "", translationDir, false)
+		_, terr := translation.PushTranslations(report, workspace, "", translationDir, false)
 		var ce *clierr.CLIError
 		if errors.As(terr, &ce) && (ce.Code == clierr.CodeInvalidUsage || ce.Code == clierr.CodeFileNotFound) {
 			log.Debugf("No translations to push: %v", terr)
 			terr = nil
 		}
 
-		mgmntClient := utils.GetSuprSendMgmntClient()
-		err := mgmntClient.FinalizeCategories(workspace, commitMsg)
+		spinner := utils.NewSpinner("Committing categories...")
+		commitStatus, err := utils.GetSuprSendMgmntClient().FinalizeCategories(workspace, commitMsg)
+		spinner.Stop("")
 		if err != nil {
-			log.WithError(err).Error("Couldn't commit categories")
-			return clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			err = clierr.Wrap(err, clierr.CodeAPIInternal, "")
+			report.Fail("preference_categories", err)
+			return report.Finish(err)
 		}
-		spinner.Stop(fmt.Sprintf("Categories in %s are up to date in live", workspace))
+		status, detail := utils.PushStatus(commitStatus)
+		report.Add("preference_categories", status, detail)
 		if terr != nil {
-			return clierr.New(fmt.Sprintf("categories committed to %s, but translations failed to push: %v", workspace, terr), clierr.CodeAPIInternal)
+			return report.Finish(clierr.New(fmt.Sprintf("categories committed to %s, but translations failed to push: %v", workspace, terr), clierr.CodeAPIInternal))
 		}
-		return nil
+		return report.Finish(nil)
 	},
 }
 
 func init() {
 	categoryCommitCmd.Flags().StringP("dir", "d", "", "Directory containing category and translation files (default: ./"+defaultCategoryDir+")")
 	categoryCommitCmd.PersistentFlags().String("commit-message", "", "Message describing the changes being committed")
-	categoryCommitCmd.Flags().BoolP("dry-run", "n", false, "Print what would be committed without making any changes")
+	categoryCommitCmd.Flags().BoolP("dry-run", "n", false, "Report what would be committed without making any changes")
 	categoryCommitCmd.Flags().BoolP("force", "F", false, "Skip confirmation prompt")
 	CategoryCmd.AddCommand(categoryCommitCmd)
 }

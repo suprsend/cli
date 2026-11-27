@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 	"golang.org/x/text/cases"
@@ -34,23 +37,24 @@ var generateTypesCmd = &cobra.Command{
 	Long:  "Generate typed code from trigger payload JSON schemas. Fetches schemas linked to workflows and events from a workspace and generates type definitions in the target language.",
 	Annotations: map[string]string{
 		"skills:tip.a-after-commit": "Run after every `suprsend schema commit` so consuming code stays in sync with the live trigger payloads.",
-		"skills:tip.b-language":     "Pick the right subcommand for your stack: `python` (Pydantic), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.",
+		"skills:tip.b-language":     "Pick the right subcommand for your stack: `python` (Pydantic `BaseModel`s by default, which need the `pydantic` package; `--pydantic=false` for plain dataclasses), `typescript` (optional Zod), `go`, `java`, `kotlin`, `swift`, or `dart`.",
+		"skills:tip.c-dates":        "Plain `typescript` output types `date-time`, `date` and `time` fields as `string`, which is what a JSON payload carries; `--zod` output coerces them to `Date`. A schema with no properties gives an empty type, and the command warns about it.",
 	},
 }
 
 var generateTypesPythonCmd = &cobra.Command{
 	Use:   "python [flags]",
 	Short: "Generate Python types from JSON Schema",
-	Long:  "Generate Python type definitions from trigger payload schemas. Fetches linked schemas from the workspace and generates a single Python file with type classes. Supports Pydantic models (enabled by default).",
+	Long:  "Generate Python type definitions from trigger payload schemas. Fetches linked schemas from the workspace and generates a single Python file with type classes. By default the classes are Pydantic `BaseModel`s, so the generated file imports `pydantic` and the project must have it installed; pass `--pydantic=false` for plain dataclasses with no dependency.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		pydantic, _ := cmd.Flags().GetBool("pydantic")
 		if pydantic {
 			cmd.Flags().Set("build-flags", "just-types=true,python-version=3.7,pydantic-base-model=true")
 		} else {
 			cmd.Flags().Set("build-flags", "just-types=true,python-version=3.7")
 		}
-		generateTypesForLanguage("python")(cmd, args)
+		return generateTypesForLanguage("python")(cmd, args)
 	},
 }
 
@@ -59,7 +63,7 @@ var generateTypesJavaCmd = &cobra.Command{
 	Short: "Generate Java types from JSON Schema",
 	Long:  "Generate Java type definitions from trigger payload schemas. Creates one Java file per linked schema in a package directory structure. Supports Lombok annotations with --lombok.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		buildFlags, _ := cmd.Flags().GetString("build-flags")
 		mode, _ := cmd.Flags().GetString("mode")
@@ -67,24 +71,23 @@ var generateTypesJavaCmd = &cobra.Command{
 		packageName, _ := cmd.Flags().GetString("package")
 		fileName, _ := cmd.Flags().GetString("output-file")
 		if fileName == "" {
-			log.Error("File name argument is required")
-			return
+			return clierr.New("--output-file is required", clierr.CodeInvalidUsage)
 		}
 
 		// Generate output directory from package name
 		outputDir := filepath.Join(strings.ReplaceAll(packageName, ".", string(os.PathSeparator)))
 		if err := os.MkdirAll(outputDir, 0o755); err != nil {
-			log.WithError(err).Errorf("Failed to create output directory: %s", outputDir)
-			return
+			return clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to create output directory %s", outputDir))
 		}
 
+		report := utils.NewReport("generate-types java", workspace, false)
 		spinner := utils.NewSpinner("Generating Java types...")
+		defer spinner.Stop("")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
 		if err != nil {
-			log.WithError(err).Error("Couldn't fetch schemas")
-			return
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch schemas"))
 		}
 
 		var schemasToBeGenerated []*schemaToBeGeneratedType
@@ -111,20 +114,23 @@ var generateTypesJavaCmd = &cobra.Command{
 		}
 
 		if len(schemasToBeGenerated) == 0 {
-			spinner.Stop("No valid schemas found")
-			log.Warn("No valid schemas found with meaningful JSON schema content")
-			return
+			log.Warn("No schemas linked to a workflow or event; nothing to generate")
+			return report.Finish(nil)
 		}
 
-		generatedCount := 0
+		var failures []string
 		for _, targetSchema := range schemasToBeGenerated {
 			schemaName := targetSchema.TriggerName
 			javaFileName := filepath.Join(outputDir, schemaName+".java")
 			log.Debugf("Processing TargetSchema: %v", targetSchema)
+			if len(targetSchema.JSONSchema.Properties) == 0 {
+				log.Warnf("%s (schema %s) has no properties, so its generated type is empty", targetSchema.TriggerName, targetSchema.Slug)
+			}
 
 			if _, err := os.Stat(javaFileName); err == nil {
 				if err := os.WriteFile(javaFileName, []byte(""), 0o644); err != nil {
-					log.WithError(err).Errorf("Failed to clear existing file: %s", javaFileName)
+					report.Fail(schemaName, err)
+					failures = append(failures, fmt.Sprintf("%s: failed to clear %s: %v", schemaName, javaFileName, err))
 					continue
 				}
 			}
@@ -156,12 +162,13 @@ var generateTypesJavaCmd = &cobra.Command{
 
 			err = runTypeMorph("java", string(schemaBytes), schemaName, javaFileName, javaFlags)
 			if err != nil {
-				log.WithError(err).Errorln("Could not generate types for schema: " + targetSchema.Slug)
+				report.Fail(schemaName, err)
+				failures = append(failures, fmt.Sprintf("%s (schema %s): %v", schemaName, targetSchema.Slug, err))
 			} else {
-				generatedCount++
+				report.Add(schemaName, utils.StatusGenerated, javaFileName)
 			}
 		}
-		spinner.Stop(fmt.Sprintf("Generated %d Java type files in %s", generatedCount, outputDir))
+		return report.Finish(generateFailures(failures))
 	},
 }
 
@@ -170,14 +177,13 @@ var generateTypesTypeScriptCmd = &cobra.Command{
 	Short: "Generate TypeScript types from JSON Schema",
 	Long:  "Generate TypeScript type definitions from trigger payload schemas. Fetches linked schemas and generates types in a single output file. Supports Zod schema generation with --zod.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		zod, _ := cmd.Flags().GetBool("zod")
 		cmd.Flags().Set("build-flags", "just-types=true,prefer-unions=true")
 		if zod {
-			generateTypesForLanguage("typescript-zod")(cmd, args)
-		} else {
-			generateTypesForLanguage("typescript")(cmd, args)
+			return generateTypesForLanguage("typescript-zod")(cmd, args)
 		}
+		return generateTypesForLanguage("typescript")(cmd, args)
 	},
 }
 
@@ -186,10 +192,10 @@ var generateTypesGoCmd = &cobra.Command{
 	Short: "Generate Go types from JSON Schema",
 	Long:  "Generate Go type definitions from trigger payload schemas. Produces struct definitions in a single output file with the specified package name.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		packageName, _ := cmd.Flags().GetString("package")
 		cmd.Flags().Set("build-flags", "just-types-and-package=true,package="+packageName)
-		generateTypesForLanguage("go")(cmd, args)
+		return generateTypesForLanguage("go")(cmd, args)
 	},
 }
 
@@ -198,12 +204,12 @@ var generateTypesKotlinCmd = &cobra.Command{
 	Short: "Generate Kotlin types from JSON Schema",
 	Long:  "Generate Kotlin type definitions from trigger payload schemas. Produces data classes in a single output file with the specified package name.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		packageName, _ := cmd.Flags().GetString("package")
 		if packageName != "" {
 			cmd.Flags().Set("build-flags", "package="+packageName)
 		}
-		generateTypesForLanguage("kotlin")(cmd, args)
+		return generateTypesForLanguage("kotlin")(cmd, args)
 	},
 }
 
@@ -212,9 +218,9 @@ var generateTypesSwiftCmd = &cobra.Command{
 	Short: "Generate Swift types from JSON Schema",
 	Long:  "Generate Swift type definitions from trigger payload schemas. Produces Codable structs in a single output file.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().Set("build-flags", "coding-keys=true,struct-or-class=struct,initializers=false")
-		generateTypesForLanguage("swift")(cmd, args)
+		return generateTypesForLanguage("swift")(cmd, args)
 	},
 }
 
@@ -223,37 +229,45 @@ var generateTypesDartCmd = &cobra.Command{
 	Short: "Generate Dart types from JSON Schema",
 	Long:  "Generate Dart type definitions from trigger payload schemas. Produces null-safe classes in a single output file.",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().Set("build-flags", "just-types=true,null-safety=true")
-		generateTypesForLanguage("dart")(cmd, args)
+		return generateTypesForLanguage("dart")(cmd, args)
 	},
 }
 
-func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) {
-	return func(cmd *cobra.Command, args []string) {
+// generateFailures is the error for a generate-types run in which some
+// schemas failed, or nil.
+func generateFailures(failures []string) error {
+	if len(failures) == 0 {
+		return nil
+	}
+	return clierr.Failures(fmt.Sprintf("%d type(s) failed to generate", len(failures)), failures, clierr.CodeAPIInternal)
+}
+
+func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
 		buildFlags, _ := cmd.Flags().GetString("build-flags")
 		mode, _ := cmd.Flags().GetString("mode")
 		fileName, _ := cmd.Flags().GetString("output-file")
 		if fileName == "" {
-			log.Error("File name argument is required")
-			return
+			return clierr.New("--output-file is required", clierr.CodeInvalidUsage)
 		}
 
 		expectedExt := utils.GetExtensionForLanguage(targetLang)
 		fileExtension := strings.ToLower(filepath.Ext(fileName))
 		if fileExtension != expectedExt {
-			log.Errorf("File extension %s doesn't match expected extension %s for %s", fileExtension, expectedExt, targetLang)
-			return
+			return clierr.New(fmt.Sprintf("file extension %s doesn't match expected extension %s for %s", fileExtension, expectedExt, targetLang), clierr.CodeInvalidUsage)
 		}
 
+		report := utils.NewReport("generate-types "+targetLang, workspace, false)
 		spinner := utils.NewSpinner(fmt.Sprintf("Generating %s types...", cases.Title(language.English).String(targetLang)))
+		defer spinner.Stop("")
 
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		schemasResp, err := mgmntClient.GetLinkedSchemas(workspace, mode)
 		if err != nil {
-			log.WithError(err).Error("Couldn't fetch schemas")
-			return
+			return report.Finish(clierr.Wrap(err, clierr.CodeAPIInternal, "couldn't fetch schemas"))
 		}
 
 		var schemasToBeGenerated []*schemaToBeGeneratedType
@@ -280,22 +294,23 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 		}
 
 		if len(schemasToBeGenerated) == 0 {
-			spinner.Stop("No valid schemas found")
-			log.Warn("No valid schemas found with meaningful JSON schema content")
-			return
+			log.Warn("No schemas linked to a workflow or event; nothing to generate")
+			return report.Finish(nil)
 		}
 
 		if _, err := os.Stat(fileName); err == nil {
 			if err := os.WriteFile(fileName, []byte(""), 0o644); err != nil {
-				log.WithError(err).Errorf("Failed to clear existing file: %s", fileName)
-				return
+				return report.Finish(clierr.Wrap(err, clierr.CodeFileNotFound, fmt.Sprintf("failed to clear existing file %s", fileName)))
 			}
 		}
 
-		generatedCount := 0
+		var failures []string
 		for _, targetSchema := range schemasToBeGenerated {
 			schemaName := targetSchema.TriggerName
 			log.Debugf("Processing TargetSchema: %v", targetSchema)
+			if len(targetSchema.JSONSchema.Properties) == 0 {
+				log.Warnf("%s (schema %s) has no properties, so its generated type is empty", targetSchema.TriggerName, targetSchema.Slug)
+			}
 
 			schemaJSON := map[string]interface{}{
 				"type":       targetSchema.JSONSchema.Type,
@@ -313,12 +328,13 @@ func generateTypesForLanguage(targetLang string) func(*cobra.Command, []string) 
 			}
 			err = runTypeMorph(targetLang, string(schemaBytes), schemaName, fileName, buildFlags)
 			if err != nil {
-				log.WithError(err).Errorln("Could not generate types for schema: " + targetSchema.Slug)
+				report.Fail(schemaName, err)
+				failures = append(failures, fmt.Sprintf("%s (schema %s): %v", schemaName, targetSchema.Slug, err))
 			} else {
-				generatedCount++
+				report.Add(schemaName, utils.StatusGenerated, fileName)
 			}
 		}
-		spinner.Stop(fmt.Sprintf("Generated %d %s types in %s", generatedCount, targetLang, fileName))
+		return report.Finish(generateFailures(failures))
 	}
 }
 
@@ -334,13 +350,13 @@ func init() {
 	}
 
 	for _, cmd := range commonFlags {
-		cmd.Flags().String("workspace", "staging", "Workspace name (e.g., staging, production)")
+		cmd.Flags().StringP("workspace", "w", "", config.WorkspaceFlagHelp)
 		cmd.Flags().String("mode", "live", "Version mode: draft or live")
 		cmd.Flags().String("build-flags", "", "Flags to generate types in a certain way.")
 		cmd.Flags().MarkHidden("build-flags")
 	}
 	// Python
-	generateTypesPythonCmd.Flags().Bool("pydantic", true, "Generate Pydantic BaseModel classes instead of plain dataclasses")
+	generateTypesPythonCmd.Flags().Bool("pydantic", true, "Generate Pydantic BaseModel classes (needs the pydantic package) instead of plain dataclasses")
 	generateTypesPythonCmd.Flags().String("output-file", "suprsend_types.py", "Output file path for generated types")
 	generateTypesCmd.AddCommand(generateTypesPythonCmd)
 	// Java
@@ -384,11 +400,21 @@ func runTypeMorph(language, schema, schemaName, fileName, buildFlags string) err
 		args = append(args, "--build-flags="+buildFlags)
 	}
 
+	// The generator's own output is not the command's result: keep it off
+	// stdout (debug log only) and put what it wrote to stderr in the error.
+	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	if out := strings.TrimSpace(stdout.String()); out != "" {
+		log.Debugf("type generator: %s", out)
+	}
+	if err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return fmt.Errorf("type generation failed for %s: %w: %s", fileName, err, msg)
+		}
 		return fmt.Errorf("type generation failed for %s: %w", fileName, err)
 	}
 	return nil

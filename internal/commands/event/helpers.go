@@ -20,12 +20,12 @@ type EventWriteStats struct {
 	Success int
 	Failed  int
 	Errors  []string
+	Written []string // names of the events written
 }
 
 var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 var leadingNonAlphanumRe = regexp.MustCompile(`^[^a-zA-Z0-9]+`)
 var trailingNonAlphanumRe = regexp.MustCompile(`[^a-zA-Z0-9]+$`)
-
 
 func promptForOutputDirectory() (string, bool) {
 	if !utils.IsInputInteractive() {
@@ -147,8 +147,9 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 			continue
 		}
 
-		log.Infof("Wrote event to %s", filename)
+		log.Debugf("Wrote event to %s", filename)
 		stats.Success++
+		stats.Written = append(stats.Written, name)
 	}
 
 	return stats, nil
@@ -157,7 +158,7 @@ func WriteEventsToFiles(events_resp *mgmnt.EventsResponse, outputDir string) (*E
 // ReadEventsFromDir reads per-event subdirectories and returns the events slice
 // ready for the push wire format. $schema is stripped before returning.
 func ReadEventsFromDir(dirPath string) ([]any, error) {
-	entries, err := os.ReadDir(dirPath)
+	entries, err := utils.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read events directory %q: %w", dirPath, err)
 	}
@@ -177,9 +178,25 @@ func ReadEventsFromDir(dirPath string) ([]any, error) {
 			return nil, fmt.Errorf("events/%s/event.json: invalid JSON: %w", entry.Name(), err)
 		}
 		delete(obj, "$schema")
+		warnIfRenamed(entry.Name(), obj)
 		events = append(events, obj)
 	}
 	return events, nil
+}
+
+// warnIfRenamed warns when event.json names a different event than the one
+// its directory was pulled for. The API has no rename: pushing the new name
+// creates a second event, and the old one (with the workflows it triggers)
+// stays as it is.
+func warnIfRenamed(dirName string, obj map[string]any) {
+	name, _ := obj["name"].(string)
+	if name == "" {
+		return
+	}
+	if want, err := slugifyEventName(name); err == nil && !strings.EqualFold(want, dirName) {
+		log.Warnf("events/%s: event.json#name is %q, so this push creates a new event %s; it doesn't rename the event in this directory, and workflows triggered by that event keep using it",
+			dirName, name, strings.ToUpper(name))
+	}
 }
 
 // PushFailures returns an error listing every event the bulk push rejected,
@@ -188,26 +205,32 @@ func ReadEventsFromDir(dirPath string) ([]any, error) {
 func PushFailures(events []any, records []mgmnt.EventPushRecord) error {
 	var lines []string
 	for i, rec := range records {
-		if !rec.Failed() {
-			continue
+		if rec.Failed() {
+			lines = append(lines, fmt.Sprintf("events/%s: %s", EventName(events, i), RecordMessage(rec)))
 		}
-		name := fmt.Sprintf("#%d", i)
-		if i < len(events) {
-			if obj, ok := events[i].(map[string]any); ok {
-				if n, _ := obj["name"].(string); n != "" {
-					name = n
-				}
-			}
-		}
-		msg := rec.Message
-		if msg == "" && rec.Error != nil {
-			msg = rec.Error.Message
-		}
-		log.Errorf("events/%s: %s", name, msg)
-		lines = append(lines, fmt.Sprintf("events/%s: %s", name, msg))
 	}
 	if len(lines) == 0 {
 		return nil
 	}
 	return clierr.Failures(fmt.Sprintf("%d of %d event(s) failed to push", len(lines), len(events)), lines, clierr.CodeAPIInternal)
+}
+
+// EventName returns the name of events[i], or "#i" when it has none.
+func EventName(events []any, i int) string {
+	if i < len(events) {
+		if obj, ok := events[i].(map[string]any); ok {
+			if n, _ := obj["name"].(string); n != "" {
+				return n
+			}
+		}
+	}
+	return fmt.Sprintf("#%d", i)
+}
+
+// RecordMessage returns why the API rejected an event.
+func RecordMessage(rec mgmnt.EventPushRecord) string {
+	if rec.Message == "" && rec.Error != nil {
+		return rec.Error.Message
+	}
+	return rec.Message
 }

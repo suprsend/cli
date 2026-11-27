@@ -24,11 +24,15 @@ suprsend category translation push [flags]
   suprsend category translation push --dry-run
 ```
 
+### Tips
+
+- Each locale is compared with the workspace's and reported on stdout as `created` or `updated` (translations go live immediately), `unchanged` (the workspace already has the same, so nothing was sent), `skipped` (English) or `failed`, followed by a summary. Keys the API didn't save (not a section or category slug in the workspace) are named in the locale's result line: fix or remove them, since the locale is otherwise pushed again every time; with `-o json` the result is one JSON object with `items` and `counts`.
+
 ### Options
 
 ```
   -d, --dir string      Directory containing translation JSON files (default: suprsend/preference_categories/translations)
-  -n, --dry-run         Print what would be pushed without making any changes
+  -n, --dry-run         Report what would be pushed without making any changes
   -h, --help            help for push
       --locale string   Locale code to push, e.g., es, fr (omit to push all)
 ```
@@ -39,9 +43,10 @@ suprsend category translation push [flags]
       --config string          config file (default: $HOME/.suprsend.yaml)
       --no-color               Disable color output (default: $NO_COLOR)
   -o, --output string          Output format: pretty, json, or yaml (default "pretty")
-  -q, --quiet                  Suppress info/warn output (errors are still shown)
+      --profile name           Profile to use, by name (default: $SUPRSEND_PROFILE, else the config file's active profile)
+  -q, --quiet                  Suppress info and warning output (results and errors are still shown)
   -s, --service-token string   Service token (default: $SUPRSEND_SERVICE_TOKEN)
   -v, --verbosity string       Log level (debug, info, warn, error, fatal, panic) (default "info")
-  -w, --workspace string       Workspace name (e.g., staging, production) (default "staging")
+  -w, --workspace string       Workspace slug, e.g. staging or production (default: $SUPRSEND_WORKSPACE, else the profile's workspace, else staging)
 ```
 

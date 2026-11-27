@@ -6,9 +6,9 @@
 // fingerprints taken the last time the CLI pulled or pushed that item: one of
 // the item as the workspace had it, one of the local copy. On the next push,
 // comparing both with the current values says whether the item changed
-// locally, in the workspace, or both. Fingerprints are kept per workspace, so
-// files pulled from one workspace and pushed to another don't read as a
-// conflict. The file is meant to be committed with the asset files, like a
+// locally, in the workspace, or both. Fingerprints are kept per API host and
+// workspace, so files pulled from one workspace and pushed to another (or to
+// a workspace of the same name on another host) don't read as a conflict. The file is meant to be committed with the asset files, like a
 // lockfile.
 package state
 
@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,9 @@ import (
 // FileName is the state file's name inside an asset directory.
 const FileName = ".suprsend-state.json"
 
-const version = 1
+// version 2 keys entries by API host as well as workspace. Version 1 had
+// workspaces at the top level; it only shipped in QA builds.
+const version = 2
 
 // Entry holds an item's fingerprints from the last pull or push.
 type Entry struct {
@@ -43,18 +46,25 @@ type Entry struct {
 
 // File is a loaded state file. Its methods are safe for concurrent use.
 type File struct {
-	Version    int                         `json:"version"`
-	Workspaces map[string]map[string]Entry `json:"workspaces"`
+	Version int `json:"version"`
+	// Hosts maps API host > workspace > item key to its entry. Every account
+	// has a "staging" and a "production" workspace, so the workspace name
+	// alone doesn't say which one an entry describes.
+	Hosts map[string]map[string]map[string]Entry `json:"hosts"`
+	// Workspaces is the version 1 layout, read only to migrate it.
+	Workspaces map[string]map[string]Entry `json:"workspaces,omitempty"`
 
+	host  string
 	path  string
 	dirty bool
 	mu    sync.Mutex
 }
 
-// Load reads dir's state file. A missing file is an empty state: push then
-// has no record to compare with and pushes what differs from the workspace.
-func Load(dir string) (*File, error) {
-	f := &File{Version: version, Workspaces: map[string]map[string]Entry{}, path: filepath.Join(dir, FileName)}
+// Load reads dir's state file for the API at apiURL (the management URL in
+// use). A missing file is an empty state: push then has no record to compare
+// with and pushes what differs from the workspace.
+func Load(dir, apiURL string) (*File, error) {
+	f := &File{Version: version, Hosts: map[string]map[string]map[string]Entry{}, host: hostKey(apiURL), path: filepath.Join(dir, FileName)}
 	data, err := os.ReadFile(f.path)
 	if os.IsNotExist(err) {
 		return f, nil
@@ -70,11 +80,47 @@ func Load(dir string) (*File, error) {
 		return nil, clierr.New(fmt.Sprintf("%s was written by a newer version of the CLI (state version %d)", f.path, f.Version), clierr.CodeFileParseFailed).
 			WithHint("upgrade the CLI")
 	}
-	f.Version = version
-	if f.Workspaces == nil {
-		f.Workspaces = map[string]map[string]Entry{}
+	if f.Hosts == nil {
+		f.Hosts = map[string]map[string]map[string]Entry{}
 	}
+	if f.Version < version || f.Workspaces != nil {
+		// Version 1 didn't record the host. Its entries are taken to be for
+		// the host in use, which is where they almost always came from.
+		for ws, entries := range f.Workspaces {
+			if _, ok := f.Hosts[f.host][ws]; !ok && len(entries) > 0 {
+				f.entries(ws, true)
+				f.Hosts[f.host][ws] = entries
+			}
+		}
+		f.Workspaces = nil
+		f.dirty = true
+	}
+	f.Version = version
 	return f, nil
+}
+
+// hostKey reduces an API URL to its host, lower-cased, so the same API
+// written with or without a scheme or trailing slash gives one key.
+func hostKey(apiURL string) string {
+	raw := strings.TrimSpace(apiURL)
+	if u, err := url.Parse(raw); err == nil && u.Host != "" {
+		return strings.ToLower(u.Host)
+	}
+	return strings.ToLower(strings.Trim(raw, "/"))
+}
+
+// entries returns the entries of workspace on the host in use, creating the
+// maps when create is set. The caller holds f.mu.
+func (f *File) entries(workspace string, create bool) map[string]Entry {
+	if create {
+		if f.Hosts[f.host] == nil {
+			f.Hosts[f.host] = map[string]map[string]Entry{}
+		}
+		if f.Hosts[f.host][workspace] == nil {
+			f.Hosts[f.host][workspace] = map[string]Entry{}
+		}
+	}
+	return f.Hosts[f.host][workspace]
 }
 
 // Get returns the entry for key in workspace. A nil File has no entries.
@@ -84,7 +130,7 @@ func (f *File) Get(workspace, key string) (Entry, bool) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	e, ok := f.Workspaces[workspace][key]
+	e, ok := f.entries(workspace, false)[key]
 	return e, ok
 }
 
@@ -95,11 +141,9 @@ func (f *File) Set(workspace, key string, e Entry) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.Workspaces[workspace] == nil {
-		f.Workspaces[workspace] = map[string]Entry{}
-	}
-	if f.Workspaces[workspace][key] != e {
-		f.Workspaces[workspace][key] = e
+	entries := f.entries(workspace, true)
+	if old, ok := entries[key]; !ok || old != e {
+		entries[key] = e
 		f.dirty = true
 	}
 }
@@ -112,14 +156,18 @@ func (f *File) Delete(workspace, key string, prefix bool) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for k := range f.Workspaces[workspace] {
+	entries := f.entries(workspace, false)
+	for k := range entries {
 		if k == key || (prefix && strings.HasPrefix(k, key)) {
-			delete(f.Workspaces[workspace], k)
+			delete(entries, k)
 			f.dirty = true
 		}
 	}
-	if len(f.Workspaces[workspace]) == 0 {
-		delete(f.Workspaces, workspace)
+	if entries != nil && len(entries) == 0 {
+		delete(f.Hosts[f.host], workspace)
+		if len(f.Hosts[f.host]) == 0 {
+			delete(f.Hosts, f.host)
+		}
 	}
 }
 

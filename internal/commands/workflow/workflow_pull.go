@@ -62,7 +62,7 @@ var workflowPullCmd = &cobra.Command{
 		report := utils.NewReport("workflow pull", workspace, false)
 		spinner := utils.NewSpinner("Loading...")
 
-		st, err := state.Load(outputDir)
+		st, err := utils.LoadState(outputDir)
 		if err != nil {
 			return err
 		}

@@ -371,7 +371,7 @@ var templatePushCmd = &cobra.Command{
 		mgmntClient := utils.GetSuprSendMgmntClient()
 		opts := PushOptions{CommitMessage: commitMessage, Commit: commit, SkipInvalid: skipInvalid, DryRun: dryRun, Overwrite: overwrite}
 		if !dryRun {
-			st, err := state.Load(path)
+			st, err := utils.LoadState(path)
 			if err != nil {
 				return err
 			}

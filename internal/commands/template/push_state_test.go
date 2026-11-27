@@ -137,7 +137,7 @@ func TestPushTemplateUsesState(t *testing.T) {
 
 	// Pull.
 	outDir := t.TempDir()
-	st, err := state.Load(outDir)
+	st, err := state.Load(outDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestPushTemplateUsesState(t *testing.T) {
 func pullFake(t *testing.T, client *mgmnt.SS_MgmntClient, slug string) (string, *state.File) {
 	t.Helper()
 	outDir := t.TempDir()
-	st, err := state.Load(outDir)
+	st, err := state.Load(outDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestPushTemplateAfterLivePull(t *testing.T) {
 
 	// Pull live, as `template pull` does by default.
 	outDir := t.TempDir()
-	st, err := state.Load(outDir)
+	st, err := state.Load(outDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}

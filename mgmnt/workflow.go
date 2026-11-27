@@ -236,10 +236,28 @@ func (c *SS_MgmntClient) GetWorkflows(workspace, mode string) (*WorkflowsRespons
 	}, nil
 }
 
+// keepEnabledWhenUnset returns workflow with "is_enabled": null when it has
+// no such key. The API reads null as "keep the current value"; older
+// versions of it read a missing key as true, which enabled a disabled
+// workflow. A new workflow starts enabled either way. workflow is not
+// modified.
+func keepEnabledWhenUnset(workflow map[string]any) map[string]any {
+	if _, ok := workflow["is_enabled"]; ok {
+		return workflow
+	}
+	out := make(map[string]any, len(workflow)+1)
+	for k, v := range workflow {
+		out[k] = v
+	}
+	out["is_enabled"] = nil
+	return out
+}
+
 func (c *SS_MgmntClient) PushWorkflow(workspace, slug string, workflow map[string]any, commit bool, commitMessage string) (CommitStatus, error) {
 	if slug == "" {
 		return NotCommitted, fmt.Errorf("slug cannot be empty")
 	}
+	workflow = keepEnabledWhenUnset(workflow)
 
 	client := client.NewHTTPClient()
 	defer client.Close()

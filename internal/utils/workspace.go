@@ -6,6 +6,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/clierr"
+	"github.com/suprsend/cli/internal/config"
+	"github.com/suprsend/cli/internal/state"
 )
 
 // CheckWorkspace returns an api-not-found error when the account has no
@@ -86,4 +88,10 @@ func editDistance(a, b string) int {
 		prev = cur
 	}
 	return prev[len(b)]
+}
+
+// LoadState reads dir's state file for the management API in use. Entries
+// are kept per API host, so the host has to be known when the file is read.
+func LoadState(dir string) (*state.File, error) {
+	return state.Load(dir, config.Cfg.MgmntUrl.Value)
 }

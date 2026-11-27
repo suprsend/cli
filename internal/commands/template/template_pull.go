@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
-	"github.com/suprsend/cli/internal/state"
 	"github.com/suprsend/cli/internal/utils"
 	"github.com/suprsend/cli/mgmnt"
 	"golang.org/x/sync/errgroup"
@@ -248,7 +247,7 @@ var templatePullCmd = &cobra.Command{
 			return err
 		}
 
-		st, err := state.Load(outputDir)
+		st, err := utils.LoadState(outputDir)
 		if err != nil {
 			return err
 		}

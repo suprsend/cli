@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/suprsend/cli/internal/clierr"
-	"github.com/suprsend/cli/internal/state"
 	"github.com/suprsend/cli/internal/utils"
 )
 
@@ -26,12 +25,13 @@ var workflowPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend workflow push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-draft":  "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
-		"skills:tip.b-dryrun": "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and reports what would be pushed. Nothing is validated server-side.",
-		"skills:tip.c-commit": "With `--commit`, a workflow that is saved as a draft but not committed is an error. Pushing one workflow (`workflow push <slug> --commit`) exits 1 for an invalid workflow (code `api-validation-failed`, with the validation errors in the message) and for any other commit failure. Pushing all workflows exits 1 if any of them fails, and the error lists each failed workflow with its reason. A workflow whose draft already matches live counts as success (nothing to commit).",
-		"skills:tip.d-force":  "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
-		"skills:tip.e-result": "Each workflow is reported on stdout as `created` or `updated` (saved as draft), `unchanged` (the workspace's draft already matches the file, so nothing was sent; with `--commit`, the draft already matched live), `skipped` (see the state tip), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
-		"skills:tip.f-state":  "Pull and push keep `.suprsend-state.json` in the workflows directory (commit it with the files): what each workflow looked like, per workspace, at the last pull or push. Push compares the file and the workspace's draft with it: a workflow changed only in the workspace since then is `skipped` rather than overwritten with the stale file (with `--commit` that is an error, so nobody else's draft goes live unseen), and one changed on both sides fails as a conflict (code `api-conflict`). Pull again to get the workspace's version, or pass `--overwrite` to push the file anyway. Without a record for that workspace (a first push, or files pulled from another workspace), push sends every workflow that differs from the draft. A pull takes the live version by default, while push compares with the draft. If the draft differed from live at the pull, it is someone's pending work: push reports the workflow `unchanged` with a note and leaves the draft alone (with `--commit` it is not committed), and a local edit to it fails as a conflict. Pull with `--mode draft` to work on the draft, or pass `--overwrite` to replace it. The order of a multi-channel node's `channels` is ignored when comparing.",
+		"skills:tip.a-draft":   "Push writes to the **draft** state. Run `suprsend workflow commit` to promote draft → live, or pass `--commit` to push + commit in one step.",
+		"skills:tip.b-dryrun":  "`--dry-run` makes no API calls: it only reads and parses the local files (or `--json`) and reports what would be pushed. Nothing is validated server-side.",
+		"skills:tip.c-commit":  "With `--commit`, a workflow that is saved as a draft but not committed is an error. Pushing one workflow (`workflow push <slug> --commit`) exits 1 for an invalid workflow (code `api-validation-failed`, with the validation errors in the message) and for any other commit failure. Pushing all workflows exits 1 if any of them fails, and the error lists each failed workflow with its reason. A workflow whose draft already matches live counts as success (nothing to commit).",
+		"skills:tip.d-force":   "`-F/--force` only skips the confirmation prompt for `--commit`; it does not change what is committed. The prompt only appears when stdin is a TTY, so in non-interactive shells (CI, agents) `--commit` proceeds without asking even without `-F`.",
+		"skills:tip.e-result":  "Each workflow is reported on stdout as `created` or `updated` (saved as draft), `unchanged` (the workspace's draft already matches the file, so nothing was sent; with `--commit`, the draft already matched live), `skipped` (see the state tip), `committed` or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.f-state":   "Pull and push keep `.suprsend-state.json` in the workflows directory (commit it with the files): what each workflow looked like, per workspace, at the last pull or push. Push compares the file and the workspace's draft with it: a workflow changed only in the workspace since then is `skipped` rather than overwritten with the stale file (with `--commit` that is an error, so nobody else's draft goes live unseen), and one changed on both sides fails as a conflict (code `api-conflict`). Pull again to get the workspace's version, or pass `--overwrite` to push the file anyway. Without a record for that workspace (a first push, or files pulled from another workspace), push sends every workflow that differs from the draft. A pull takes the live version by default, while push compares with the draft. If the draft differed from live at the pull, it is someone's pending work: push reports the workflow `unchanged` with a note and leaves the draft alone (with `--commit` it is not committed), and a local edit to it fails as a conflict. Pull with `--mode draft` to work on the draft, or pass `--overwrite` to replace it. The order of a multi-channel node's `channels` is ignored when comparing.",
+		"skills:tip.g-enabled": "Enabled/disabled is a property of the workflow, not a version: an `is_enabled` in the file applies on push, without `--commit`. `workflow pull` writes the key. If a file has no `is_enabled`, a push leaves the workflow's enabled state as it is; a new workflow starts enabled. Use `workflow enable` / `workflow disable` to change only that.",
 	},
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -95,7 +95,7 @@ var workflowPushCmd = &cobra.Command{
 					return clierr.Wrap(err, clierr.CodeFileParseFailed, fmt.Sprintf("failed to parse JSON for %s", filePath))
 				}
 				workflow["slug"] = slug
-				st, err := state.Load(path)
+				st, err := utils.LoadState(path)
 				if err != nil {
 					return err
 				}
@@ -139,7 +139,7 @@ var workflowPushCmd = &cobra.Command{
 		}
 
 		if !dryRun {
-			st, err := state.Load(path)
+			st, err := utils.LoadState(path)
 			if err != nil {
 				return err
 			}

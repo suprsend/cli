@@ -333,3 +333,25 @@ func TestPushPreferenceTranslationSkippedKeys(t *testing.T) {
 		}
 	}
 }
+
+// A push with expected_hash can't be repeated: once it goes through, the
+// hash is a new one. A lost reply is reported as unknown, not retried.
+func TestPushCategoriesWithHashIsNotRetried(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+			conn.Close()
+		}
+	}))
+	defer srv.Close()
+	c := NewClientWithUrls("token", srv.URL, srv.URL, false)
+
+	_, err := c.PushCategories("staging", map[string]any{}, false, "", "h1")
+	if err == nil || !strings.Contains(err.Error(), "push status unknown") {
+		t.Errorf("err = %v, want a push-status-unknown error", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("request sent %d times, want 1", n)
+	}
+}

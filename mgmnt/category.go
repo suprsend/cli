@@ -143,14 +143,25 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 	}
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
-	resp, err := client.R().
+	req := client.R().
 		SetDebug(c.debug).
 		SetHeader("Authorization", "ServiceToken "+c.serviceToken).
 		SetHeader("Content-Type", "application/json").
 		SetBody(categories).
-		SetResult(&CategoryPushResponse{}).
-		Post(urlStr)
+		SetResult(&CategoryPushResponse{})
+	if expectedHash != "" {
+		// With expected_hash the push can't be repeated: once it has gone
+		// through, the draft's hash is a new one, and a retry after a lost
+		// reply would be refused as "draft has changed" though it was saved.
+		req.SetRetryCount(0)
+	}
+	resp, err := req.Post(urlStr)
 	if err != nil {
+		if expectedHash != "" && !commit {
+			return NotCommitted, clierr.New(fmt.Sprintf("preference_categories: push status unknown: request failed: %v", err), clierr.CodeAPIInternal).
+				WithResource("preference_categories").
+				WithHint("the draft may have been saved; run the same command again: it reports \"unchanged\" if it was")
+		}
 		return NotCommitted, requestError("preference_categories", commit, err)
 	}
 	if resp.IsError() {

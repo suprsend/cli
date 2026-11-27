@@ -3,6 +3,7 @@ package state
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,7 +65,7 @@ func TestFingerprint(t *testing.T) {
 
 func TestLoadSave(t *testing.T) {
 	dir := t.TempDir()
-	f, err := Load(dir)
+	f, err := Load(dir, "https://api.example.test/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func TestLoadSave(t *testing.T) {
 	if err := f.Save(); err != nil {
 		t.Fatal(err)
 	}
-	g, err := Load(dir)
+	g, err := Load(dir, "https://api.example.test/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +100,7 @@ func TestLoadSave(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, FileName), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Load(dir); err == nil {
+	if _, err := Load(dir, "https://api.example.test/"); err == nil {
 		t.Error("a corrupt state file should be an error")
 	}
 
@@ -110,5 +111,62 @@ func TestLoadSave(t *testing.T) {
 	}
 	if err := nilFile.Save(); err != nil {
 		t.Error(err)
+	}
+}
+
+// Every account has a "staging" workspace, so entries are kept per API host:
+// a record from one host must not apply to the same workspace name on another.
+func TestStateIsPerHost(t *testing.T) {
+	dir := t.TempDir()
+	a, err := Load(dir, "https://api-a.example.test/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Set("staging", "welcome", Entry{Remote: "r", Local: "l"})
+	if err := a.Save(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Load(dir, "https://api-b.example.test/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := b.Get("staging", "welcome"); ok {
+		t.Error("an entry recorded for another host should not be found")
+	}
+	b.Set("staging", "welcome", Entry{Remote: "r2", Local: "l2"})
+	b.Delete("staging", "other", false)
+	if err := b.Save(); err != nil {
+		t.Fatal(err)
+	}
+	// The same host written without a scheme or slash is the same key.
+	again, err := Load(dir, "API-A.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := again.Get("staging", "welcome"); !ok || e.Remote != "r" {
+		t.Errorf("host a entry = %+v, %v; want the one it saved", e, ok)
+	}
+}
+
+// A version 1 file had no host; its entries move to the host in use.
+func TestStateMigratesVersion1(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"version":1,"workspaces":{"staging":{"welcome":{"remote":"r","local":"l","pending":true}}}}`
+	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := Load(dir, "https://api-a.example.test/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := f.Get("staging", "welcome"); !ok || !e.Pending || e.Remote != "r" {
+		t.Errorf("migrated entry = %+v, %v", e, ok)
+	}
+	if err := f.Save(); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, FileName))
+	if strings.Contains(string(data), `"workspaces"`) || !strings.Contains(string(data), `"api-a.example.test"`) {
+		t.Errorf("saved file should use the host layout: %s", data)
 	}
 }

@@ -107,18 +107,44 @@ const pendingNote = "the workspace's draft has changes that aren't in the file (
 // draftFingerprint fingerprints the workspace's draft of slug, or returns ""
 // when the workspace has no such workflow.
 func draftFingerprint(client *mgmnt.SS_MgmntClient, workspace, slug string) (string, error) {
+	fp, _, err := draftOf(client, workspace, slug)
+	return fp, err
+}
+
+// draftOf returns the fingerprint of the workspace's draft of slug and the
+// draft itself, or "" and nil when the workspace has no such workflow.
+func draftOf(client *mgmnt.SS_MgmntClient, workspace, slug string) (string, map[string]any, error) {
 	wf, err := client.GetWorkflowDetailBySlug(workspace, slug, "draft")
 	var ce *clierr.CLIError
 	if errors.As(err, &ce) && ce.Code == clierr.CodeAPINotFound {
-		return "", nil
+		return "", nil, nil
 	}
 	if err != nil {
-		return "", clierr.Wrap(err, clierr.CodeAPIInternal, "")
+		return "", nil, clierr.Wrap(err, clierr.CodeAPIInternal, "")
 	}
 	if wf == nil {
-		return "", nil
+		return "", nil, nil
 	}
-	return fingerprint(*wf), nil
+	return fingerprint(*wf), *wf, nil
+}
+
+// withStoredEnabled returns wf with is_enabled taken from draft when wf has
+// no such key: a push without it keeps the workspace's value, so for the
+// comparison the local copy has that value. wf is not modified.
+func withStoredEnabled(wf, draft map[string]any) map[string]any {
+	if _, ok := wf["is_enabled"]; ok || draft == nil {
+		return wf
+	}
+	stored, ok := draft["is_enabled"]
+	if !ok {
+		return wf
+	}
+	out := make(map[string]any, len(wf)+1)
+	for k, v := range wf {
+		out[k] = v
+	}
+	out["is_enabled"] = stored
+	return out
 }
 
 // pushOptions control how one workflow is pushed.
@@ -137,11 +163,11 @@ type pushOptions struct {
 // newer version of it, and returns its report status and detail.
 func pushOne(client *mgmnt.SS_MgmntClient, workspace, slug string, wf map[string]any, opts pushOptions) (string, string, error) {
 	resource := "workflows/" + slug
-	local := fingerprint(wf)
-	remote, err := draftFingerprint(client, workspace, slug)
+	remote, draft, err := draftOf(client, workspace, slug)
 	if err != nil {
 		return "", "", err
 	}
+	local := fingerprint(withStoredEnabled(wf, draft))
 	base, hasBase := opts.state.Get(workspace, slug)
 
 	switch action := state.Decide(local, remote, base, hasBase, opts.overwrite); action {

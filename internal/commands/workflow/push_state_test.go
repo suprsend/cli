@@ -24,6 +24,8 @@ type fakeAPI struct {
 	drafts map[string]map[string]any
 	pushes int
 	saves  int
+	// lastBody is the body of the latest push, as sent.
+	lastBody map[string]any
 }
 
 func (f *fakeAPI) handler(t *testing.T) http.HandlerFunc {
@@ -51,6 +53,17 @@ func (f *fakeAPI) handler(t *testing.T) http.HandlerFunc {
 			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			f.pushes++
+			f.lastBody = body
+			// Like the API: a null is_enabled keeps the stored value, and a
+			// new workflow starts enabled.
+			if v, ok := body["is_enabled"]; ok && v == nil {
+				stored := any(true)
+				if old, ok := f.drafts[slug]; ok && old["is_enabled"] != nil {
+					stored = old["is_enabled"]
+				}
+				body = copyMap(body)
+				body["is_enabled"] = stored
+			}
 			f.save(slug, body)
 			_, _ = w.Write([]byte(`{"validation_result":{"is_valid":true},"commit_result":{"is_committed":true}}`))
 		case http.MethodPatch: // commit
@@ -104,7 +117,7 @@ func TestPushOneUsesState(t *testing.T) {
 	defer srv.Close()
 	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
 
-	st, err := state.Load(t.TempDir())
+	st, err := state.Load(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +212,7 @@ func TestPushAfterLivePull(t *testing.T) {
 		return api, mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
 	}
 	newState := func(t *testing.T) *state.File {
-		st, err := state.Load(t.TempDir())
+		st, err := state.Load(t.TempDir(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -268,5 +281,42 @@ func TestFingerprintIgnoresSetOrder(t *testing.T) {
 	}
 	if got := a["trigger_events"].([]any)[0]; got != "A" {
 		t.Error("the workflow was modified")
+	}
+}
+
+// A file without is_enabled keeps the workspace's value: the push sends null
+// (which the API reads as "keep"), and the missing key is not a difference.
+func TestPushWithoutIsEnabledKeepsStoredValue(t *testing.T) {
+	api := &fakeAPI{drafts: map[string]map[string]any{}}
+	api.save("welcome", map[string]any{"slug": "welcome", "name": "Welcome", "is_enabled": false})
+	srv := httptest.NewServer(api.handler(t))
+	defer srv.Close()
+	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+
+	local := map[string]any{"slug": "welcome", "name": "Welcome"}
+	status, _, err := pushOne(client, "staging", "welcome", local, pushOptions{})
+	if err != nil || status != utils.StatusUnchanged || api.pushCount() != 0 {
+		t.Fatalf("file without is_enabled: got %q, %v, %d pushes; want unchanged and nothing sent", status, err, api.pushCount())
+	}
+
+	local["name"] = "Welcome!"
+	status, _, err = pushOne(client, "staging", "welcome", local, pushOptions{})
+	if err != nil || status != utils.StatusUpdated {
+		t.Fatalf("edited file: got %q, %v; want updated", status, err)
+	}
+	if v, ok := api.lastBody["is_enabled"]; !ok || v != nil {
+		t.Errorf("is_enabled sent as %v (present %v), want an explicit null", v, ok)
+	}
+	if api.drafts["welcome"]["is_enabled"] != false {
+		t.Error("the workflow should still be disabled")
+	}
+	if _, ok := local["is_enabled"]; ok {
+		t.Error("the local workflow was modified")
+	}
+
+	local["is_enabled"] = true
+	status, _, err = pushOne(client, "staging", "welcome", local, pushOptions{})
+	if err != nil || status != utils.StatusUpdated || api.drafts["welcome"]["is_enabled"] != true {
+		t.Fatalf("is_enabled true: got %q, %v, stored %v; want updated and enabled", status, err, api.drafts["welcome"]["is_enabled"])
 	}
 }

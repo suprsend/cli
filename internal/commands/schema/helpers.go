@@ -29,6 +29,8 @@ type FilteredSchema struct {
 	Slug        string `json:"slug"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	// IsEnabled is left out when the API doesn't return it (older versions).
+	IsEnabled *bool `json:"is_enabled,omitempty"`
 }
 
 func promptForOutputDirectory() (string, bool) {
@@ -97,6 +99,7 @@ func filterSchemaData(schemas []mgmnt.SchemaResponse) []FilteredSchema {
 			Slug:        schema.Slug,
 			Name:        schema.Name,
 			Description: schema.Description,
+			IsEnabled:   schema.IsEnabled,
 		}
 	}
 	return filtered

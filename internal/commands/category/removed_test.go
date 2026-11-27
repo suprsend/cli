@@ -23,3 +23,16 @@ func TestRemovedCategories(t *testing.T) {
 		t.Errorf("nothing was removed, got %v", got)
 	}
 }
+
+// The service trims strings, so padding in the file is not a change.
+func TestTreeFingerprintTrims(t *testing.T) {
+	stored := []mgmnt.RootCategory{{RootCategory: "system", Sections: []mgmnt.Section{{Name: "Billing", Categories: []mgmnt.Category{{Category: "invoices", Name: "Invoices", Description: "paid"}}}}}}
+	padded := []mgmnt.RootCategory{{RootCategory: "system", Sections: []mgmnt.Section{{Name: " Billing ", Categories: []mgmnt.Category{{Category: "invoices", Name: "Invoices", Description: " paid"}}}}}}
+	if treeFingerprint(stored) != treeFingerprint(padded) {
+		t.Error("padding around a name or description should not count as a change")
+	}
+	padded[0].Sections[0].Categories[0].Description = "unpaid"
+	if treeFingerprint(stored) == treeFingerprint(padded) {
+		t.Error("a changed description should differ")
+	}
+}

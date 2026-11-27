@@ -29,12 +29,13 @@ type ListSchemaResponse struct {
 }
 
 type SchemaResponse struct {
-	Slug        string     `json:"slug"`
-	Title       string     `json:"title"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	IsEnabled   bool       `json:"is_enabled"`
-	JSONSchema  JSONSchema `json:"json_schema"`
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// IsEnabled is nil when the API doesn't return it (older versions).
+	IsEnabled  *bool      `json:"is_enabled"`
+	JSONSchema JSONSchema `json:"json_schema"`
 }
 
 type LinkedSchemasResponse struct {

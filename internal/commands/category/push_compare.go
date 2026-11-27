@@ -1,6 +1,7 @@
 package category
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/suprsend/cli/internal/clierr"
@@ -21,7 +22,7 @@ func pushCategories(client *mgmnt.SS_MgmntClient, workspace string, categories *
 	case err != nil:
 		return "", "", clierr.Wrap(err, clierr.CodeAPIInternal, "")
 	}
-	if exists && remote != nil && state.Fingerprint(remote.RootCategories) == state.Fingerprint(categories.RootCategories) {
+	if exists && remote != nil && treeFingerprint(remote.RootCategories) == treeFingerprint(categories.RootCategories) {
 		if !commit {
 			return utils.StatusUnchanged, "", nil
 		}
@@ -37,7 +38,7 @@ func pushCategories(client *mgmnt.SS_MgmntClient, workspace string, categories *
 		// draft differs: it is someone's pending work. A push replaces the
 		// whole draft tree, so leave it alone.
 		if live, err := client.ListCategories(workspace, "live"); err == nil && live != nil &&
-			state.Fingerprint(live.RootCategories) == state.Fingerprint(categories.RootCategories) {
+			treeFingerprint(live.RootCategories) == treeFingerprint(categories.RootCategories) {
 			note := "the workspace's draft has changes that aren't in the file, which matches live; pull with --mode draft to see them"
 			if commit {
 				note = "not committed: " + note
@@ -66,6 +67,37 @@ func pushCategories(client *mgmnt.SS_MgmntClient, workspace string, categories *
 		return utils.StatusCreated, "", nil
 	}
 	return utils.StatusUpdated, removedNote(remote, categories), nil
+}
+
+// treeFingerprint fingerprints a category tree as the service stores it: it
+// trims the whitespace around every string, so a padded name or description
+// in the file is not a change.
+func treeFingerprint(roots any) string {
+	raw, err := json.Marshal(roots)
+	if err != nil {
+		return state.Fingerprint(roots)
+	}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return state.Fingerprint(roots)
+	}
+	return state.Fingerprint(trimStrings(v))
+}
+
+func trimStrings(v any) any {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case map[string]any:
+		for k, val := range t {
+			t[k] = trimStrings(val)
+		}
+	case []any:
+		for i, val := range t {
+			t[i] = trimStrings(val)
+		}
+	}
+	return v
 }
 
 // removedNote names the categories a push took out of the draft. A push

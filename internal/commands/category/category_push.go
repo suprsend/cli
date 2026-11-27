@@ -157,9 +157,7 @@ var categoryPushCmd = &cobra.Command{
 		spinner := utils.NewSpinner("Pushing categories...")
 		status, detail, err := pushCategories(mgmntClient, workspace, categories, commit, commitMessage)
 		spinner.Stop("")
-		categoryFailErr := ""
 		if err != nil {
-			categoryFailErr = err.Error()
 			report.Fail("preference_categories", err)
 		} else {
 			if detail != "" {
@@ -169,7 +167,7 @@ var categoryPushCmd = &cobra.Command{
 		}
 
 		if err != nil || translationStats.Failed > 0 {
-			return report.Finish(categoryPushError(translationStats, err == nil, categoryFailErr))
+			return report.Finish(categoryPushError(translationStats, err))
 		}
 		return report.Finish(nil)
 	},
@@ -177,13 +175,22 @@ var categoryPushCmd = &cobra.Command{
 
 // categoryPushError lists everything that failed in a category push: the
 // categories themselves and each translation locale.
-func categoryPushError(t *translation.PushTranslationStats, categorySuccess bool, categoryFailErr string) error {
+//
+// The categories' own error code is kept (api-conflict for a draft that
+// changed, api-validation-failed for a refused commit) unless a locale
+// failed too.
+func categoryPushError(t *translation.PushTranslationStats, categoryErr error) error {
 	var failures []string
-	if !categorySuccess {
-		failures = append(failures, clierr.ItemFailure("preference_categories", "failed to push", errors.New(categoryFailErr)))
+	code := clierr.CodeAPIInternal
+	if categoryErr != nil {
+		failures = append(failures, clierr.ItemFailure("preference_categories", "failed to push", categoryErr))
+		var ce *clierr.CLIError
+		if errors.As(categoryErr, &ce) && len(t.Errors) == 0 {
+			code = ce.Code
+		}
 	}
 	failures = append(failures, t.Errors...)
-	return clierr.Failures("category push had errors", failures, clierr.CodeAPIInternal)
+	return clierr.Failures("category push had errors", failures, code)
 }
 
 func countSectionsAndCategories(cats *CategoriesOnDisk) (int, int) {

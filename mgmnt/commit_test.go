@@ -155,7 +155,7 @@ func TestPushCategoriesCommitResult(t *testing.T) {
 			defer srv.Close()
 			c := NewClientWithUrls("token", srv.URL, srv.URL, false)
 
-			_, err := c.PushCategories("staging", map[string]any{}, true, "")
+			_, err := c.PushCategories("staging", map[string]any{}, true, "", "")
 			checkCode(t, "categories", err, tt.wantCode)
 		})
 	}
@@ -268,5 +268,68 @@ func TestCommitOutcomeUnknownAfterRetries(t *testing.T) {
 	_, err := c.FinalizeWorkflow("staging", "welcome", "")
 	if err == nil || !strings.Contains(err.Error(), "commit status unknown") {
 		t.Errorf("got %v, want a commit-status-unknown error", err)
+	}
+}
+
+// The category push commits in the same transaction as the upsert, so its
+// outcomes come back as HTTP errors: nothing to publish (not a failure), a
+// draft that changed since it was read, and a failed pre-commit check.
+func TestPushCategoriesErrorReplies(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     int
+		body       string
+		wantStatus CommitStatus
+		wantCode   string
+	}{
+		{"nothing to publish", http.StatusConflict, `{"code":409,"message":"no changes to publish"}`, NoChanges, ""},
+		{"stale draft", http.StatusConflict, `{"code":409,"message":"draft has changed, current hash: abc"}`, NotCommitted, clierr.CodeAPIConflict},
+		{"pre-commit check", http.StatusBadRequest, `{"code":400,"message":"it seems some categories have been deleted in this version, on which active workflows are configured. missing categories: [\"billing\"]"}`, NotCommitted, clierr.CodeAPIValidation},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var query string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				query = r.URL.RawQuery
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.status)
+				w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+			c := NewClientWithUrls("token", srv.URL, srv.URL, false)
+
+			status, err := c.PushCategories("staging", map[string]any{}, true, "", "h1")
+			checkCode(t, "categories", err, tt.wantCode)
+			if status != tt.wantStatus {
+				t.Errorf("commit status = %q, want %q", status, tt.wantStatus)
+			}
+			if !strings.Contains(query, "expected_hash=h1") {
+				t.Errorf("query %q should carry expected_hash", query)
+			}
+		})
+	}
+}
+
+func TestPushPreferenceTranslationSkippedKeys(t *testing.T) {
+	bodies := map[string]string{
+		`{"sections":{},"categories":{},"skipped":{"sections":["Old Section"],"categories":["gone","legacy"]}}`: "not saved (not a section or category slug in the workspace): sections Old Section; categories gone, legacy",
+		`{"sections":{},"categories":{},"skipped":{"sections":[],"categories":[]}}`:                             "",
+		`{"sections":{},"categories":{}}`: "", // a service that doesn't report them
+	}
+	for body, want := range bodies {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(body))
+		}))
+		c := NewClientWithUrls("token", srv.URL, srv.URL, false)
+		skipped, err := c.PushPreferenceTranslation("staging", "fr", PreferenceTranslationContent{})
+		srv.Close()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := skipped.Note(); got != want {
+			t.Errorf("note = %q, want %q", got, want)
+		}
 	}
 }

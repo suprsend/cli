@@ -16,7 +16,7 @@ import (
 var schemaPullCmd = &cobra.Command{
 	Use:   "pull [<slug>]",
 	Short: "Pull schemas",
-	Long:  "Download schema definitions from a workspace to local JSON files. Each schema is saved as `<dir>/<slug>/schema.json` (slug, name, description, and `is_enabled` when the API returns it) plus `<dir>/<slug>/payload_schema.json` (the JSON Schema), default dir `./suprsend/schemas`. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.",
+	Long:  "Download schema definitions from a workspace to local JSON files. Each schema is saved as `<dir>/<slug>/schema.json` (slug, name, description, and `is_enabled`) plus `<dir>/<slug>/payload_schema.json` (the JSON Schema), default dir `./suprsend/schemas`. Pass a slug as a positional argument or via --slug to pull a single schema, or omit to pull all.",
 	Example: `  # Pull all schemas to default directory (suprsend/schemas/)
   suprsend schema pull
 

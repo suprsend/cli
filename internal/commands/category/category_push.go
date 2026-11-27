@@ -40,7 +40,7 @@ var categoryPushCmd = &cobra.Command{
 		"skills:tip.b-live":    "Translations are not drafted: every non-English `translations/<locale>.json` (or `translations` entry in `--json`) is pushed **live immediately**, with or without `--commit`, before the categories are pushed.",
 		"skills:tip.c-dryrun":  "`--dry-run` makes no API calls: it parses `categories.json` (or `--json`), lists the translation files without reading them, and reports counts. A malformed translation file is only caught by a real push. Nothing is validated server-side.",
 		"skills:tip.d-confirm": "The `--commit` confirmation prompt only appears when stdin is a TTY. In non-interactive shells (CI, agents) it proceeds without asking, even without `-F`.",
-		"skills:tip.e-result":  "The result lists each translation locale and then `preference_categories` as `updated` (saved as draft), `unchanged` (the draft already matches `categories.json`, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`; locales are `created`, `updated` or `unchanged` the same way, followed by a summary; with `-o json` it is one JSON object with `items` and `counts`.",
+		"skills:tip.e-result":  "The result lists each translation locale and then `preference_categories` as `updated` (saved as draft), `unchanged` (the draft already matches `categories.json`, so nothing was sent; with `--commit`, the draft already matched live), `committed` or `failed`. With `--commit` the push and the commit are one step on the server: if the commit is refused (a removed category is still used by an active workflow), exit code 1 and the draft is left as it was. If the draft changes in the workspace while the push runs, it fails with `api-conflict` and nothing is saved; run it again. Locales are `created`, `updated` or `unchanged` the same way, followed by a summary; with `-o json` it is one JSON object with `items` and `counts`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -91,7 +91,7 @@ var categoryPushCmd = &cobra.Command{
 				}
 				translationStats.Total++
 				spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s.json...", locale))
-				status, err := translation.PushLocale(mgmntClient, workspace, locale, t)
+				status, detail, err := translation.PushLocale(mgmntClient, workspace, locale, t)
 				spinner.Stop("")
 				if err != nil {
 					translationStats.Failed++
@@ -100,7 +100,7 @@ var categoryPushCmd = &cobra.Command{
 					continue
 				}
 				translationStats.Success++
-				report.Add(resource, status, "live")
+				report.Add(resource, status, detail)
 			}
 		} else {
 			translationDir := path

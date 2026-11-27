@@ -410,7 +410,11 @@ func syncCategories(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fro
 	// The push replaces the destination's whole tree, so categories that
 	// exist only there are deleted. Name them.
 	removedDetail := ""
+	// The destination draft's hash goes with the push, so the API refuses it
+	// if the draft changes in between.
+	expectedHash := ""
 	if dest, err := mgmntClient.ListCategories(toWorkspace, "draft"); err == nil && dest != nil {
+		expectedHash = dest.Hash
 		if removed := category.RemovedCategories(dest.RootCategories, categories.RootCategories); len(removed) > 0 {
 			removedDetail = fmt.Sprintf("removes categories that are only in %s: %s", toWorkspace, strings.Join(removed, ", "))
 		}
@@ -422,7 +426,7 @@ func syncCategories(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fro
 	}
 
 	spinner.UpdateMessage(fmt.Sprintf("Pushing categories to %s ...", toWorkspace))
-	commitStatus, err := mgmntClient.PushCategories(toWorkspace, categories, commit, commitMessage)
+	commitStatus, err := mgmntClient.PushCategories(toWorkspace, categories, commit, commitMessage, expectedHash)
 	spinner.Stop("")
 	if err != nil {
 		report.Fail("preference_categories", err)
@@ -497,12 +501,16 @@ func syncCategoryTranslations(report *utils.Report, mgmntClient *mgmnt.SS_MgmntC
 		}
 
 		// Push translation to destination workspace
-		err = mgmntClient.PushPreferenceTranslation(toWorkspace, locale, *translations)
+		skipped, err := mgmntClient.PushPreferenceTranslation(toWorkspace, locale, *translations)
 		if err != nil {
 			fail(locale, clierr.ItemFailure("preference_categories/translations/"+locale+".json", "failed to push", err), err)
 			continue
 		}
-		report.Add("preference_categories/translations/"+locale+".json", utils.StatusPushed, "live")
+		detail := "live"
+		if note := skipped.Note(); note != "" {
+			detail += "; " + note
+		}
+		report.Add("preference_categories/translations/"+locale+".json", utils.StatusPushed, detail)
 	}
 	spinner.Stop("")
 

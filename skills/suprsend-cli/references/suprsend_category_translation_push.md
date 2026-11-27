@@ -26,7 +26,7 @@ suprsend category translation push [flags]
 
 ### Tips
 
-- Each locale is compared with the workspace's and reported on stdout as `created` or `updated` (translations go live immediately), `unchanged` (the workspace already has the same, so nothing was sent), `skipped` (English) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.
+- Each locale is compared with the workspace's and reported on stdout as `created` or `updated` (translations go live immediately), `unchanged` (the workspace already has the same, so nothing was sent), `skipped` (English) or `failed`, followed by a summary. Keys the API didn't save (not a section or category slug in the workspace) are named in the locale's result line: fix or remove them, since the locale is otherwise pushed again every time; with `-o json` the result is one JSON object with `items` and `counts`.
 
 ### Options
 

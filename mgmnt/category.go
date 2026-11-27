@@ -2,12 +2,16 @@ package mgmnt
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/suprsend/cli/internal/client"
 	"github.com/suprsend/cli/internal/clierr"
+	resty "resty.dev/v3"
 )
 
 type PreferenceCategoryResponse struct {
@@ -110,7 +114,17 @@ func (c *SS_MgmntClient) ListCategories(workspace, mode string) (*PreferenceCate
 	return result, nil
 }
 
-func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage string) (CommitStatus, error) {
+// staleDraftMarker is in the 409 the category push answers when the draft's
+// hash is no longer expected_hash.
+const staleDraftMarker = "draft has changed"
+
+// PushCategories replaces the workspace's draft category tree, and with
+// commit publishes it in the same transaction. expectedHash, when set, is
+// the hash of the draft the caller compared with: the API then refuses the
+// push (api-conflict) if the draft has changed since. With commit, a tree
+// that already matches live and a failed pre-commit check both leave the
+// draft as it was.
+func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}, commit bool, commitMessage, expectedHash string) (CommitStatus, error) {
 	client := client.NewHTTPClient()
 	defer client.Close()
 	urlStr, err := url.JoinPath(c.mgmnt_base_URL, "v1", workspace, "preference_category", "/")
@@ -124,6 +138,9 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 	q := u.Query()
 	q.Add("commit", strconv.FormatBool(commit))
 	q.Add("commit_message", commitMessage)
+	if expectedHash != "" {
+		q.Add("expected_hash", expectedHash)
+	}
 	u.RawQuery = q.Encode()
 	urlStr = u.String()
 	resp, err := client.R().
@@ -137,11 +154,17 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return NotCommitted, requestError("preference_categories", commit, err)
 	}
 	if resp.IsError() {
-		return NotCommitted, apiError(resp)
+		// With commit, a tree that already matches live answers 409 "no
+		// changes to publish"; a re-run of sync or push must not fail on it.
+		if commit && resp.StatusCode() == http.StatusConflict && isNoChanges(resp.String()) {
+			log.Debugf("preference_categories: no changes to commit")
+			return NoChanges, nil
+		}
+		return NotCommitted, categoryPushError(resp, commit)
 	}
 	if commit {
-		// Like the workflow and schema endpoints, this answers 201 even when
-		// the commit fails; the outcome is in commit_result.
+		// Older versions of the service answer 201 even when the commit
+		// fails, with the outcome in commit_result.
 		result := resp.Result().(*CategoryPushResponse)
 		if result.CommitResult != nil && !result.CommitResult.IsCommitted && !result.ValidationResult.IsValid {
 			return NotCommitted, clierr.New(fmt.Sprintf("preference_categories: saved as draft but not committed: categories are invalid: %v", result.ValidationResult.Errors),
@@ -150,6 +173,28 @@ func (c *SS_MgmntClient) PushCategories(workspace string, categories interface{}
 		return commitError("preference_categories", result.CommitResult, clierr.CodeAPIConflict, nil)
 	}
 	return NotCommitted, nil
+}
+
+// categoryPushError explains an error reply to a category push. Nothing was
+// saved in any of these cases: the push and its commit are one transaction.
+func categoryPushError(resp *resty.Response, commit bool) (err error) {
+	const resource = "preference_categories"
+	msg := extractMessage(resp, resp.Status())
+	switch resp.StatusCode() {
+	case http.StatusConflict:
+		if strings.Contains(strings.ToLower(msg), staleDraftMarker) {
+			return clierr.New(fmt.Sprintf("%s: the draft changed in the workspace while this push was running; nothing was saved", resource), clierr.CodeAPIConflict).
+				WithResource(resource).
+				WithHint("run the command again: it compares with the draft as it is now")
+		}
+	case http.StatusBadRequest:
+		what := "rejected by the API"
+		if commit {
+			what = "not committed, and the draft was left as it was"
+		}
+		return clierr.New(fmt.Sprintf("%s: %s: %s", resource, what, msg), clierr.CodeAPIValidation).WithResource(resource)
+	}
+	return apiError(resp)
 }
 
 func (c *SS_MgmntClient) FinalizeCategories(workspace string, commitMessage string) (CommitStatus, error) {

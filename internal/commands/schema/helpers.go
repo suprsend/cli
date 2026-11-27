@@ -161,8 +161,8 @@ func writeSchemaFiles(slugDir, slug string, obj map[string]any) error {
 		"name":        obj["name"],
 		"description": obj["description"],
 	}
-	// is_enabled belongs to the schema, not a version, and push sends it back
-	// so a disabled schema stays disabled. Only written when the API returns it.
+	// is_enabled belongs to the schema, not a version. Push sends it back; a
+	// file without it leaves the workspace's value alone.
 	if v, ok := obj["is_enabled"].(bool); ok {
 		schemaMeta["is_enabled"] = v
 	}

@@ -8,10 +8,10 @@ import (
 )
 
 // fingerprint covers what a schema push changes: the fields the API reads
-// from the request. A push without is_enabled enables the schema, so a
-// missing is_enabled compares as true. The API adds additionalProperties:
-// false to a schema that has properties and doesn't set it, so that counts
-// as set on both sides.
+// from the request. A new schema is enabled, so a missing is_enabled
+// compares as true (sameAs fills it in for a schema that exists). The API
+// adds additionalProperties: false to a schema that has properties and
+// doesn't set it, so that counts as set on both sides.
 func fingerprint(payload map[string]any) string {
 	jsonSchema := map[string]any{}
 	if js, ok := payload["json_schema"].(map[string]any); ok {
@@ -39,15 +39,15 @@ func fingerprint(payload map[string]any) string {
 }
 
 // sameAs reports whether pushing payload would leave remote as it is. A
-// name or description the payload leaves out keeps the stored value (as
-// with `schema push --json`, which sends only json_schema), so it is taken
-// from remote.
+// name, description or is_enabled the payload leaves out keeps the stored
+// value (as with `schema push --json`, which sends only json_schema), so it
+// is taken from remote.
 func sameAs(payload, remote map[string]any) bool {
 	filled := map[string]any{}
 	for k, v := range payload {
 		filled[k] = v
 	}
-	for _, k := range []string{"name", "description"} {
+	for _, k := range []string{"name", "description", "is_enabled"} {
 		if _, ok := filled[k]; !ok {
 			filled[k] = remote[k]
 		}

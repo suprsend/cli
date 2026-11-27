@@ -45,7 +45,13 @@ func pushCategories(client *mgmnt.SS_MgmntClient, workspace string, categories *
 			return utils.StatusUnchanged, note, nil
 		}
 	}
-	commitStatus, err := client.PushCategories(workspace, categories, commit, commitMessage)
+	// The hash of the draft just compared with: the API refuses the push if
+	// the draft has changed since, as a push replaces the whole tree.
+	expectedHash := ""
+	if exists && remote != nil {
+		expectedHash = remote.Hash
+	}
+	commitStatus, err := client.PushCategories(workspace, categories, commit, commitMessage, expectedHash)
 	if err != nil {
 		return "", "", err
 	}

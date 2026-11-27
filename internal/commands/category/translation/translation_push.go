@@ -40,7 +40,7 @@ var translationPushCmd = &cobra.Command{
   # Dry run: preview what would be pushed without making changes
   suprsend category translation push --dry-run`,
 	Annotations: map[string]string{
-		"skills:tip.a-result": "Each locale is compared with the workspace's and reported on stdout as `created` or `updated` (translations go live immediately), `unchanged` (the workspace already has the same, so nothing was sent), `skipped` (English) or `failed`, followed by a summary; with `-o json` the result is one JSON object with `items` and `counts`.",
+		"skills:tip.a-result": "Each locale is compared with the workspace's and reported on stdout as `created` or `updated` (translations go live immediately), `unchanged` (the workspace already has the same, so nothing was sent), `skipped` (English) or `failed`, followed by a summary. Keys the API didn't save (not a section or category slug in the workspace) are named in the locale's result line: fix or remove them, since the locale is otherwise pushed again every time; with `-o json` the result is one JSON object with `items` and `counts`.",
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workspace, _ := cmd.Flags().GetString("workspace")
@@ -167,7 +167,7 @@ func PushTranslations(report *utils.Report, workspace, locale, dir string, dryRu
 		}
 
 		spinner := utils.NewSpinner(fmt.Sprintf("Pushing %s...", fileName))
-		status, err := PushLocale(mgmntClient, workspace, fileLocale, translation)
+		status, detail, err := PushLocale(mgmntClient, workspace, fileLocale, translation)
 		spinner.Stop("")
 		if err != nil {
 			fail(fileName, "failed to push", err)
@@ -175,7 +175,7 @@ func PushTranslations(report *utils.Report, workspace, locale, dir string, dryRu
 		}
 
 		stats.Success++
-		report.Add(translationResource(fileName), status, "live")
+		report.Add(translationResource(fileName), status, detail)
 	}
 
 	if stats.Failed > 0 {
@@ -196,24 +196,30 @@ func init() {
 }
 
 // PushLocale pushes one locale's translations unless the workspace already
-// has the same, and returns the report status: created, updated or unchanged.
-func PushLocale(client *mgmnt.SS_MgmntClient, workspace, locale string, translation mgmnt.PreferenceTranslationContent) (string, error) {
+// has the same, and returns the report status (created, updated or
+// unchanged) and detail. The detail names any keys the API didn't save.
+func PushLocale(client *mgmnt.SS_MgmntClient, workspace, locale string, translation mgmnt.PreferenceTranslationContent) (string, string, error) {
 	remote, err := client.GetPreferenceTranslationsForLocale(workspace, locale)
 	exists := true
 	switch {
 	case clierr.HasCode(err, clierr.CodeAPINotFound):
 		exists = false
 	case err != nil:
-		return "", err
+		return "", "", err
 	}
 	if exists && remote != nil && state.Fingerprint(*remote) == state.Fingerprint(translation) {
-		return utils.StatusUnchanged, nil
+		return utils.StatusUnchanged, "live", nil
 	}
-	if err := client.PushPreferenceTranslation(workspace, locale, translation); err != nil {
-		return "", err
+	skipped, err := client.PushPreferenceTranslation(workspace, locale, translation)
+	if err != nil {
+		return "", "", err
+	}
+	detail := "live"
+	if note := skipped.Note(); note != "" {
+		detail += "; " + note
 	}
 	if !exists {
-		return utils.StatusCreated, nil
+		return utils.StatusCreated, detail, nil
 	}
-	return utils.StatusUpdated, nil
+	return utils.StatusUpdated, detail, nil
 }

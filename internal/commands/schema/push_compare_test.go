@@ -13,8 +13,12 @@ func TestSchemaFingerprint(t *testing.T) {
 		t.Error("a pulled schema should match: $schema, a null description and fields the API manages don't count, and a missing is_enabled means enabled")
 	}
 	remote["is_enabled"] = false
-	if fingerprint(local) == fingerprint(remote) {
-		t.Error("pushing without is_enabled enables a disabled schema, so it differs")
+	if !sameAs(local, remote) {
+		t.Error("a push without is_enabled keeps the stored value, so a disabled schema still matches")
+	}
+	local["is_enabled"] = true
+	if sameAs(local, remote) {
+		t.Error("is_enabled: true on a disabled schema is a change")
 	}
 	local["is_enabled"] = false
 	local["json_schema"] = map[string]any{"type": "object", "required": []any{"id"}}

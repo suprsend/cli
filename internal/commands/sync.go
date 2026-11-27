@@ -200,7 +200,9 @@ func syncWorkflows(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, from
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local workflows directory")
 	}
 
-	spinner.UpdateMessage(fmt.Sprintf("Pushing workflows to %s ...", toWorkspace))
+	// Each item prints its own result line from here on; the spinner has to
+	// be gone before the first one.
+	spinner.Stop("")
 
 	var errors []string
 	// Items that couldn't be written locally are never pushed; report them too.
@@ -278,7 +280,9 @@ func syncSchemas(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fromWo
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local schemas directory")
 	}
 
-	spinner.UpdateMessage(fmt.Sprintf("Pushing schemas to %s ...", toWorkspace))
+	// Each item prints its own result line from here on; the spinner has to
+	// be gone before the first one.
+	spinner.Stop("")
 
 	var errors []string
 	// Items that couldn't be written locally are never pushed; report them too.
@@ -433,7 +437,9 @@ func syncCategories(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fro
 		return clierr.Wrap(err, clierr.CodeAPIInternal, "error pushing categories")
 	}
 	status, detail := utils.PushStatus(commitStatus)
-	if removedDetail != "" {
+	// "No changes" means the tree already matched live: the service rolls
+	// the whole push back, so nothing was removed.
+	if removedDetail != "" && commitStatus != mgmnt.NoChanges {
 		detail = strings.TrimPrefix(detail+"; "+removedDetail, "; ")
 	}
 	report.Add("preference_categories", status, detail)
@@ -463,6 +469,7 @@ func syncCategoryTranslations(report *utils.Report, mgmntClient *mgmnt.SS_MgmntC
 	var errors []string
 	fail := func(locale, msg string, err error) {
 		errors = append(errors, msg)
+		spinner.Stop("")
 		report.Fail("preference_categories/translations/"+locale+".json", err)
 	}
 
@@ -510,6 +517,7 @@ func syncCategoryTranslations(report *utils.Report, mgmntClient *mgmnt.SS_MgmntC
 		if note := skipped.Note(); note != "" {
 			detail += "; " + note
 		}
+		spinner.Stop("")
 		report.Add("preference_categories/translations/"+locale+".json", utils.StatusPushed, detail)
 	}
 	spinner.Stop("")
@@ -545,7 +553,9 @@ func syncTranslation(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, fr
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local translations directory")
 	}
 
-	spinner.UpdateMessage(fmt.Sprintf("Pushing translations to %s ...", toWorkspace))
+	// Each item prints its own result line from here on; the spinner has to
+	// be gone before the first one.
+	spinner.Stop("")
 
 	var errors []string
 	// Translations that couldn't be written locally are never pushed; report them too.
@@ -648,7 +658,9 @@ func syncTemplates(report *utils.Report, mgmntClient *mgmnt.SS_MgmntClient, from
 		return clierr.Wrap(err, clierr.CodeFileNotFound, "error reading local templates directory")
 	}
 
-	spinner.UpdateMessage(fmt.Sprintf("Pushing templates to %s ...", toWorkspace))
+	// Each item prints its own result line from here on; the spinner has to
+	// be gone before the first one.
+	spinner.Stop("")
 
 	var pushErrors []string
 	for _, entry := range entries {

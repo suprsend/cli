@@ -28,6 +28,9 @@ type fakeTemplateAPI struct {
 	live       map[string]map[string]any // committed variants
 	commits    int
 	fieldSaves int
+	// mock and liveMock are the draft's and the live version's mock data;
+	// nil answers 404, as a template without mock data does.
+	mock, liveMock map[string]any
 }
 
 func (f *fakeTemplateAPI) handler(t *testing.T) http.HandlerFunc {
@@ -66,6 +69,16 @@ func (f *fakeTemplateAPI) handler(t *testing.T) http.HandlerFunc {
 			key := rest[1] + "/" + rest[3]
 			f.pushed = append(f.pushed, key)
 			f.store(key, v)
+		case rest[0] == "mock_data" && r.Method == http.MethodGet:
+			data := f.mock
+			if r.URL.Query().Get("mode") == "live" {
+				data = f.liveMock
+			}
+			if data == nil {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 		case rest[0] == "mock_data" || (len(rest) == 2 && rest[1] == "order"):
 			w.WriteHeader(http.StatusNotFound)
 		default:
@@ -380,5 +393,46 @@ func TestPushTemplateAfterLivePull(t *testing.T) {
 	_, _, err = PushTemplate(client, "staging", "t1", dir, PushOptions{State: st})
 	if !clierr.HasCode(err, clierr.CodeAPIConflict) {
 		t.Fatalf("edit over a pending draft variant: got %v, want a conflict", err)
+	}
+}
+
+// A commit publishes the draft's mock data too. A directory without
+// mock_data.json has never seen it, so a draft that differs from live is not
+// committed unasked.
+func TestPushTemplateCommitUnseenMockData(t *testing.T) {
+	api := &fakeTemplateAPI{
+		fields:   map[string]any{"slug": "t1", "name": "T1", "description": "", "tags": []any{}, "enabled_channels": []any{"sms"}},
+		variants: map[string]map[string]any{},
+	}
+	api.store("sms/default", map[string]any{"id": "default", "channel": "sms", "content": map[string]any{"text": "hi"}})
+	api.live = map[string]map[string]any{"sms/default": api.variants["sms/default"]}
+	srv := httptest.NewServer(api.handler(t))
+	defer srv.Close()
+	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+	dir, st := pullFake(t, client, "t1") // no mock data yet, so no mock_data.json
+
+	// Someone edits the mock data in the dashboard draft.
+	api.mu.Lock()
+	api.mock = map[string]any{"name": "draft"}
+	api.liveMock = map[string]any{"name": "live"}
+	api.mu.Unlock()
+	editVariant(t, dir, "sms/default", "hello")
+
+	_, _, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: true})
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != clierr.CodeAPIConflict || !strings.Contains(ce.Message, "mock data") {
+		t.Fatalf("commit with unseen draft mock data: got %v, want a conflict naming mock data", err)
+	}
+	if api.commits != 0 {
+		t.Fatal("the draft was committed")
+	}
+
+	// Mock data that is already live as it stands doesn't block a commit.
+	api.mu.Lock()
+	api.liveMock = map[string]any{"name": "draft"}
+	api.mu.Unlock()
+	status, _, err := PushTemplate(client, "staging", "t1", dir, PushOptions{State: st, Commit: true})
+	if err != nil || status != utils.StatusCommitted {
+		t.Fatalf("commit with mock data that matches live: %q, %v", status, err)
 	}
 }

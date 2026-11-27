@@ -81,6 +81,33 @@ func sortStrings(m map[string]any, key string) {
 	m[key] = sorted
 }
 
+// localFingerprint fingerprints the local workflow for the comparison with
+// the workspace's draft and with the entry recorded at the last pull or
+// push.
+//
+// A file without is_enabled has the draft's value for the comparison with
+// the draft (withStoredEnabled). That makes its fingerprint depend on the
+// workspace: the recorded one was taken with the value the draft had then,
+// or with none when the push created the workflow. So when the fingerprint
+// doesn't match the record, the file is also fingerprinted with each value
+// is_enabled could have had; a match means the file itself hasn't changed,
+// and the recorded fingerprint is returned.
+func localFingerprint(wf, draft map[string]any, remote string, base state.Entry, hasBase bool) string {
+	local := fingerprint(withStoredEnabled(wf, draft))
+	if _, set := wf["is_enabled"]; set || !hasBase || local == base.Local || local == remote {
+		return local
+	}
+	if fingerprint(wf) == base.Local {
+		return base.Local
+	}
+	for _, enabled := range []bool{true, false} {
+		if fingerprint(withStoredEnabled(wf, map[string]any{"is_enabled": enabled})) == base.Local {
+			return base.Local
+		}
+	}
+	return local
+}
+
 // RecordPulled records a workflow just written by pull. draft is the
 // workspace's draft of it, which is what push compares with; pass nil when
 // wf is the draft, or when the draft couldn't be fetched. A draft that
@@ -167,8 +194,8 @@ func pushOne(client *mgmnt.SS_MgmntClient, workspace, slug string, wf map[string
 	if err != nil {
 		return "", "", err
 	}
-	local := fingerprint(withStoredEnabled(wf, draft))
 	base, hasBase := opts.state.Get(workspace, slug)
+	local := localFingerprint(wf, draft, remote, base, hasBase)
 
 	switch action := state.Decide(local, remote, base, hasBase, opts.overwrite); action {
 	case state.Conflict:
@@ -206,7 +233,7 @@ func pushOne(client *mgmnt.SS_MgmntClient, workspace, slug string, wf map[string
 	default:
 		commitStatus, err := client.PushWorkflow(workspace, slug, wf, opts.commit, opts.commitMessage)
 		if err == nil || mgmnt.DraftSaved(err) {
-			recordPushed(client, opts.state, workspace, slug, local)
+			recordPushed(client, opts.state, workspace, slug, wf)
 		}
 		if err != nil {
 			return "", "", err
@@ -227,17 +254,19 @@ func pushOne(client *mgmnt.SS_MgmntClient, workspace, slug string, wf map[string
 
 // recordPushed records what the workspace holds after a push. When it can't
 // be read back, the entry is dropped, so the next push compares with the
-// workspace alone rather than with a stale record.
-func recordPushed(client *mgmnt.SS_MgmntClient, st *state.File, workspace, slug, local string) {
+// workspace alone rather than with a stale record. The local fingerprint is
+// taken against the draft as it is after the push, so a file without
+// is_enabled is recorded with the value the workflow now has.
+func recordPushed(client *mgmnt.SS_MgmntClient, st *state.File, workspace, slug string, wf map[string]any) {
 	if st == nil {
 		return
 	}
-	remote, err := draftFingerprint(client, workspace, slug)
+	remote, draft, err := draftOf(client, workspace, slug)
 	if err != nil || remote == "" {
 		st.Delete(workspace, slug, false)
 		return
 	}
-	st.Set(workspace, slug, state.Entry{Remote: remote, Local: local})
+	st.Set(workspace, slug, state.Entry{Remote: remote, Local: fingerprint(withStoredEnabled(wf, draft))})
 }
 
 // saveState writes st, warning (not failing the push) when it can't: the

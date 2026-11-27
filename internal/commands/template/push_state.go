@@ -216,14 +216,20 @@ func planParts(client *mgmnt.SS_MgmntClient, workspace, slug string, local templ
 	return p, remote, exists, nil
 }
 
-// unseenDraftVariants lists the variants a commit would publish that the
-// local files don't have: variants in the workspace's draft, missing
-// locally, that are new or differ from the live version. Nobody running
-// this push has seen them.
-func unseenDraftVariants(client *mgmnt.SS_MgmntClient, workspace, slug string, local, remote templateParts) ([]string, error) {
+// unseenDraftParts lists the parts of the workspace's draft that the local
+// files don't have and that aren't live as they stand: variants, and the
+// mock data or variant order of a template whose directory has no
+// mock_data.json or variant_order. A commit publishes the whole draft, so
+// these would go live without anyone here having seen them. Mock data and
+// variant order are only checked for a template that has a live version:
+// before that the API's defaults are all there is.
+func unseenDraftParts(client *mgmnt.SS_MgmntClient, workspace, slug string, local, remote templateParts) ([]string, error) {
 	var missing []string
 	for _, key := range sortedKeys(remote) {
-		if _, ok := local[key]; !ok && strings.HasPrefix(key, variantPrefix) {
+		if _, ok := local[key]; ok {
+			continue
+		}
+		if strings.HasPrefix(key, variantPrefix) || key == partMockData || key == partVariantOrder {
 			missing = append(missing, key)
 		}
 	}
@@ -231,7 +237,8 @@ func unseenDraftVariants(client *mgmnt.SS_MgmntClient, workspace, slug string, l
 		return nil, nil
 	}
 	liveVariants, err := client.GetTemplateVariants(workspace, slug, "live")
-	if err != nil && !isNotFound(err) { // not found: nothing is live yet
+	hasLive := !isNotFound(err) // not found: nothing is live yet
+	if err != nil && hasLive {
 		return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live variants of template %s", slug))
 	}
 	live := map[string]string{}
@@ -240,8 +247,39 @@ func unseenDraftVariants(client *mgmnt.SS_MgmntClient, workspace, slug string, l
 	}
 	var unseen []string
 	for _, key := range missing {
-		if fp, ok := live[key]; !ok || fp != partFingerprint(key, remote[key]) {
-			unseen = append(unseen, key)
+		switch key {
+		case partMockData:
+			if !hasLive {
+				continue
+			}
+			mockData, err := client.GetTemplateMockData(workspace, slug, "live")
+			if err != nil {
+				return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live mock data of template %s", slug))
+			}
+			if mockData == nil { // the live version has none to compare with
+				continue
+			}
+			if partFingerprint(key, mockData) != partFingerprint(key, remote[key]) {
+				unseen = append(unseen, key)
+			}
+		case partVariantOrder:
+			if !hasLive {
+				continue
+			}
+			order, err := client.GetVariantOrder(workspace, slug, "live")
+			if isNotFound(err) || (err == nil && order == nil) {
+				continue
+			}
+			if err != nil {
+				return nil, clierr.Wrap(err, clierr.CodeAPIInternal, fmt.Sprintf("couldn't fetch the live variant order of template %s", slug))
+			}
+			if partFingerprint(key, flattenVariantOrder(order)) != partFingerprint(key, remote[key]) {
+				unseen = append(unseen, key)
+			}
+		default:
+			if fp, ok := live[key]; !ok || fp != partFingerprint(key, remote[key]) {
+				unseen = append(unseen, key)
+			}
 		}
 	}
 	return unseen, nil

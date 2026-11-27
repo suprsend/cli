@@ -127,11 +127,11 @@ func PushTemplate(mgmntClient *mgmnt.SS_MgmntClient, workspace, slug, templateDi
 	// --overwrite they are committed and named in the result.
 	var unseen []string
 	if opts.Commit && !opts.PushAll {
-		if unseen, err = unseenDraftVariants(mgmntClient, workspace, slug, local, remote); err != nil {
+		if unseen, err = unseenDraftParts(mgmntClient, workspace, slug, local, remote); err != nil {
 			return "", "", err
 		}
 		if len(unseen) > 0 && !opts.Overwrite {
-			return "", "", clierr.New(fmt.Sprintf("%s: not committed: the workspace's draft has variants that aren't in your files and aren't live yet (or differ from live): %s", resource, describeParts(unseen)), clierr.CodeAPIConflict).
+			return "", "", clierr.New(fmt.Sprintf("%s: not committed: the workspace's draft has changes that aren't in your files and aren't live yet (or differ from live), in: %s", resource, describeParts(unseen)), clierr.CodeAPIConflict).
 				WithResource(resource).
 				WithHint("committing would publish them too: pull the template with --mode draft to review them, or pass --overwrite to commit them as they are")
 		}

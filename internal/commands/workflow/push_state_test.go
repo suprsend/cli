@@ -320,3 +320,51 @@ func TestPushWithoutIsEnabledKeepsStoredValue(t *testing.T) {
 		t.Fatalf("is_enabled true: got %q, %v, stored %v; want updated and enabled", status, err, api.drafts["welcome"]["is_enabled"])
 	}
 }
+
+// A file without is_enabled is fingerprinted with the workspace's value, so
+// its fingerprint moves when that value does. An untouched file must still
+// read as unchanged locally: after the push that created the workflow, and
+// after the workflow is disabled in the workspace.
+func TestFileWithoutIsEnabledIsNotALocalChange(t *testing.T) {
+	api := &fakeAPI{drafts: map[string]map[string]any{}}
+	srv := httptest.NewServer(api.handler(t))
+	defer srv.Close()
+	client := mgmnt.NewClientWithUrls("token", srv.URL+"/", srv.URL+"/", false)
+	st, err := state.Load(t.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := pushOptions{state: st}
+	wf := map[string]any{"slug": "fresh", "name": "Fresh"}
+	push := func(step, want string) {
+		t.Helper()
+		status, _, err := pushOne(client, "staging", "fresh", wf, opts)
+		if err != nil || status != want {
+			t.Fatalf("%s: got %q, %v; want %q", step, status, err, want)
+		}
+	}
+
+	push("first push", utils.StatusCreated)
+	push("push again", utils.StatusUnchanged)
+
+	// A dashboard edit: the untouched file is skipped, not a conflict.
+	api.edit("fresh", "description", "dashboard edit")
+	push("after a dashboard edit", utils.StatusSkipped)
+
+	// The API stores the workflow differently from the file, and it is then
+	// disabled in the workspace. Still nothing changed locally.
+	api.edit("fresh", "description", nil)
+	api.edit("fresh", "stored_differently", true)
+	st.Delete("staging", "fresh", false)
+	wf["name"] = "Fresh!"
+	push("edited file, no record", utils.StatusUpdated)
+	api.edit("fresh", "stored_differently", true)
+	api.edit("fresh", "is_enabled", false)
+	push("after a disable in the workspace", utils.StatusSkipped)
+
+	// A real local edit on top of that is a conflict.
+	wf["name"] = "Fresh!!"
+	if _, _, err := pushOne(client, "staging", "fresh", wf, opts); !clierr.HasCode(err, clierr.CodeAPIConflict) {
+		t.Fatalf("local edit after a workspace change: err = %v, want api-conflict", err)
+	}
+}

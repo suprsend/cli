@@ -58,7 +58,9 @@ func pushCategories(client *mgmnt.SS_MgmntClient, workspace string, categories *
 	}
 	if commit {
 		s, d := utils.PushStatus(commitStatus)
-		if note := removedNote(remote, categories); note != "" && exists {
+		// "No changes" means the tree already matched live: the service
+		// rolls the whole push back, so nothing was removed from the draft.
+		if note := removedNote(remote, categories); note != "" && exists && commitStatus != mgmnt.NoChanges {
 			d = strings.TrimPrefix(d+"; "+note, "; ")
 		}
 		return s, d, nil
